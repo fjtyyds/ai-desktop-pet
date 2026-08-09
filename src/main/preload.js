@@ -6,7 +6,10 @@ const CHANNELS = {
   settingsGet: 'settings:get',
   settingsSet: 'settings:set',
   windowHide: 'window:hide',
-  historyGet: 'history:get'
+  historyGet: 'history:get',
+  memoryList: 'memory:list',
+  memoryDelete: 'memory:delete',
+  memoryUpdate: 'memory:update'
 };
 
 contextBridge.exposeInMainWorld('petAPI', {
@@ -24,5 +27,10 @@ contextBridge.exposeInMainWorld('petAPI', {
   },
   history: {
     get: () => ipcRenderer.invoke(CHANNELS.historyGet)
+  },
+  memory: {
+    list: () => ipcRenderer.invoke(CHANNELS.memoryList),
+    delete: (id) => ipcRenderer.invoke(CHANNELS.memoryDelete, id),
+    update: (id, patch) => ipcRenderer.invoke(CHANNELS.memoryUpdate, id, patch)
   }
 });

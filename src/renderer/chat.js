@@ -4,6 +4,8 @@
  * - 输入框与发送（通过 window.petAPI.chat.send，接口未实现时优雅降级）
  * - 设置页（petAPI.settings.get/set 初始化与保存宠物名 + 人格 + API Key + 模型 + 语言，
  *   ADR-013/ADR-015/ADR-018；localStorage 仅作 petAPI 缺失时的降级）
+ * - 设置页“记忆”子页（petAPI.memory.list/delete/update，T-17，ADR-022）：
+ *   列表展示、删除、内联修正，空态与错误提示
  * - 文案经 src/shared/locales 获取，默认跟随系统，设置页可选并持久化
  */
 (function () {
@@ -16,6 +18,7 @@
   let elements = {};
   let currentLocale = 'zh-CN';
   let currentPetName = 'AI 桌宠';
+  let memoryItems = [];
 
   async function init() {
     cacheElements();
@@ -30,6 +33,8 @@
     elements = {
       chatView: document.getElementById('chat-view'),
       settingsView: document.getElementById('settings-view'),
+      settingsHome: document.getElementById('settings-home'),
+      memoryPage: document.getElementById('memory-page'),
       messageList: document.getElementById('message-list'),
       serviceStatus: document.getElementById('service-status'),
       chatForm: document.getElementById('chat-form'),
@@ -38,6 +43,11 @@
       settingsBtn: document.getElementById('settings-btn'),
       closeBtn: document.getElementById('close-btn'),
       settingsBack: document.getElementById('settings-back'),
+      memoryManageBtn: document.getElementById('memory-manage-btn'),
+      memoryBack: document.getElementById('memory-back'),
+      memoryStatus: document.getElementById('memory-status'),
+      memoryEmpty: document.getElementById('memory-empty'),
+      memoryList: document.getElementById('memory-list'),
       headerTitle: document.getElementById('header-title'),
       apiKey: document.getElementById('api-key'),
       model: document.getElementById('model'),
@@ -56,6 +66,8 @@
     elements.settingsBtn.addEventListener('click', showSettingsView);
     elements.closeBtn.addEventListener('click', hideToTray);
     elements.settingsBack.addEventListener('click', showChatView);
+    elements.memoryManageBtn.addEventListener('click', openMemoryView);
+    elements.memoryBack.addEventListener('click', closeMemoryView);
     elements.settingsSave.addEventListener('click', saveSettings);
   }
 
@@ -187,13 +199,247 @@
   function showSettingsView() {
     elements.chatView.hidden = true;
     elements.settingsView.hidden = false;
+    elements.settingsHome.hidden = false;
+    elements.memoryPage.hidden = true;
     elements.settingsBack.focus();
   }
 
   function showChatView() {
     elements.settingsView.hidden = true;
+    elements.memoryPage.hidden = true;
+    elements.settingsHome.hidden = false;
     elements.chatView.hidden = false;
     elements.chatInput.focus();
+  }
+
+  /* 记忆管理子页（T-17） */
+  function isMemoryReady() {
+    return Boolean(
+      window.petAPI &&
+      window.petAPI.memory &&
+      typeof window.petAPI.memory.list === 'function' &&
+      typeof window.petAPI.memory.delete === 'function' &&
+      typeof window.petAPI.memory.update === 'function'
+    );
+  }
+
+  async function openMemoryView() {
+    elements.settingsHome.hidden = true;
+    elements.memoryPage.hidden = false;
+    elements.memoryBack.focus();
+    await loadMemories();
+  }
+
+  function closeMemoryView() {
+    elements.memoryPage.hidden = true;
+    elements.settingsHome.hidden = false;
+    elements.settingsBack.focus();
+  }
+
+  async function loadMemories() {
+    const t = window.PetLocales.createTranslator(currentLocale);
+    showMemoryStatus('', 'ok', true);
+    elements.memoryList.textContent = '';
+    if (!isMemoryReady()) {
+      elements.memoryEmpty.hidden = false;
+      elements.memoryEmpty.textContent = t('settings.memoryUnavailable');
+      return;
+    }
+    try {
+      const items = await window.petAPI.memory.list();
+      memoryItems = Array.isArray(items) ? items : [];
+      renderMemoryList();
+    } catch (error) {
+      console.warn('加载记忆失败：', error);
+      elements.memoryEmpty.hidden = true;
+      showMemoryStatus(
+        t('settings.memoryListError', { error: formatErrorMessage(error) }),
+        'error'
+      );
+    }
+  }
+
+  function renderMemoryList() {
+    const t = window.PetLocales.createTranslator(currentLocale);
+    elements.memoryList.textContent = '';
+    elements.memoryEmpty.hidden = memoryItems.length > 0;
+    if (memoryItems.length === 0) {
+      return;
+    }
+
+    for (const item of memoryItems) {
+      const card = document.createElement('div');
+      card.className = 'memory-card';
+      card.dataset.id = item.id;
+
+      const content = document.createElement('div');
+      content.className = 'memory-content';
+      content.textContent = item.content || '';
+
+      const textarea = document.createElement('textarea');
+      textarea.className = 'field-input field-textarea memory-edit-input';
+      textarea.maxLength = 500;
+      textarea.hidden = true;
+
+      const meta = document.createElement('div');
+      meta.className = 'memory-meta';
+      meta.textContent = item.updatedAt
+        ? t('settings.memoryUpdatedAt', { time: formatMemoryTime(item.updatedAt) })
+        : '';
+
+      const actions = document.createElement('div');
+      actions.className = 'memory-actions';
+
+      const editBtn = document.createElement('button');
+      editBtn.type = 'button';
+      editBtn.className = 'memory-btn';
+      editBtn.textContent = t('settings.memoryEdit');
+      editBtn.addEventListener('click', () =>
+        startEditMemory(card, content, textarea, actions, item, editBtn, deleteBtn)
+      );
+
+      const deleteBtn = document.createElement('button');
+      deleteBtn.type = 'button';
+      deleteBtn.className = 'memory-btn memory-btn-danger';
+      deleteBtn.textContent = t('settings.memoryDelete');
+      deleteBtn.addEventListener('click', () => deleteMemoryItem(item.id));
+
+      actions.append(editBtn, deleteBtn);
+      card.append(content, textarea, meta, actions);
+      elements.memoryList.appendChild(card);
+    }
+  }
+
+  function startEditMemory(card, contentEl, textareaEl, actionsEl, item, editBtn, deleteBtn) {
+    const t = window.PetLocales.createTranslator(currentLocale);
+    contentEl.hidden = true;
+    textareaEl.value = item.content || '';
+    textareaEl.hidden = false;
+    textareaEl.focus();
+
+    const saveBtn = document.createElement('button');
+    saveBtn.type = 'button';
+    saveBtn.className = 'memory-btn memory-btn-primary';
+    saveBtn.textContent = t('settings.memorySave');
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.type = 'button';
+    cancelBtn.className = 'memory-btn';
+    cancelBtn.textContent = t('settings.memoryCancel');
+
+    function restore() {
+      contentEl.hidden = false;
+      textareaEl.hidden = true;
+      actionsEl.replaceChildren(editBtn, deleteBtn);
+    }
+
+    cancelBtn.addEventListener('click', restore);
+    saveBtn.addEventListener('click', () => {
+      void saveMemoryEdit(card, item.id, textareaEl.value, restore);
+    });
+    actionsEl.replaceChildren(saveBtn, cancelBtn);
+  }
+
+  async function saveMemoryEdit(card, id, rawValue, restore) {
+    const t = window.PetLocales.createTranslator(currentLocale);
+    const content = rawValue.trim();
+    if (!content) {
+      showMemoryStatus(t('settings.memoryEmptyContent'), 'error');
+      return;
+    }
+    try {
+      const result = await window.petAPI.memory.update(id, { content });
+      if (result && result.ok && result.item) {
+        const index = memoryItems.findIndex((item) => item.id === id);
+        if (index >= 0) {
+          memoryItems[index] = result.item;
+        }
+        restore();
+        showMemoryStatus(t('settings.memoryUpdateSuccess'), 'ok');
+        renderMemoryList();
+      } else {
+        restore();
+        showMemoryStatus(
+          t('settings.memoryUpdateError', {
+            error: memoryErrorMessage(result && result.error, t)
+          }),
+          'error'
+        );
+      }
+    } catch (error) {
+      restore();
+      showMemoryStatus(
+        t('settings.memoryUpdateError', { error: formatErrorMessage(error) }),
+        'error'
+      );
+    }
+  }
+
+  async function deleteMemoryItem(id) {
+    const t = window.PetLocales.createTranslator(currentLocale);
+    try {
+      const result = await window.petAPI.memory.delete(id);
+      if (result && result.ok) {
+        memoryItems = memoryItems.filter((item) => item.id !== id);
+        showMemoryStatus(t('settings.memoryDeleteSuccess'), 'ok');
+        renderMemoryList();
+      } else {
+        showMemoryStatus(
+          t('settings.memoryDeleteError', {
+            error: memoryErrorMessage(result && result.error, t)
+          }),
+          'error'
+        );
+      }
+    } catch (error) {
+      showMemoryStatus(
+        t('settings.memoryDeleteError', { error: formatErrorMessage(error) }),
+        'error'
+      );
+    }
+  }
+
+  function memoryErrorMessage(error, t) {
+    if (error === 'memory-not-found') {
+      return t('settings.memoryNotFound');
+    }
+    if (error === 'memory-empty-content') {
+      return t('settings.memoryEmptyContent');
+    }
+    if (error === 'memory-invalid-id') {
+      return t('settings.memoryInvalidId');
+    }
+    return typeof error === 'string' && error ? error : String(error || '');
+  }
+
+  function formatErrorMessage(error) {
+    return error && error.message ? error.message : String(error);
+  }
+
+  function formatMemoryTime(value) {
+    const timestamp = Number(value);
+    if (!Number.isFinite(timestamp) || timestamp <= 0) {
+      return '';
+    }
+    const locale = currentLocale === 'zh-CN' ? 'zh-CN' : 'en-US';
+    try {
+      return new Date(timestamp).toLocaleString(locale);
+    } catch (_error) {
+      return new Date(timestamp).toLocaleString();
+    }
+  }
+
+  function showMemoryStatus(text, type, hide) {
+    elements.memoryStatus.textContent = text;
+    elements.memoryStatus.dataset.type = type || 'ok';
+    elements.memoryStatus.hidden = Boolean(hide);
+    clearTimeout(showMemoryStatus._timer);
+    if (hide) {
+      return;
+    }
+    showMemoryStatus._timer = setTimeout(() => {
+      elements.memoryStatus.hidden = true;
+    }, 4000);
   }
 
   /**
@@ -317,6 +563,9 @@
       typeof persona.backstory === 'string' ? persona.backstory : '';
 
     applyStaticText();
+    if (elements.memoryPage && !elements.memoryPage.hidden) {
+      renderMemoryList();
+    }
   }
 
   /** 保存设置：优先 petAPI.settings.set；petAPI 缺失时降级 localStorage */

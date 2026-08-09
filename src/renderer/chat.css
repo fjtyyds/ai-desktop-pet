@@ -176,6 +176,17 @@
   display: none;
 }
 
+.settings-page {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-page[hidden] {
+  display: none;
+}
+
 .settings-header {
   display: flex;
   align-items: center;
@@ -280,6 +291,25 @@
   cursor: default;
 }
 
+.secondary-btn {
+  padding: 8px 0;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 10px;
+  background: transparent;
+  color: #e8eaf6;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.secondary-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.secondary-btn:focus-visible {
+  outline: 2px solid #8ab4ff;
+  outline-offset: 2px;
+}
+
 .settings-status {
   font-size: 12px;
   line-height: 1.5;
@@ -301,4 +331,94 @@
   font-size: 11px;
   opacity: 0.7;
   line-height: 1.6;
+}
+
+/* 记忆管理子页（T-17） */
+.memory-hint {
+  font-size: 11px;
+  opacity: 0.7;
+  line-height: 1.6;
+}
+
+.memory-empty {
+  font-size: 12px;
+  opacity: 0.75;
+  text-align: center;
+  padding: 18px 0;
+  line-height: 1.6;
+}
+
+.memory-empty[hidden] {
+  display: none;
+}
+
+.memory-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.memory-card {
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.memory-content {
+  font-size: 13px;
+  line-height: 1.5;
+  word-break: break-word;
+  white-space: pre-wrap;
+  user-select: text;
+}
+
+.memory-meta {
+  margin-top: 6px;
+  font-size: 11px;
+  opacity: 0.6;
+}
+
+.memory-actions {
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
+}
+
+.memory-btn {
+  padding: 5px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  background: transparent;
+  color: #e8eaf6;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.memory-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.memory-btn:focus-visible {
+  outline: 2px solid #8ab4ff;
+  outline-offset: 1px;
+}
+
+.memory-btn-primary {
+  background: #4160de;
+  border-color: #4160de;
+  color: #fff;
+}
+
+.memory-btn-primary:hover {
+  background: #4a66ea;
+}
+
+.memory-btn-danger {
+  color: #ef9a9a;
+  border-color: rgba(244, 67, 54, 0.45);
+}
+
+.memory-btn-danger:hover {
+  background: rgba(244, 67, 54, 0.15);
 }
