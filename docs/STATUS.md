@@ -1,10 +1,10 @@
 # 项目状态
 
 - 更新时间：2026-08-09
-- 当前阶段：M3.5 内容增强（规划完成，待批次 1 启动）
-- 当前任务：M3 已整体目检通过；M3.5 规划（ADR-020~023、SPEC 更新、任务卡 T-14~T-23）
-- 最近完成：M0~M3 全部验收通过（含安装包安装/卸载冒烟）；M3.5 规划
-- 下一步：批次 1（T-14 流式回复与打字机体验）开发
+- 当前阶段：M3.5 内容增强（T-14~T-18 已合并，待整体目检）
+- 当前任务：T-14~T-18 五个任务集成完成；剩余 T-19/T-20/T-21~T-23 未启动
+- 最近完成：M0~M3 全部验收通过；M3.5 规划；T-14~T-18 开发与集成（流式/空闲/情绪/记忆/导出清除）
+- 下一步：`npm run dev` 人工目检 T-14~T-18；随后启动 T-19/T-20 与批次 5
 - 阻塞：无
 - 交接提示：新会话先读 `AGENTS.md` → `PLAN.md` → 自己的任务卡（docs/tasks/T-xx.md）
 
@@ -98,3 +98,13 @@
 - ADR-023：扩展能力验证门禁（语音/图片/天气/番茄钟）。
 - SPEC：语音输入/输出、任务提醒/日程从非目标转为 M3.5 增强范围；移动端/皮肤市场/云账号仍为非目标。
 - 任务卡：T-14~T-23；批次 1~5 见 PLAN.md；worktree 在对应批次启动时创建。
+
+## M3.5 集成记录（2026-08-09，T-14~T-18）
+
+- T-14 流式：provider.chatStream（SSE/onDelta/AbortSignal/超时）、mock 分段、chat.sendStream、IPC chat:send-stream/chat:delta/chat:stream-cancel、打字机与“正在思考…”；分支 7b7cc4c。
+- T-15 空闲互动：idle.js（3 分钟触发/90 秒节流/防打扰）、idleEnabled 开关持久化、双语言话术池；分支 dfc011b。
+- T-16 情绪可视化：mood.get 通道与渲染层表情/配色（含共享情绪单例包装，避免显示与实际 mood 不一致）；分支 9b438cb。
+- T-17 记忆管理页：memory:list/delete/update + 设置页“记忆”子页（memory-store 增加 updateMemory，属边界扩展已记录）；分支 457594b。
+- T-18 导出与清除：history:export（showSaveDialog，Markdown/JSON）、history:clear（确认框 + 分范围清空）；分支 37c003a。
+- 集成：共享文件冲突全部解决；`npm run check`、`npm run smoke` 通过；合并后集成验证通过（API 齐全、mock 流式 23 段、mood/memory/export 正常、无 CSP 错误）。
+- 待办：整体目检；仓库根目录未跟踪的“多线程开发/”（约 5GB）与 scripts/orchestrator/ 删除与否待用户决定。
