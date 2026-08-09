@@ -26,6 +26,19 @@ const PERSONA_LIMITS = {
 const API_KEY_MAX_LENGTH = 256;
 const MODEL_MAX_LENGTH = 100;
 
+/** personaTemplate id 清洗上限（T-20） */
+const PERSONA_TEMPLATE_ID_MAX_LENGTH = 40;
+
+/**
+ * 预设人格模板 id（T-20）。
+ * 与渲染层 chat.js 内联双语模板表（PERSONA_TEMPLATES）的键一一对应；
+ * 此处冻结 id 清单供主进程校验/默认值使用。
+ */
+const PERSONA_TEMPLATE_IDS = ['warm', 'sage', 'playful', 'gentle', 'cool', 'curious'];
+
+/** 默认人格模板 id（与 DEFAULT_PERSONA 内容一致，T-20） */
+const DEFAULT_PERSONA_TEMPLATE_ID = 'warm';
+
 /** 支持的语言设置：'system' = 跟随系统；'zh-CN' / 'en' 为显式选择（ADR-018，T-12） */
 const SUPPORTED_LANGUAGES = ['system', 'zh-CN', 'en'];
 
@@ -38,6 +51,8 @@ const DEFAULT_SETTINGS = {
   dockEnabled: true, // T-19：贴边隐藏开关，默认开启
   shortcutEnabled: true, // T-19：全局快捷键呼出开关，默认开启
   windowBounds: null, // T-19：上次窗口位置 { x, y }；null 表示未保存
+  onboardingDone: false, // T-20：首次启动三步引导是否已完成
+  personaTemplate: '', // T-20：最近应用的预设人格模板 id；'' 表示自定义/未应用
   persona: { ...DEFAULT_PERSONA }
 };
 
@@ -195,6 +210,15 @@ function createStore(baseDir) {
       merged.shortcutEnabled,
       DEFAULT_SETTINGS.shortcutEnabled
     );
+    merged.onboardingDone = sanitizeBoolean(
+      merged.onboardingDone,
+      DEFAULT_SETTINGS.onboardingDone
+    );
+    merged.personaTemplate = sanitizeText(
+      merged.personaTemplate,
+      DEFAULT_SETTINGS.personaTemplate,
+      PERSONA_TEMPLATE_ID_MAX_LENGTH
+    );
     merged.windowBounds = sanitizeWindowBounds(
       merged.windowBounds,
       DEFAULT_SETTINGS.windowBounds
@@ -212,7 +236,9 @@ function createStore(baseDir) {
       'idleEnabled',
       'dockEnabled',
       'shortcutEnabled',
-      'windowBounds'
+      'windowBounds',
+      'onboardingDone',
+      'personaTemplate'
     ];
     const next = { ...current };
     for (const key of allowed) {
@@ -253,6 +279,21 @@ function createStore(baseDir) {
           );
           continue;
         }
+        if (key === 'onboardingDone') {
+          next.onboardingDone = sanitizeBoolean(
+            patch.onboardingDone,
+            current.onboardingDone
+          );
+          continue;
+        }
+        if (key === 'personaTemplate') {
+          next.personaTemplate = sanitizeText(
+            patch.personaTemplate,
+            current.personaTemplate,
+            PERSONA_TEMPLATE_ID_MAX_LENGTH
+          );
+          continue;
+        }
         next[key] = typeof patch[key] === 'string' ? patch[key].trim() : String(patch[key]);
       }
     }
@@ -275,4 +316,9 @@ function createStore(baseDir) {
   return { readSettings, writeSettings, readMessages, appendMessages };
 }
 
-module.exports = { createStore, DEFAULT_SETTINGS };
+module.exports = {
+  createStore,
+  DEFAULT_SETTINGS,
+  PERSONA_TEMPLATE_IDS,
+  DEFAULT_PERSONA_TEMPLATE_ID
+};

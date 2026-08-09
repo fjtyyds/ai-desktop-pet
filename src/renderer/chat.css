@@ -574,3 +574,192 @@
 .memory-btn-danger:hover {
   background: rgba(244, 67, 54, 0.15);
 }
+
+/* T-20：首次启动引导与预设人格模板 */
+.pet-card {
+  position: relative;
+}
+
+.onboarding-view {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  padding: 16px 14px 14px;
+  border-radius: 18px;
+  background: linear-gradient(160deg, #2b2f45, #171a2b);
+  overflow: hidden;
+}
+
+.onboarding-view[hidden] {
+  display: none;
+}
+
+.onboarding-header {
+  text-align: center;
+}
+
+.onboarding-title {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.onboarding-subtitle {
+  margin-top: 4px;
+  font-size: 12px;
+  opacity: 0.75;
+  line-height: 1.5;
+}
+
+.onboarding-progress {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin: 14px 0 12px;
+  padding: 0;
+  list-style: none;
+}
+
+.onboarding-progress-item {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(232, 234, 246, 0.55);
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.onboarding-progress-item.active {
+  background: rgba(65, 96, 222, 0.28);
+  color: #c5d0ff;
+}
+
+.onboarding-progress-item.current {
+  background: #4160de;
+  color: #fff;
+}
+
+.onboarding-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.onboarding-step {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.onboarding-step[hidden] {
+  display: none;
+}
+
+.onboarding-step-hint {
+  font-size: 12px;
+  opacity: 0.8;
+  line-height: 1.6;
+}
+
+.onboarding-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.onboarding-actions .primary-btn,
+.onboarding-actions .secondary-btn {
+  flex: 1;
+  max-width: 140px;
+}
+
+.template-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 220px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 2px;
+}
+
+.template-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #e8eaf6;
+  font-size: 12px;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.template-card:hover {
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.template-card:focus-visible {
+  outline: 2px solid #8ab4ff;
+  outline-offset: 1px;
+}
+
+.template-card.selected {
+  border-color: #4160de;
+  background: rgba(65, 96, 222, 0.22);
+  box-shadow: inset 0 0 0 1px #4160de;
+}
+
+.template-name {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.template-desc {
+  font-size: 11px;
+  opacity: 0.78;
+  line-height: 1.5;
+}
+
+.template-traits {
+  font-size: 11px;
+  opacity: 0.6;
+}
+
+.template-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.template-preview[hidden] {
+  display: none;
+}
+
+.template-preview-title {
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+.template-preview-line {
+  font-size: 12px;
+  line-height: 1.5;
+  word-break: break-word;
+  white-space: pre-wrap;
+}

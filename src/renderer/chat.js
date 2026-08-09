@@ -12,6 +12,10 @@
  * - T-15 空闲主动互动：窗口内交互心跳上报主进程；主进程触发后随机展示互动气泡
  * - T-19 窗口体验：设置页注入“贴边隐藏/全局快捷键”开关与提示（ADR-022 冻结契约
  *   petAPI.window.toggleDock / setShortcutEnabled；提示文案为本地双语映射，不依赖 locale 文件）
+ * - T-20 首次引导与人格模板：首次启动三步引导（语言 / API Key 与模型 / 人格模板），
+ *   完成标志 onboardingDone 持久化；内置 6 套预设人格模板（双语内联，与 store.js
+ *   PERSONA_TEMPLATE_IDS 对齐），设置页与引导中均可一键切换，切换即时保存到
+ *   settings.persona 并持久化
  */
 (function () {
   'use strict';
@@ -58,6 +62,185 @@
       unavailable: 'System voice unavailable'
     }
   };
+  /**
+   * T-20：首次引导与人格模板文案（双语内联，原因同 WINDOW_FEATURE_HINTS：
+   * locale JSON 不在本次任务边界内，与协调者核对的边界一致）。
+   */
+  const ONBOARDING_TEXTS = {
+    'zh-CN': {
+      title: '欢迎使用 AI 桌宠',
+      subtitle: '三步完成首次设置，随时可改。',
+      progressAria: '引导步骤',
+      step1: '语言',
+      step2: 'API Key 与模型',
+      step3: '人格模板',
+      languageHint: '界面语言会即时切换，也可以在设置中随时修改。',
+      modelHint: '不填写 API Key 时将以演示模式运行，随时可在设置中补充。',
+      templateHint: '选择一位你喜欢的桌宠人格，之后可在设置中随时切换或微调。',
+      templatePreview: '人格预览',
+      templateEmpty: '暂无可用的人格模板。',
+      back: '上一步',
+      next: '下一步',
+      finish: '开始使用',
+      applied: '设置完成，欢迎回来！',
+      applyError: '保存引导设置失败：{error}',
+      personaTemplates: '人格模板',
+      personaTemplatesHint: '一键套用预设人格，之后仍可在下方手动微调。',
+      personaTemplateApplied: '已应用人格模板「{name}」',
+      personaTemplateApplyError: '应用人格模板失败：{error}'
+    },
+    en: {
+      title: 'Welcome to AI Pet',
+      subtitle:
+        'Complete three quick steps to get started — you can change these anytime.',
+      progressAria: 'Onboarding steps',
+      step1: 'Language',
+      step2: 'API key & model',
+      step3: 'Personality template',
+      languageHint:
+        'The UI language switches instantly and can be changed in settings anytime.',
+      modelHint:
+        'Without an API key the app runs in demo mode; you can add one later in settings.',
+      templateHint:
+        'Pick a personality for your pet. You can switch or fine-tune it in settings later.',
+      templatePreview: 'Personality preview',
+      templateEmpty: 'No personality templates are available.',
+      back: 'Back',
+      next: 'Next',
+      finish: 'Get started',
+      applied: 'Setup complete. Welcome back!',
+      applyError: 'Failed to save onboarding: {error}',
+      personaTemplates: 'Personality templates',
+      personaTemplatesHint:
+        'Apply a preset personality in one click; you can still fine-tune it below.',
+      personaTemplateApplied: 'Applied personality template “{name}”',
+      personaTemplateApplyError: 'Failed to apply template: {error}'
+    }
+  };
+  /**
+   * T-20：6 套预设人格模板（双语内联；id 与 store.js PERSONA_TEMPLATE_IDS 对齐，
+   * 内容与现有 Persona 字段 traits/tone/backstory 一致，ADR-011）。
+   */
+  const PERSONA_TEMPLATES = {
+    'zh-CN': {
+      warm: {
+        name: '温暖陪伴',
+        description: '热情友善的贴心伙伴，适合日常陪伴与闲聊。',
+        persona: {
+          traits: ['热情', '友善', '好奇'],
+          tone: '温暖活泼',
+          backstory: '我是你的 AI 桌宠，喜欢陪你聊天、记住你在意的小事，给你带来好心情。'
+        }
+      },
+      sage: {
+        name: '博学智囊',
+        description: '沉稳博学的知识伙伴，擅长把复杂问题讲明白。',
+        persona: {
+          traits: ['睿智', '沉稳', '条理清晰'],
+          tone: '温和专业',
+          backstory: '我是一只饱览群书的桌宠，擅长把复杂的问题讲得简单明白，陪你一起学习和思考。'
+        }
+      },
+      playful: {
+        name: '元气玩伴',
+        description: '活泼幽默的气氛担当，把无聊日常变得有趣。',
+        persona: {
+          traits: ['活泼', '幽默', '爱玩'],
+          tone: '俏皮欢快',
+          backstory: '我是你的元气玩伴，最喜欢陪你打气、讲笑话，把无聊的日常变得有趣起来。'
+        }
+      },
+      gentle: {
+        name: '温柔治愈',
+        description: '耐心体贴的倾听者，适合疲惫时聊聊天。',
+        persona: {
+          traits: ['温柔', '耐心', '善解人意'],
+          tone: '轻柔舒缓',
+          backstory: '我是温柔治愈型桌宠，会认真倾听你的心事，给你安心和鼓励，陪你慢慢放松下来。'
+        }
+      },
+      cool: {
+        name: '高冷猫系',
+        description: '话不多但观察力一流的猫系伙伴，嘴硬心软。',
+        persona: {
+          traits: ['高冷', '敏锐', '嘴硬心软'],
+          tone: '简洁利落',
+          backstory: '我是一只高冷但护短的猫系桌宠，话不多，观察力一流，关键时刻永远站在你这边。'
+        }
+      },
+      curious: {
+        name: '好奇宝宝',
+        description: '对世界充满好奇，拉着你一起探索新事物。',
+        persona: {
+          traits: ['好奇', '爱问', '元气'],
+          tone: '天真雀跃',
+          backstory: '我对世界充满好奇，总想拉着你一起探索新事物，问东问西却常常发现有趣的东西！'
+        }
+      }
+    },
+    en: {
+      warm: {
+        name: 'Warm Companion',
+        description: 'A warm and friendly buddy for everyday chats.',
+        persona: {
+          traits: ['Warm', 'Friendly', 'Curious'],
+          tone: 'Warm and lively',
+          backstory:
+            "I'm your AI pet who loves chatting with you, remembering the little things that matter, and brightening your day."
+        }
+      },
+      sage: {
+        name: 'Wise Mentor',
+        description: 'A calm, well-read partner who makes complex ideas simple.',
+        persona: {
+          traits: ['Wise', 'Calm', 'Clear-minded'],
+          tone: 'Warm and professional',
+          backstory:
+            "I'm a well-read pet who loves turning complex ideas into simple explanations and learning together with you."
+        }
+      },
+      playful: {
+        name: 'Playful Buddy',
+        description: 'An energetic joker who makes ordinary days more fun.',
+        persona: {
+          traits: ['Energetic', 'Humorous', 'Playful'],
+          tone: 'Cheerful and lively',
+          backstory:
+            "I'm your energetic buddy who cheers you on, tells jokes, and makes ordinary days more fun."
+        }
+      },
+      gentle: {
+        name: 'Gentle Healer',
+        description: 'A patient listener who soothes you when you are tired.',
+        persona: {
+          traits: ['Gentle', 'Patient', 'Empathetic'],
+          tone: 'Soft and soothing',
+          backstory:
+            "I'm a gentle, healing pet who listens carefully, encourages you, and helps you unwind at your own pace."
+        }
+      },
+      cool: {
+        name: 'Cool Cat',
+        description: 'A sharp-eyed cat companion who says little but always has your back.',
+        persona: {
+          traits: ['Aloof', 'Sharp', 'Soft-hearted'],
+          tone: 'Terse and witty',
+          backstory:
+            "I'm a cool cat who does not talk much, notices everything, and always has your back when it counts."
+        }
+      },
+      curious: {
+        name: 'Curious Explorer',
+        description: 'Endlessly curious, eager to explore new things with you.',
+        persona: {
+          traits: ['Curious', 'Inquisitive', 'Bubbly'],
+          tone: 'Eager and bright',
+          backstory:
+            'I am endlessly curious and love exploring new things with you, asking questions and finding fun surprises along the way.'
+        }
+      }
+    }
+  };
   /** 情绪带：valence 从高到低匹配；face 为角色表情，className 对应配色主题 */
   const MOOD_BANDS = [
     { min: 85, className: 'mood-excited', face: '🤩' },
@@ -77,6 +260,9 @@
   let memoryItems = [];
   let currentSettings = {};
   let windowFeatureEls = {};
+  // T-20：首次引导当前步骤与选中的预设人格模板 id
+  let onboardingStep = 1;
+  let selectedOnboardingTemplateId = '';
   // T-23：系统 TTS（Web Speech Synthesis）状态
   let ttsVoices = [];
   let ttsReady = false;
@@ -136,7 +322,40 @@
       exportStatus: document.getElementById('export-status'),
       clearScope: document.getElementById('clear-scope'),
       clearDataBtn: document.getElementById('clear-data'),
-      clearStatus: document.getElementById('clear-status')
+      clearStatus: document.getElementById('clear-status'),
+      personaTemplateLabel: document.getElementById('persona-template-label'),
+      personaTemplateHint: document.getElementById('persona-template-hint'),
+      personaTemplateList: document.getElementById('persona-template-list'),
+      onboardingView: document.getElementById('onboarding-view'),
+      onboardingTitle: document.getElementById('onboarding-title'),
+      onboardingSubtitle: document.getElementById('onboarding-subtitle'),
+      onboardingProgress: document.getElementById('onboarding-progress'),
+      onboardingProgress1: document.getElementById('onboarding-progress-1'),
+      onboardingProgress2: document.getElementById('onboarding-progress-2'),
+      onboardingProgress3: document.getElementById('onboarding-progress-3'),
+      onboardingStep1: document.getElementById('onboarding-step-1'),
+      onboardingStep2: document.getElementById('onboarding-step-2'),
+      onboardingStep3: document.getElementById('onboarding-step-3'),
+      onboardingLanguage: document.getElementById('onboarding-language'),
+      onboardingApiKey: document.getElementById('onboarding-api-key'),
+      onboardingModel: document.getElementById('onboarding-model'),
+      onboardingLanguageHint: document.getElementById('onboarding-language-hint'),
+      onboardingModelHint: document.getElementById('onboarding-model-hint'),
+      onboardingStep3Hint: document.getElementById('onboarding-step3-hint'),
+      onboardingTemplateList: document.getElementById('onboarding-template-list'),
+      onboardingTemplatePreview: document.getElementById(
+        'onboarding-template-preview'
+      ),
+      onboardingPreviewTitle: document.getElementById('onboarding-preview-title'),
+      onboardingPreviewTraits: document.getElementById('onboarding-preview-traits'),
+      onboardingPreviewTone: document.getElementById('onboarding-preview-tone'),
+      onboardingPreviewBackstory: document.getElementById(
+        'onboarding-preview-backstory'
+      ),
+      onboardingBack: document.getElementById('onboarding-back'),
+      onboardingNext: document.getElementById('onboarding-next'),
+      onboardingFinish: document.getElementById('onboarding-finish'),
+      onboardingStatus: document.getElementById('onboarding-status')
     };
     showExportStatus = makeStatusShower(elements.exportStatus);
     showClearStatus = makeStatusShower(elements.clearStatus);
@@ -318,6 +537,17 @@
     elements.exportMdBtn.addEventListener('click', () => void exportConversation('markdown'));
     elements.exportJsonBtn.addEventListener('click', () => void exportConversation('json'));
     elements.clearDataBtn.addEventListener('click', handleClearData);
+    elements.onboardingLanguage.addEventListener(
+      'change',
+      handleOnboardingLanguageChange
+    );
+    elements.onboardingBack.addEventListener('click', () =>
+      showOnboardingStep(onboardingStep - 1)
+    );
+    elements.onboardingNext.addEventListener('click', () =>
+      showOnboardingStep(onboardingStep + 1)
+    );
+    elements.onboardingFinish.addEventListener('click', () => void finishOnboarding());
   }
 
   /**
@@ -1159,6 +1389,7 @@
     elements.headerTitle.textContent = currentPetName;
     renderServiceStatus();
     applyMeta();
+    applyOnboardingText(); // T-20：引导与人格模板静态文案（内联双语）
   }
 
   /** 底部 meta（平台/版本）；renderer.js 先行写入中文，这里按当前语言覆盖 */
@@ -1210,10 +1441,12 @@
     elements.personaTone.value = typeof persona.tone === 'string' ? persona.tone : '';
     elements.personaBackstory.value =
       typeof persona.backstory === 'string' ? persona.backstory : '';
+    renderPersonaTemplates(); // T-20：刷新设置页模板选中态
 
     applyStaticText();
     applyWindowFeatureSettings(currentSettings); // T-19
     updateWindowFeatureText(); // T-19: 语言切换后刷新提示文案
+    syncOnboardingVisibility(); // T-20：首次启动引导（完成标志持久化）
     stopSpeaking(); // T-23: 语言切换后停止当前朗读，并刷新按钮文案
     updateAllSpeakButtons();
     if (elements.memoryPage && !elements.memoryPage.hidden) {
@@ -1241,6 +1474,8 @@
       tone: elements.personaTone.value.trim(),
       backstory: elements.personaBackstory.value.trim()
     };
+    // T-20：人格与某套预设模板一致时保留模板 id，手动微调后标记为自定义
+    const personaTemplate = currentTemplateId({ persona }) || '';
 
     const settingsApi =
       window.petAPI &&
@@ -1253,7 +1488,8 @@
         model,
         persona,
         language,
-        idleEnabled: elements.idleEnabled.checked
+        idleEnabled: elements.idleEnabled.checked,
+        personaTemplate
       });
       showSettingsStatus(t('settings.savedLocalFallback'), 'ok');
       return;
@@ -1267,7 +1503,8 @@
         model,
         persona,
         language,
-        idleEnabled: elements.idleEnabled.checked
+        idleEnabled: elements.idleEnabled.checked,
+        personaTemplate
       });
       // 回填清洗后的规范值，保证表单与持久化一致
       applySettings(saved || { petName, persona, language });
@@ -1317,6 +1554,434 @@
         element.hidden = true;
       }, 5000);
     };
+  }
+
+  /* ---------------- T-20：预设人格模板（设置页一键切换 + 首次引导） ---------------- */
+
+  /** 当前语言下的预设人格模板表：{ id: { name, description, persona } }（双语内联） */
+  function getPersonaTemplates() {
+    return PERSONA_TEMPLATES[currentLocale] || PERSONA_TEMPLATES['zh-CN'];
+  }
+
+  /** 内联双语文案查询（含 {param} 插值），与 locale 文件无关 */
+  function onboardingText(key, params) {
+    const table = ONBOARDING_TEXTS[currentLocale] || ONBOARDING_TEXTS['zh-CN'];
+    let text = table[key];
+    if (typeof text !== 'string') {
+      return key;
+    }
+    if (!params || typeof params !== 'object') {
+      return text;
+    }
+    return text.replace(/\{(\w+)\}/g, (match, name) =>
+      params[name] != null ? String(params[name]) : match
+    );
+  }
+
+  /** T-20：引导与人格模板静态文案（不依赖 locale 文件，语言切换时随 applyStaticText 刷新） */
+  function applyOnboardingText() {
+    if (!elements.onboardingView) {
+      return;
+    }
+    const text = (key, params) => onboardingText(key, params);
+    elements.onboardingTitle.textContent = text('title');
+    elements.onboardingSubtitle.textContent = text('subtitle');
+    elements.onboardingProgress.setAttribute('aria-label', text('progressAria'));
+    elements.onboardingProgress1.textContent = text('step1');
+    elements.onboardingProgress2.textContent = text('step2');
+    elements.onboardingProgress3.textContent = text('step3');
+    elements.onboardingLanguageHint.textContent = text('languageHint');
+    elements.onboardingModelHint.textContent = text('modelHint');
+    elements.onboardingStep3Hint.textContent = text('templateHint');
+    elements.onboardingPreviewTitle.textContent = text('templatePreview');
+    elements.onboardingBack.textContent = text('back');
+    elements.onboardingNext.textContent = text('next');
+    elements.onboardingFinish.textContent = text('finish');
+    elements.personaTemplateLabel.textContent = text('personaTemplates');
+    elements.personaTemplateHint.textContent = text('personaTemplatesHint');
+    elements.personaTemplateList.setAttribute(
+      'aria-label',
+      text('personaTemplates')
+    );
+    elements.onboardingTemplateList.setAttribute(
+      'aria-label',
+      text('personaTemplates')
+    );
+  }
+
+  function getTemplateById(id) {
+    if (typeof id !== 'string' || !id) {
+      return null;
+    }
+    return getPersonaTemplates()[id] || null;
+  }
+
+  /** 返回模板数组（6 套：warm/sage/playful/gentle/cool/curious） */
+  function templateList() {
+    const templates = getPersonaTemplates();
+    return Object.keys(templates).map((id) => ({ id, ...templates[id] }));
+  }
+
+  function firstTemplateId() {
+    const list = templateList();
+    return list.length > 0 ? list[0].id : '';
+  }
+
+  /** persona 与模板内容是否一致（字段与顺序均需相同，T-20） */
+  function personaMatchesTemplate(persona, template) {
+    if (!persona || !template || !template.persona) {
+      return false;
+    }
+    const expected = template.persona;
+    const traitsMatch =
+      Array.isArray(persona.traits) &&
+      Array.isArray(expected.traits) &&
+      persona.traits.length === expected.traits.length &&
+      persona.traits.every((item, index) => item === expected.traits[index]);
+    return (
+      traitsMatch &&
+      persona.tone === expected.tone &&
+      persona.backstory === expected.backstory
+    );
+  }
+
+  /** 计算当前生效的模板 id：优先 settings.personaTemplate，其次按内容匹配 */
+  function currentTemplateId(settings) {
+    const savedId = settings && settings.personaTemplate;
+    if (savedId && getTemplateById(savedId)) {
+      return savedId;
+    }
+    const persona = settings && settings.persona;
+    for (const item of templateList()) {
+      if (personaMatchesTemplate(persona, item)) {
+        return item.id;
+      }
+    }
+    return '';
+  }
+
+  /** 通用模板卡片渲染：供设置页与引导第 3 步复用 */
+  function renderTemplateCards(container, options) {
+    const items = templateList();
+    const selectedId = options && options.selectedId ? options.selectedId : '';
+    const onSelect =
+      options && typeof options.onSelect === 'function'
+        ? options.onSelect
+        : () => {};
+    container.textContent = '';
+    if (items.length === 0) {
+      const empty = document.createElement('p');
+      empty.className = 'memory-empty';
+      empty.textContent = onboardingText('templateEmpty');
+      container.appendChild(empty);
+      return;
+    }
+    for (const item of items) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'template-card';
+      button.dataset.templateId = item.id;
+      button.setAttribute('role', 'option');
+      button.setAttribute('aria-selected', item.id === selectedId ? 'true' : 'false');
+      if (item.id === selectedId) {
+        button.classList.add('selected');
+      }
+
+      const name = document.createElement('span');
+      name.className = 'template-name';
+      name.textContent = item.name || item.id;
+
+      const desc = document.createElement('span');
+      desc.className = 'template-desc';
+      desc.textContent = item.description || '';
+
+      const traits = document.createElement('span');
+      traits.className = 'template-traits';
+      const persona = item.persona || {};
+      traits.textContent = Array.isArray(persona.traits)
+        ? persona.traits.join(' · ')
+        : '';
+
+      button.append(name, desc, traits);
+      button.addEventListener('click', () => onSelect(item.id));
+      container.appendChild(button);
+    }
+  }
+
+  /** 设置页人格模板区：点击卡片立即保存并生效 */
+  function renderPersonaTemplates() {
+    if (!elements.personaTemplateList) {
+      return;
+    }
+    renderTemplateCards(elements.personaTemplateList, {
+      selectedId: currentTemplateId(currentSettings),
+      onSelect: (id) => void applyPersonaTemplate(id)
+    });
+  }
+
+  /** 一键应用模板：persona + personaTemplate 立即写入设置并持久化 */
+  async function applyPersonaTemplate(id) {
+    pokeActivity();
+    await window.PetLocales.ready;
+    const template = getTemplateById(id);
+    if (!template || !template.persona) {
+      renderPersonaTemplates();
+      return;
+    }
+    const persona = {
+      traits: Array.isArray(template.persona.traits)
+        ? template.persona.traits.slice()
+        : [],
+      tone:
+        typeof template.persona.tone === 'string' ? template.persona.tone : '',
+      backstory:
+        typeof template.persona.backstory === 'string'
+          ? template.persona.backstory
+          : ''
+    };
+    const settingsApi =
+      window.petAPI &&
+      window.petAPI.settings &&
+      typeof window.petAPI.settings.set === 'function';
+    if (!settingsApi) {
+      const next = { ...currentSettings, persona, personaTemplate: id };
+      saveLocalFallback(next);
+      applySettings(next);
+      showSettingsStatus(
+        onboardingText('personaTemplateApplied', { name: template.name || id }),
+        'ok'
+      );
+      return;
+    }
+    try {
+      const saved = await window.petAPI.settings.set({
+        persona,
+        personaTemplate: id
+      });
+      applySettings(saved || { ...currentSettings, persona, personaTemplate: id });
+      showSettingsStatus(
+        onboardingText('personaTemplateApplied', { name: template.name || id }),
+        'ok'
+      );
+    } catch (error) {
+      console.warn('应用人格模板失败：', error);
+      showSettingsStatus(
+        onboardingText('personaTemplateApplyError', {
+          error: formatErrorMessage(error)
+        }),
+        'error'
+      );
+      renderPersonaTemplates();
+    }
+  }
+
+  /** 根据 onboardingDone 显示/隐藏首次引导覆盖层（applySettings 时统一调用） */
+  function syncOnboardingVisibility() {
+    if (!elements.onboardingView) {
+      return;
+    }
+    if (currentSettings && currentSettings.onboardingDone === true) {
+      hideOnboarding();
+    } else {
+      showOnboarding();
+    }
+  }
+
+  function showOnboarding() {
+    if (!elements.onboardingView || !elements.onboardingView.hidden) {
+      return;
+    }
+    if (!selectedOnboardingTemplateId) {
+      selectedOnboardingTemplateId =
+        currentTemplateId(currentSettings) || firstTemplateId();
+    }
+    elements.onboardingLanguage.value =
+      typeof currentSettings.language === 'string'
+        ? currentSettings.language
+        : DEFAULT_LANGUAGE;
+    elements.onboardingApiKey.value =
+      typeof currentSettings.apiKey === 'string' ? currentSettings.apiKey : '';
+    elements.onboardingModel.value =
+      typeof currentSettings.model === 'string' && currentSettings.model.trim()
+        ? currentSettings.model.trim()
+        : DEFAULT_MODEL;
+    elements.onboardingView.hidden = false;
+    elements.onboardingView.setAttribute('aria-label', onboardingText('title'));
+    renderOnboardingTemplates();
+    showOnboardingStep(1);
+  }
+
+  function hideOnboarding() {
+    if (!elements.onboardingView) {
+      return;
+    }
+    elements.onboardingView.hidden = true;
+    clearOnboardingStatus();
+  }
+
+  /** 切换引导步骤（1/2/3），同步进度条与底部按钮 */
+  function showOnboardingStep(n) {
+    onboardingStep = Math.min(3, Math.max(1, Number(n) || 1));
+    elements.onboardingStep1.hidden = onboardingStep !== 1;
+    elements.onboardingStep2.hidden = onboardingStep !== 2;
+    elements.onboardingStep3.hidden = onboardingStep !== 3;
+    for (let i = 1; i <= 3; i += 1) {
+      const item = elements[`onboardingProgress${i}`];
+      if (!item) {
+        continue;
+      }
+      item.classList.toggle('active', i <= onboardingStep);
+      item.classList.toggle('current', i === onboardingStep);
+      if (i === onboardingStep) {
+        item.setAttribute('aria-current', 'step');
+      } else {
+        item.removeAttribute('aria-current');
+      }
+    }
+    elements.onboardingBack.hidden = onboardingStep === 1;
+    elements.onboardingNext.hidden = onboardingStep === 3;
+    elements.onboardingFinish.hidden = onboardingStep !== 3;
+    if (onboardingStep === 3) {
+      renderOnboardingTemplates();
+    }
+    if (onboardingStep === 1) {
+      elements.onboardingLanguage.focus();
+    } else if (onboardingStep === 2) {
+      elements.onboardingApiKey.focus();
+    } else {
+      elements.onboardingFinish.focus();
+    }
+  }
+
+  /** 引导第 1 步：语言即时切换（完成时随设置一起保存） */
+  function handleOnboardingLanguageChange() {
+    const language = elements.onboardingLanguage.value || DEFAULT_LANGUAGE;
+    currentLocale = resolveEffectiveLocale(language);
+    applyStaticText();
+    renderOnboardingTemplates();
+  }
+
+  function renderOnboardingTemplates() {
+    if (!elements.onboardingTemplateList) {
+      return;
+    }
+    renderTemplateCards(elements.onboardingTemplateList, {
+      selectedId: selectedOnboardingTemplateId,
+      onSelect: selectOnboardingTemplate
+    });
+    updateOnboardingTemplatePreview();
+  }
+
+  function selectOnboardingTemplate(id) {
+    selectedOnboardingTemplateId = id;
+    renderOnboardingTemplates();
+  }
+
+  function updateOnboardingTemplatePreview() {
+    const template = getTemplateById(selectedOnboardingTemplateId);
+    if (!template || !template.persona) {
+      elements.onboardingTemplatePreview.hidden = true;
+      return;
+    }
+    const t = window.PetLocales.createTranslator(currentLocale);
+    elements.onboardingTemplatePreview.hidden = false;
+    elements.onboardingPreviewTraits.textContent = `${t('settings.traits')}：${
+      Array.isArray(template.persona.traits)
+        ? template.persona.traits.join(t('settings.traitsDelimiter'))
+        : ''
+    }`;
+    elements.onboardingPreviewTone.textContent = `${t('settings.tone')}：${
+      typeof template.persona.tone === 'string' ? template.persona.tone : ''
+    }`;
+    elements.onboardingPreviewBackstory.textContent = `${t(
+      'settings.backstory'
+    )}：${typeof template.persona.backstory === 'string' ? template.persona.backstory : ''}`;
+  }
+
+  /** 完成引导：语言/密钥/模型/模板 + onboardingDone 一次性持久化 */
+  async function finishOnboarding() {
+    pokeActivity();
+    await window.PetLocales.ready;
+    const t = window.PetLocales.createTranslator(currentLocale);
+    const language = elements.onboardingLanguage.value || DEFAULT_LANGUAGE;
+    const apiKey = elements.onboardingApiKey.value.trim();
+    const model = elements.onboardingModel.value.trim() || DEFAULT_MODEL;
+    elements.onboardingModel.value = model;
+    const template = getTemplateById(selectedOnboardingTemplateId);
+    const persona = template && template.persona
+      ? {
+          traits: Array.isArray(template.persona.traits)
+            ? template.persona.traits.slice()
+            : [],
+          tone:
+            typeof template.persona.tone === 'string'
+              ? template.persona.tone
+              : '',
+          backstory:
+            typeof template.persona.backstory === 'string'
+              ? template.persona.backstory
+              : ''
+        }
+      : {};
+    const petName =
+      typeof currentSettings.petName === 'string' &&
+      currentSettings.petName.trim()
+        ? currentSettings.petName.trim()
+        : t('app.defaultPetName');
+    const patch = {
+      language,
+      apiKey,
+      model,
+      petName,
+      persona,
+      personaTemplate: selectedOnboardingTemplateId || '',
+      onboardingDone: true
+    };
+    const settingsApi =
+      window.petAPI &&
+      window.petAPI.settings &&
+      typeof window.petAPI.settings.set === 'function';
+    if (!settingsApi) {
+      saveLocalFallback({ ...currentSettings, ...patch });
+      applySettings({ ...currentSettings, ...patch });
+      hideOnboarding();
+      showOnboardingStatus(onboardingText('applied'), 'ok');
+      elements.chatInput.focus();
+      return;
+    }
+    elements.onboardingFinish.disabled = true;
+    try {
+      const saved = await window.petAPI.settings.set(patch);
+      applySettings(saved || patch);
+      hideOnboarding();
+      showOnboardingStatus(onboardingText('applied'), 'ok');
+      elements.chatInput.focus();
+    } catch (error) {
+      console.warn('保存引导设置失败：', error);
+      showOnboardingStatus(
+        onboardingText('applyError', {
+          error: error && error.message ? error.message : String(error)
+        }),
+        'error'
+      );
+    } finally {
+      elements.onboardingFinish.disabled = false;
+    }
+  }
+
+  function showOnboardingStatus(text, type) {
+    elements.onboardingStatus.textContent = text;
+    elements.onboardingStatus.dataset.type = type || 'ok';
+    elements.onboardingStatus.hidden = false;
+    clearTimeout(showOnboardingStatus._timer);
+    showOnboardingStatus._timer = setTimeout(() => {
+      elements.onboardingStatus.hidden = true;
+    }, 4000);
+  }
+
+  function clearOnboardingStatus() {
+    clearTimeout(showOnboardingStatus._timer);
+    elements.onboardingStatus.hidden = true;
   }
 
   /**
