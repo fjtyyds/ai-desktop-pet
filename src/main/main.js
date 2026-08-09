@@ -1,94 +1,98 @@
+'use strict';
+
 const { app, BrowserWindow } = require('electron');
 const path = require('path');
 const { createTray } = require('./tray');
 
 let mainWindow = null;
+let trayApi = null;
+let isQuitting = false;
 
-// 单实例锁：桌宠只允许一个实例；重复启动时唤起已有窗口
-const gotTheLock = app.requestSingleInstanceLock();
+function createMainWindow() {
+  if (mainWindow) return mainWindow;
 
-if (!gotTheLock) {
+  const win = new BrowserWindow({
+    width: 320,
+    height: 420,
+    frame: false,
+    transparent: true,
+    alwaysOnTop: true,
+    resizable: false,
+    hasShadow: false,
+    backgroundColor: '#00000000',
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true
+    }
+  });
+
+  win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
+
+  // 关闭窗口时隐藏到托盘，而不是退出应用
+  win.on('close', (event) => {
+    if (!isQuitting) {
+      event.preventDefault();
+      win.hide();
+      trayApi?.refreshMenu();
+    }
+  });
+
+  win.on('closed', () => {
+    mainWindow = null;
+  });
+
+  mainWindow = win;
+  return win;
+}
+
+function showMainWindow() {
+  if (!mainWindow) createMainWindow();
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+  trayApi?.refreshMenu();
+}
+
+function toggleMainWindow() {
+  if (mainWindow && mainWindow.isVisible()) {
+    mainWindow.hide();
+  } else {
+    showMainWindow();
+  }
+  trayApi?.refreshMenu();
+}
+
+function quitApp() {
+  isQuitting = true;
+  app.quit();
+}
+
+// 单实例锁：再次启动时聚焦已有实例，而不是开第二个进程
+if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
   app.on('second-instance', () => {
-    if (app.isReady()) {
-      showMainWindow();
-    }
+    if (app.isReady()) showMainWindow();
   });
 
-  function createMainWindow() {
-    mainWindow = new BrowserWindow({
-      width: 320,
-      height: 420,
-      frame: false,
-      transparent: true,
-      alwaysOnTop: true,
-      resizable: false,
-      hasShadow: false,
-      backgroundColor: '#00000000',
-      webPreferences: {
-        preload: path.join(__dirname, 'preload.js'),
-        contextIsolation: true,
-        nodeIntegration: false,
-        sandbox: true
-      }
-    });
-
-    mainWindow.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
-
-    // 关闭窗口 = 隐藏到托盘；仅真正的退出流程才销毁窗口
-    mainWindow.on('close', (event) => {
-      if (!app.isQuitting) {
-        event.preventDefault();
-        mainWindow.hide();
-      }
-    });
-
-    mainWindow.on('closed', () => {
-      mainWindow = null;
-    });
-
-    return mainWindow;
-  }
-
-  function showMainWindow() {
-    if (!mainWindow) {
-      createMainWindow();
-    }
-    mainWindow.show();
-    mainWindow.focus();
-  }
-
-  function toggleMainWindow() {
-    if (mainWindow && mainWindow.isVisible()) {
-      mainWindow.hide();
-    } else {
-      showMainWindow();
-    }
-  }
-
   app.whenReady().then(() => {
-    app.isQuitting = false;
     createMainWindow();
-    createTray({
-      onToggle: toggleMainWindow,
-      onQuit: () => app.quit()
+    trayApi = createTray({
+      getMainWindow: () => mainWindow,
+      showMainWindow,
+      toggleMainWindow,
+      quitApp
     });
 
-    // macOS 惯例：点击 Dock 图标时若无窗口则重新创建
-    app.on('activate', () => {
-      showMainWindow();
-    });
+    // macOS 点击 Dock 图标时恢复窗口；Windows 下通常不会触发
+    app.on('activate', showMainWindow);
   });
 
   app.on('before-quit', () => {
-    app.isQuitting = true;
+    isQuitting = true;
   });
 
-  app.on('window-all-closed', () => {
-    // 桌宠驻留托盘：所有窗口关闭时不退出，由托盘菜单“退出”结束进程
-    if (process.platform === 'darwin') {
-      return;
-    }
-  });
+  // 应用常驻托盘：窗口全部关闭时不退出，由托盘菜单“退出”结束进程
 }
