@@ -1,4 +1,5 @@
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 
 const root = path.join(__dirname, '..');
@@ -71,6 +72,97 @@ if (!rendererChatSource.includes('history.get')) {
   fail('renderer/chat.js 缺少 petAPI.history.get 历史恢复集成');
 }
 pass('renderer 历史恢复集成存在');
+
+if (
+  !rendererChatSource.includes('settings.get') ||
+  !rendererChatSource.includes('settings.set')
+) {
+  fail('renderer/chat.js 缺少 petAPI.settings.get/set 设置页集成');
+}
+pass('renderer 设置页 petAPI.settings 集成存在');
+
+// T-08：store persona 默认值、读写与清洗（非法值丢弃/超长截断，不破坏 settings.json）
+const { createStore, DEFAULT_SETTINGS } = require(path.join(
+  root,
+  'src',
+  'storage',
+  'store.js'
+));
+const defaultPersona = DEFAULT_SETTINGS.persona;
+if (
+  !defaultPersona ||
+  typeof defaultPersona !== 'object' ||
+  Array.isArray(defaultPersona) ||
+  !Array.isArray(defaultPersona.traits) ||
+  typeof defaultPersona.tone !== 'string' ||
+  typeof defaultPersona.backstory !== 'string'
+) {
+  fail('DEFAULT_SETTINGS.persona 缺失或形状非法');
+}
+pass('DEFAULT_SETTINGS.persona 形状合法');
+
+const checkDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-pet-check-'));
+try {
+  const store = createStore(checkDir);
+  const written = store.writeSettings({
+    petName: '测试宠',
+    persona: {
+      traits: ['友好', 123, '', '超长标签'.repeat(20), '冷静'],
+      tone: 42,
+      backstory: '背景'.repeat(400)
+    }
+  });
+  if (
+    !Array.isArray(written.persona.traits) ||
+    written.persona.traits.includes(123) ||
+    written.persona.traits.includes('')
+  ) {
+    fail('persona.traits 清洗失败（非字符串/空串未丢弃）');
+  }
+  if (written.persona.traits.some((item) => item.length > 20)) {
+    fail('persona.traits 未按 20 字截断');
+  }
+  if (written.persona.tone !== defaultPersona.tone) {
+    fail('persona.tone 非法值未丢弃（应保留默认值）');
+  }
+  if (written.persona.backstory.length !== 500) {
+    fail(`persona.backstory 未按 500 字截断（实际 ${written.persona.backstory.length}）`);
+  }
+  const reread = store.readSettings();
+  if (
+    reread.persona.traits.length !== written.persona.traits.length ||
+    reread.persona.tone !== written.persona.tone ||
+    reread.persona.backstory !== written.persona.backstory
+  ) {
+    fail('persona 持久化后读取不一致');
+  }
+
+  const afterInvalid = store.writeSettings({ persona: 'bad' });
+  if (!afterInvalid.persona || !Array.isArray(afterInvalid.persona.traits)) {
+    fail('非法 persona 未被丢弃（settings.json 被破坏）');
+  }
+  if (afterInvalid.persona.traits.length !== written.persona.traits.length) {
+    fail('非法 persona 覆盖了已有合法值');
+  }
+
+  const afterPartial = store.writeSettings({
+    persona: { traits: 'bad', tone: ' 冷峻 ', backstory: '' }
+  });
+  if (afterPartial.persona.traits.length !== written.persona.traits.length) {
+    fail('persona.traits 非数组未丢弃');
+  }
+  if (afterPartial.persona.tone !== '冷峻' || afterPartial.persona.backstory !== '') {
+    fail('persona.tone/backstory 合法字符串未保存（空 backstory 应允许）');
+  }
+
+  const raw = JSON.parse(fs.readFileSync(path.join(checkDir, 'settings.json'), 'utf8'));
+  if (!raw || typeof raw.persona !== 'object' || !Array.isArray(raw.persona.traits)) {
+    fail('settings.json 写入内容损坏');
+  }
+  pass('store persona 读写与清洗通过');
+} finally {
+  fs.rmSync(checkDir, { recursive: true, force: true });
+}
 
 (async () => {
   try {

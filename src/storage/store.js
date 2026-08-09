@@ -4,10 +4,29 @@ const fs = require('fs');
 const path = require('path');
 const { DEFAULT_MODEL } = require('../shared/contracts');
 
+/**
+ * 默认人格（与 src/llm/persona.js 的 DEFAULT_PERSONA 保持一致，ADR-011）。
+ * 渲染层读取设置时以此预填人格表单；persona.js 对缺失字段仍有默认回退。
+ */
+const DEFAULT_PERSONA = {
+  traits: ['热情', '友善', '好奇'],
+  tone: '温暖活泼',
+  backstory: '我是你的 AI 桌宠，喜欢陪你聊天、记住你在意的小事，给你带来好心情。'
+};
+
+/** persona 清洗上限（非法值丢弃、超长截断） */
+const PERSONA_LIMITS = {
+  maxTraits: 10,
+  maxTraitLength: 20,
+  maxToneLength: 50,
+  maxBackstoryLength: 500
+};
+
 const DEFAULT_SETTINGS = {
   apiKey: '',
   model: DEFAULT_MODEL,
-  petName: 'AI 桌宠'
+  petName: 'AI 桌宠',
+  persona: { ...DEFAULT_PERSONA }
 };
 
 function ensureDir(dir) {
@@ -29,6 +48,58 @@ function writeJsonFile(file, data) {
 }
 
 /**
+ * 清洗 persona 字段（ADR-011/ADR-013）：
+ * - traits 必须是字符串数组；非字符串项/空串丢弃，每项截断到 20 字、最多 10 项；
+ *   空数组允许（表示回退默认人格）
+ * - tone/backstory 必须是字符串；非字符串丢弃（保留现值），字符串去首尾空白并截断
+ * - persona 整体非对象（含 null/数组）时丢弃，返回当前值
+ */
+function sanitizePersona(patchPersona, currentPersona) {
+  const base =
+    currentPersona && typeof currentPersona === 'object' && !Array.isArray(currentPersona)
+      ? currentPersona
+      : {};
+  if (
+    patchPersona === null ||
+    typeof patchPersona !== 'object' ||
+    Array.isArray(patchPersona)
+  ) {
+    return base;
+  }
+
+  const next = { ...base };
+  if (patchPersona.traits !== undefined) {
+    if (Array.isArray(patchPersona.traits)) {
+      next.traits = patchPersona.traits
+        .filter((item) => typeof item === 'string')
+        .map((item) => item.trim())
+        .filter((item) => item.length > 0)
+        .map((item) => item.slice(0, PERSONA_LIMITS.maxTraitLength))
+        .slice(0, PERSONA_LIMITS.maxTraits);
+    }
+    // traits 非数组：非法值丢弃，保留现值
+  }
+
+  if (patchPersona.tone !== undefined) {
+    if (typeof patchPersona.tone === 'string') {
+      next.tone = patchPersona.tone.trim().slice(0, PERSONA_LIMITS.maxToneLength);
+    }
+    // tone 非字符串：非法值丢弃，保留现值
+  }
+
+  if (patchPersona.backstory !== undefined) {
+    if (typeof patchPersona.backstory === 'string') {
+      next.backstory = patchPersona.backstory
+        .trim()
+        .slice(0, PERSONA_LIMITS.maxBackstoryLength);
+    }
+    // backstory 非字符串：非法值丢弃，保留现值
+  }
+
+  return next;
+}
+
+/**
  * JSON 文件本地存储：settings.json（设置）、messages.json（消息历史）。
  * 注意：MVP 阶段 API Key 以明文保存在本地设置文件中。
  */
@@ -38,7 +109,9 @@ function createStore(baseDir) {
 
   function readSettings() {
     const saved = readJsonFile(settingsFile, {});
-    return { ...DEFAULT_SETTINGS, ...saved };
+    const merged = { ...DEFAULT_SETTINGS, ...saved };
+    merged.persona = sanitizePersona(merged.persona, DEFAULT_SETTINGS.persona);
+    return merged;
   }
 
   function writeSettings(patch) {
@@ -50,6 +123,7 @@ function createStore(baseDir) {
         next[key] = typeof patch[key] === 'string' ? patch[key].trim() : String(patch[key]);
       }
     }
+    next.persona = sanitizePersona(patch.persona, current.persona);
     writeJsonFile(settingsFile, next);
     return next;
   }

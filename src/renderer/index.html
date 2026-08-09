@@ -46,8 +46,41 @@
             <span class="field-label">宠物名称</span>
             <input id="pet-name" class="field-input" type="text" maxlength="20" placeholder="AI 桌宠" />
           </label>
-          <button id="pet-name-save" class="primary-btn" type="button">保存</button>
-          <p class="settings-note">设置页骨架：当前仅本地保存，更多设置将在后续版本开放。</p>
+          <label class="field">
+            <span class="field-label">性格标签（逗号分隔，最多 10 个）</span>
+            <input
+              id="persona-traits"
+              class="field-input"
+              type="text"
+              maxlength="200"
+              placeholder="热情、友善、好奇"
+            />
+          </label>
+          <label class="field">
+            <span class="field-label">语气</span>
+            <input
+              id="persona-tone"
+              class="field-input"
+              type="text"
+              maxlength="50"
+              placeholder="温暖活泼"
+            />
+          </label>
+          <label class="field">
+            <span class="field-label">背景</span>
+            <textarea
+              id="persona-backstory"
+              class="field-input field-textarea"
+              maxlength="500"
+              rows="4"
+              placeholder="我是你的 AI 桌宠，喜欢陪你聊天、记住你在意的小事…"
+            ></textarea>
+          </label>
+          <button id="settings-save" class="primary-btn" type="button">保存设置</button>
+          <p id="settings-status" class="settings-status" role="status" hidden></p>
+          <p class="settings-note">
+            设置通过 petAPI.settings 持久化到本地，重启后仍生效；性格标签、语气与背景会进入桌宠的对话人格。
+          </p>
         </div>
       </section>
 

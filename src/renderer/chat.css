@@ -205,6 +205,13 @@
   border-color: #4f6ef7;
 }
 
+.field-textarea {
+  min-height: 72px;
+  resize: vertical;
+  font-family: inherit;
+  line-height: 1.5;
+}
+
 .primary-btn {
   padding: 9px 0;
   border: none;
@@ -217,6 +224,28 @@
 
 .primary-btn:hover {
   background: #5f7cf9;
+}
+
+.primary-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.settings-status {
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.settings-status[hidden] {
+  display: none;
+}
+
+.settings-status[data-type='ok'] {
+  color: #81c784;
+}
+
+.settings-status[data-type='error'] {
+  color: #ef9a9a;
 }
 
 .settings-note {
