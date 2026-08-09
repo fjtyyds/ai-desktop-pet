@@ -15,12 +15,34 @@
       <header class="drag-bar">
         <span id="header-title" class="drag-bar-title">AI 桌宠</span>
         <div class="drag-bar-actions">
-          <button id="settings-btn" class="icon-btn" type="button" title="设置" aria-label="设置">⚙</button>
-          <button id="close-btn" class="icon-btn" type="button" title="关闭（隐藏到托盘）" aria-label="关闭">✕</button>
+          <button
+            id="settings-btn"
+            class="icon-btn"
+            type="button"
+            title="设置"
+            aria-label="设置"
+            data-i18n-title="settings.title"
+            data-i18n-aria-label="settings.title"
+          >⚙</button>
+          <button
+            id="close-btn"
+            class="icon-btn"
+            type="button"
+            title="关闭（隐藏到托盘）"
+            aria-label="关闭"
+            data-i18n-title="window.closeTitle"
+            data-i18n-aria-label="window.close"
+          >✕</button>
         </div>
       </header>
 
-      <section id="chat-view" class="chat-view">
+      <section
+        id="chat-view"
+        class="chat-view"
+        role="region"
+        aria-label="聊天"
+        data-i18n-aria-label="chat.viewAriaLabel"
+      >
         <div id="message-list" class="message-list" aria-live="polite"></div>
         <div id="service-status" class="service-status" role="status"></div>
         <form id="chat-form" class="chat-form">
@@ -31,19 +53,34 @@
             placeholder="对桌宠说点什么…"
             autocomplete="off"
             aria-label="聊天输入框"
+            data-i18n-aria-label="chat.inputAriaLabel"
+            data-i18n-placeholder="chat.inputPlaceholder"
           />
-          <button id="send-btn" class="send-btn" type="submit">发送</button>
+          <button id="send-btn" class="send-btn" type="submit" data-i18n="chat.send">发送</button>
         </form>
       </section>
 
-      <section id="settings-view" class="settings-view" hidden>
+      <section
+        id="settings-view"
+        class="settings-view"
+        role="region"
+        aria-label="设置"
+        data-i18n-aria-label="settings.title"
+        hidden
+      >
         <div class="settings-header">
-          <button id="settings-back" class="icon-btn" type="button" aria-label="返回">←</button>
-          <h2 class="settings-title">设置</h2>
+          <button
+            id="settings-back"
+            class="icon-btn"
+            type="button"
+            aria-label="返回"
+            data-i18n-aria-label="settings.back"
+          >←</button>
+          <h2 class="settings-title" data-i18n="settings.title">设置</h2>
         </div>
         <div class="settings-body">
           <label class="field">
-            <span class="field-label">API Key</span>
+            <span class="field-label" data-i18n="settings.apiKey">API Key</span>
             <input
               id="api-key"
               class="field-input"
@@ -53,10 +90,12 @@
               spellcheck="false"
               placeholder="sk-…"
             />
-            <span class="field-hint">密钥仅保存在本机，仅用于调用 DeepSeek 接口。</span>
+            <span class="field-hint" data-i18n="settings.apiKeyHint"
+              >密钥仅保存在本机，仅用于调用 DeepSeek 接口。</span
+            >
           </label>
           <label class="field">
-            <span class="field-label">模型</span>
+            <span class="field-label" data-i18n="settings.model">模型</span>
             <input
               id="model"
               class="field-input"
@@ -68,42 +107,64 @@
             />
           </label>
           <label class="field">
-            <span class="field-label">宠物名称</span>
-            <input id="pet-name" class="field-input" type="text" maxlength="20" placeholder="AI 桌宠" />
+            <span class="field-label" data-i18n="settings.language">界面语言</span>
+            <select id="language" class="field-select">
+              <option value="system" data-i18n="settings.languageSystem">跟随系统</option>
+              <option value="zh-CN" data-i18n="settings.languageZhCN">简体中文</option>
+              <option value="en" data-i18n="settings.languageEn">English</option>
+            </select>
           </label>
           <label class="field">
-            <span class="field-label">性格标签（逗号分隔，最多 10 个）</span>
+            <span class="field-label" data-i18n="settings.petName">宠物名称</span>
+            <input
+              id="pet-name"
+              class="field-input"
+              type="text"
+              maxlength="20"
+              placeholder="AI 桌宠"
+              data-i18n-placeholder="settings.petNamePlaceholder"
+            />
+          </label>
+          <label class="field">
+            <span class="field-label" data-i18n="settings.traits"
+              >性格标签（逗号分隔，最多 10 个）</span
+            >
             <input
               id="persona-traits"
               class="field-input"
               type="text"
               maxlength="200"
               placeholder="热情、友善、好奇"
+              data-i18n-placeholder="settings.traitsPlaceholder"
             />
           </label>
           <label class="field">
-            <span class="field-label">语气</span>
+            <span class="field-label" data-i18n="settings.tone">语气</span>
             <input
               id="persona-tone"
               class="field-input"
               type="text"
               maxlength="50"
               placeholder="温暖活泼"
+              data-i18n-placeholder="settings.tonePlaceholder"
             />
           </label>
           <label class="field">
-            <span class="field-label">背景</span>
+            <span class="field-label" data-i18n="settings.backstory">背景</span>
             <textarea
               id="persona-backstory"
               class="field-input field-textarea"
               maxlength="500"
               rows="4"
               placeholder="我是你的 AI 桌宠，喜欢陪你聊天、记住你在意的小事…"
+              data-i18n-placeholder="settings.backstoryPlaceholder"
             ></textarea>
           </label>
-          <button id="settings-save" class="primary-btn" type="button">保存设置</button>
+          <button id="settings-save" class="primary-btn" type="button" data-i18n="settings.save"
+            >保存设置</button
+          >
           <p id="settings-status" class="settings-status" role="status" hidden></p>
-          <p class="settings-note">
+          <p class="settings-note" data-i18n="settings.note">
             设置通过 petAPI.settings 持久化到本地，重启后仍生效；性格标签、语气与背景会进入桌宠的对话人格。
           </p>
         </div>
@@ -111,6 +172,7 @@
 
       <footer class="meta" id="meta"></footer>
     </main>
+    <script src="../shared/locales/index.js"></script>
     <script src="./chat.js"></script>
     <script src="./renderer.js"></script>
   </body>
