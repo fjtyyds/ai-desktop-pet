@@ -26,10 +26,14 @@ const PERSONA_LIMITS = {
 const API_KEY_MAX_LENGTH = 256;
 const MODEL_MAX_LENGTH = 100;
 
+/** 支持的语言设置：'system' = 跟随系统；'zh-CN' / 'en' 为显式选择（ADR-018，T-12） */
+const SUPPORTED_LANGUAGES = ['system', 'zh-CN', 'en'];
+
 const DEFAULT_SETTINGS = {
   apiKey: '',
   model: DEFAULT_MODEL,
   petName: 'AI 桌宠',
+  language: 'system',
   persona: { ...DEFAULT_PERSONA }
 };
 
@@ -66,6 +70,11 @@ function sanitizeText(value, current, maxLength, { allowEmpty = true } = {}) {
     return current;
   }
   return trimmed.slice(0, maxLength);
+}
+
+/** 清洗语言设置：非法值（非字符串/不在支持列表）丢弃，保留当前值 */
+function sanitizeLanguage(value, current) {
+  return SUPPORTED_LANGUAGES.includes(value) ? value : current;
 }
 
 /**
@@ -143,12 +152,13 @@ function createStore(baseDir) {
       MODEL_MAX_LENGTH,
       { allowEmpty: false }
     );
+    merged.language = sanitizeLanguage(merged.language, DEFAULT_SETTINGS.language);
     return merged;
   }
 
   function writeSettings(patch) {
     const current = readSettings();
-    const allowed = ['apiKey', 'model', 'petName'];
+    const allowed = ['apiKey', 'model', 'petName', 'language'];
     const next = { ...current };
     for (const key of allowed) {
       if (patch && patch[key] !== undefined) {
@@ -167,6 +177,10 @@ function createStore(baseDir) {
             MODEL_MAX_LENGTH,
             { allowEmpty: false }
           );
+          continue;
+        }
+        if (key === 'language') {
+          next.language = sanitizeLanguage(patch.language, current.language);
           continue;
         }
         next[key] = typeof patch[key] === 'string' ? patch[key].trim() : String(patch[key]);

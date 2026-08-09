@@ -1,0 +1,55 @@
+{
+  "app": {
+    "name": "AI Pet",
+    "defaultPetName": "AI Pet"
+  },
+  "meta": {
+    "platformVersion": "Platform: {platform} · Version {version}"
+  },
+  "chat": {
+    "viewAriaLabel": "Chat",
+    "inputAriaLabel": "Chat input",
+    "inputPlaceholder": "Say something to your pet…",
+    "send": "Send",
+    "sending": "Sending…",
+    "serviceNotReady": "AI service is not ready",
+    "serviceNotReadyReply": "AI service is not ready yet; please try again later.",
+    "emptyReply": "(empty reply)",
+    "errorPrefix": "Error: {error}",
+    "greeting": "Hi! I am your AI pet 👋 What would you like to chat about?"
+  },
+  "window": {
+    "close": "Close",
+    "closeTitle": "Close (hide to tray)"
+  },
+  "settings": {
+    "title": "Settings",
+    "back": "Back",
+    "language": "Language",
+    "languageSystem": "Follow system",
+    "languageZhCN": "Chinese (Simplified)",
+    "languageEn": "English",
+    "apiKey": "API Key",
+    "apiKeyHint": "The key is stored only on this device and is used only to call the DeepSeek API.",
+    "model": "Model",
+    "petName": "Pet name",
+    "petNamePlaceholder": "AI Pet",
+    "traits": "Personality traits (comma-separated, up to 10)",
+    "traitsPlaceholder": "Warm, friendly, curious",
+    "tone": "Tone",
+    "tonePlaceholder": "Warm and lively",
+    "backstory": "Backstory",
+    "backstoryPlaceholder": "I am your AI pet. I love chatting with you and remembering the little things that matter…",
+    "save": "Save settings",
+    "saved": "Saved. The key is stored only on this device and will persist after restart.",
+    "savedLocalFallback": "Saved (local fallback; petAPI unavailable)",
+    "saveError": "Failed to save: {error}",
+    "note": "Settings are saved locally through petAPI.settings and persist after restart. Traits, tone and backstory shape your pet's conversation personality.",
+    "traitsDelimiter": ", "
+  },
+  "tray": {
+    "hideWindow": "Hide window",
+    "showWindow": "Show window",
+    "quit": "Quit"
+  }
+}
