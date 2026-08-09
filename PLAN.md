@@ -154,6 +154,7 @@
 - M2 集成发现并修正两处并行期兼容问题：① chat.js 原“服务内部自动创建 memory-store”在 T-05 合入后生效，导致测试写入 `~/.ai-desktop-pet` 并在沙箱/CI 失败，改为由 ipc.js 注入单例；② T-06 mood.js 实际接口为 `snapshot/applyFeedback/tick`，与 chat.js 原探针（getState/update）不一致，已在 chat.js 适配（含情感词反馈猜测，情绪变化体现在下一轮 system prompt）。
 - 复盘教训：T-05~T-07 按“存储/逻辑/组装”分层拆卡，把设置页 UI 与 writeSettings 白名单排除在所有边界外，导致 SPEC“人格可配置”直到集成后才被发现缺失；已通过 ADR-014 建立“用户故事→触点清单→任务卡”规则。
 - 自动化试点发现（T-14）：spawn/followup 下发的子代理三次均未执行任务（只回复“等待任务指派”），连“回复投递测试码”的最小指令也未送达内容；结论为当前环境子代理消息内容不可达，全自动子代理执行不可行。替代方案：协调者直行（A1）或外部线程半自动（B）。
+- 自动化方案评估（scripts/orchestrator）：外部编排器（codex exec 多路循环）设计合理，但 `codex` CLI 为 WindowsApps MSIX 打包，在本工具沙箱/提权环境中均被拒绝运行（Access denied）；可行路径为“用户在自己的终端运行 orchestrator，协调者审查日志并合并”，或继续半自动线程模式。
 
 ## Decision Log
 

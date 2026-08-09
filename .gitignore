@@ -1,5 +1,6 @@
 node_modules/
 dist/
+多线程开发/
 out/
 release/
 *.log
