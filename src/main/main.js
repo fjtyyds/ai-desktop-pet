@@ -1,7 +1,16 @@
+'use strict';
+
 const { app, BrowserWindow } = require('electron');
 const path = require('path');
+const { createTray } = require('./tray');
+
+let mainWindow = null;
+let trayApi = null;
+let isQuitting = false;
 
 function createMainWindow() {
+  if (mainWindow) return mainWindow;
+
   const win = new BrowserWindow({
     width: 320,
     height: 420,
@@ -20,21 +29,70 @@ function createMainWindow() {
   });
 
   win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
+
+  // 关闭窗口时隐藏到托盘，而不是退出应用
+  win.on('close', (event) => {
+    if (!isQuitting) {
+      event.preventDefault();
+      win.hide();
+      trayApi?.refreshMenu();
+    }
+  });
+
+  win.on('closed', () => {
+    mainWindow = null;
+  });
+
+  mainWindow = win;
   return win;
 }
 
-app.whenReady().then(() => {
-  createMainWindow();
+function showMainWindow() {
+  if (!mainWindow) createMainWindow();
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+  trayApi?.refreshMenu();
+}
 
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createMainWindow();
-    }
-  });
-});
-
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit();
+function toggleMainWindow() {
+  if (mainWindow && mainWindow.isVisible()) {
+    mainWindow.hide();
+  } else {
+    showMainWindow();
   }
-});
+  trayApi?.refreshMenu();
+}
+
+function quitApp() {
+  isQuitting = true;
+  app.quit();
+}
+
+// 单实例锁：再次启动时聚焦已有实例，而不是开第二个进程
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (app.isReady()) showMainWindow();
+  });
+
+  app.whenReady().then(() => {
+    createMainWindow();
+    trayApi = createTray({
+      getMainWindow: () => mainWindow,
+      showMainWindow,
+      toggleMainWindow,
+      quitApp
+    });
+
+    // macOS 点击 Dock 图标时恢复窗口；Windows 下通常不会触发
+    app.on('activate', showMainWindow);
+  });
+
+  app.on('before-quit', () => {
+    isQuitting = true;
+  });
+
+  // 应用常驻托盘：窗口全部关闭时不退出，由托盘菜单“退出”结束进程
+}
