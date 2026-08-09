@@ -18,6 +18,7 @@ const CHANNELS = {
   memoryUpdate: 'memory:update',
   historyExport: 'history:export',
   historyClear: 'history:clear',
+  weatherGet: 'weather:get',
   windowToggleDock: 'window:toggle-dock',
   windowSetShortcut: 'window:set-shortcut'
 };
@@ -77,5 +78,8 @@ contextBridge.exposeInMainWorld('petAPI', {
     list: () => ipcRenderer.invoke(CHANNELS.memoryList),
     delete: (id) => ipcRenderer.invoke(CHANNELS.memoryDelete, id),
     update: (id, patch) => ipcRenderer.invoke(CHANNELS.memoryUpdate, id, patch)
+  },
+  weather: {
+    get: (payload) => ipcRenderer.invoke(CHANNELS.weatherGet, payload)
   }
 });

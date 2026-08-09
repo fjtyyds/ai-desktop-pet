@@ -16,6 +16,9 @@
  *   完成标志 onboardingDone 持久化；内置 6 套预设人格模板（双语内联，与 store.js
  *   PERSONA_TEMPLATE_IDS 对齐），设置页与引导中均可一键切换，切换即时保存到
  *   settings.persona 并持久化
+ * - T-22 天气小部件：设置页开关 + 城市配置（weatherEnabled/weatherCity），
+ *   角色面板顶部可选展示实时天气；刷新按钮与失败降级（缓存上次成功数据），
+ *   数据源 Open-Meteo 无需 API Key，网络请求在主进程完成
  */
 (function () {
   'use strict';
@@ -25,6 +28,8 @@
   const DEFAULT_LANGUAGE = 'system';
   const ACTIVITY_POKE_MIN_INTERVAL_MS = 5000; // T-15: 交互心跳节流
   const MOOD_POLL_MS = 3000;
+  const WEATHER_AUTO_REFRESH_MS = 30 * 60 * 1000; // T-22：开启时每 30 分钟自动刷新
+  const WEATHER_MIN_REFRESH_GAP_MS = 30 * 1000; // T-22：自动刷新节流（手动刷新不受限）
   /** T-19：设置页窗口行为区块文案（双语内联，因 locale 文件不在任务边界内） */
   const WINDOW_FEATURE_HINTS = {
     'zh-CN': {
@@ -268,6 +273,12 @@
   let ttsReady = false;
   let currentUtterance = null;
   let currentSpeakButton = null;
+  // T-22：天气小部件状态（最近一次成功数据 / 错误码 / 加载中）
+  let weatherState = null;
+  let weatherErrorCode = null;
+  let weatherLoading = false;
+  let weatherLastFetchAt = 0;
+  let weatherTimer = null;
 
   async function init() {
     cacheElements();
@@ -306,6 +317,15 @@
       memoryStatus: document.getElementById('memory-status'),
       memoryEmpty: document.getElementById('memory-empty'),
       memoryList: document.getElementById('memory-list'),
+      weatherWidget: document.getElementById('weather-widget'),
+      weatherIcon: document.getElementById('weather-icon'),
+      weatherLocation: document.getElementById('weather-location'),
+      weatherDesc: document.getElementById('weather-desc'),
+      weatherTemp: document.getElementById('weather-temp'),
+      weatherMeta: document.getElementById('weather-meta'),
+      weatherRefresh: document.getElementById('weather-refresh'),
+      weatherEnabled: document.getElementById('weather-enabled'),
+      weatherCity: document.getElementById('weather-city'),
       headerTitle: document.getElementById('header-title'),
       apiKey: document.getElementById('api-key'),
       model: document.getElementById('model'),
@@ -537,6 +557,10 @@
     elements.exportMdBtn.addEventListener('click', () => void exportConversation('markdown'));
     elements.exportJsonBtn.addEventListener('click', () => void exportConversation('json'));
     elements.clearDataBtn.addEventListener('click', handleClearData);
+    elements.weatherRefresh.addEventListener('click', () => {
+      pokeActivity();
+      void refreshWeather(true);
+    });
     elements.onboardingLanguage.addEventListener(
       'change',
       handleOnboardingLanguageChange
@@ -1070,6 +1094,219 @@
     updateSpeakButtonState(button, true);
   }
 
+  /* ---------------- T-22：天气小部件（Open-Meteo，主进程请求） ---------------- */
+
+  function hasWeatherApi() {
+    return Boolean(
+      window.petAPI &&
+        window.petAPI.weather &&
+        typeof window.petAPI.weather.get === 'function'
+    );
+  }
+
+  function weatherTranslator() {
+    return window.PetLocales.createTranslator(currentLocale);
+  }
+
+  /** 开关状态：设置页 weatherEnabled 且主进程 API 可用时展示 */
+  function updateWeatherWidgetVisibility() {
+    if (!elements.weatherWidget) {
+      return;
+    }
+    const enabled = currentSettings.weatherEnabled === true && hasWeatherApi();
+    elements.weatherWidget.hidden = !enabled;
+    if (!enabled) {
+      if (weatherTimer) {
+        clearInterval(weatherTimer);
+        weatherTimer = null;
+      }
+      return;
+    }
+    if (!weatherTimer) {
+      weatherTimer = setInterval(
+        () => void refreshWeather(false),
+        WEATHER_AUTO_REFRESH_MS
+      );
+    }
+  }
+
+  /** 从设置同步天气开关与城市输入框（applySettings 时调用） */
+  function applyWeatherSettings(settings) {
+    if (!elements.weatherEnabled || !elements.weatherCity) {
+      return;
+    }
+    elements.weatherEnabled.checked = settings.weatherEnabled === true;
+    elements.weatherCity.value =
+      typeof settings.weatherCity === 'string' ? settings.weatherCity : '';
+    updateWeatherWidgetVisibility();
+    if (!elements.weatherWidget.hidden) {
+      void refreshWeather(false);
+    }
+  }
+
+  async function refreshWeather(force) {
+    if (
+      !hasWeatherApi() ||
+      !elements.weatherWidget ||
+      elements.weatherWidget.hidden ||
+      weatherLoading
+    ) {
+      return;
+    }
+    const now = Date.now();
+    if (
+      !force &&
+      weatherState &&
+      now - weatherLastFetchAt < WEATHER_MIN_REFRESH_GAP_MS
+    ) {
+      return;
+    }
+    weatherLoading = true;
+    elements.weatherRefresh.disabled = true;
+    const t = weatherTranslator();
+    setWeatherMeta(t('weather.loading'), 'loading');
+    try {
+      const result = await window.petAPI.weather.get({ force: force === true });
+      weatherLastFetchAt = Date.now();
+      renderWeatherResult(result);
+    } catch (error) {
+      console.warn('获取天气失败：', error);
+      weatherLastFetchAt = Date.now();
+      renderWeatherError('weather-network-error', null);
+    } finally {
+      weatherLoading = false;
+      elements.weatherRefresh.disabled = false;
+    }
+  }
+
+  function renderWeatherResult(result) {
+    if (result && result.ok && result.data) {
+      weatherState = result.data;
+      weatherErrorCode = null;
+      renderWeatherData(result.data);
+      return;
+    }
+    const code =
+      result && typeof result.error === 'string'
+        ? result.error
+        : 'weather-network-error';
+    const cachedData = result && result.data ? result.data : null;
+    renderWeatherError(code, cachedData);
+    if (cachedData) {
+      const t = weatherTranslator();
+      setWeatherMeta(
+        `${t('weather.updatedAt', {
+          time: formatWeatherTime(cachedData.updatedAt)
+        })} · ${t('weather.cachedNotice')}`,
+        'warning'
+      );
+    }
+  }
+
+  /** 渲染成功数据（城市/图标/温度/描述 + 详情行）；语言切换时经 applyWeatherText 复用 */
+  function renderWeatherData(data) {
+    const t = weatherTranslator();
+    elements.weatherIcon.textContent = data.icon || '🌡️';
+    elements.weatherLocation.textContent = [data.name, data.country]
+      .filter(Boolean)
+      .join(' · ');
+    elements.weatherDesc.textContent = data.description || '';
+    const temperature = Number(data.temperature);
+    elements.weatherTemp.textContent = Number.isFinite(temperature)
+      ? `${Math.round(temperature)}°`
+      : '';
+
+    const details = [];
+    if (Number.isFinite(Number(data.apparentTemperature))) {
+      details.push(
+        t('weather.feelsLike', {
+          temp: Math.round(Number(data.apparentTemperature))
+        })
+      );
+    }
+    if (Number.isFinite(Number(data.humidity))) {
+      details.push(t('weather.humidity', { value: Math.round(data.humidity) }));
+    }
+    if (Number.isFinite(Number(data.windSpeed))) {
+      details.push(t('weather.wind', { value: Math.round(data.windSpeed) }));
+    }
+    if (Number.isFinite(Number(data.updatedAt))) {
+      details.push(
+        t('weather.updatedAt', { time: formatWeatherTime(data.updatedAt) })
+      );
+    }
+    setWeatherMeta(details.join(' · '), 'ok');
+  }
+
+  /** 失败降级：有缓存数据时保留展示；无缓存时显示本地化错误 */
+  function renderWeatherError(code, cachedData) {
+    weatherErrorCode = code;
+    if (cachedData) {
+      weatherState = cachedData;
+      renderWeatherData(cachedData);
+      return;
+    }
+    weatherState = null;
+    elements.weatherIcon.textContent = '⚠️';
+    elements.weatherLocation.textContent = weatherTranslator()(
+      'weather.unavailable'
+    );
+    elements.weatherDesc.textContent = '';
+    elements.weatherTemp.textContent = '';
+    setWeatherMeta(weatherErrorMessage(code), 'error');
+  }
+
+  function weatherErrorMessage(code) {
+    const t = weatherTranslator();
+    switch (code) {
+      case 'weather-empty-city':
+        return t('weather.notConfigured');
+      case 'weather-city-not-found':
+        return t('weather.cityNotFound', {
+          city:
+            typeof currentSettings.weatherCity === 'string'
+              ? currentSettings.weatherCity
+              : ''
+        });
+      case 'weather-network-error':
+        return t('weather.networkError');
+      case 'weather-invalid-response':
+        return t('weather.invalidResponse');
+      default:
+        return t('weather.errorPrefix', { error: code || 'unknown' });
+    }
+  }
+
+  function setWeatherMeta(text, type) {
+    elements.weatherMeta.textContent = text;
+    elements.weatherMeta.dataset.type = type || 'ok';
+  }
+
+  function formatWeatherTime(value) {
+    const timestamp = Number(value);
+    if (!Number.isFinite(timestamp) || timestamp <= 0) {
+      return '';
+    }
+    const locale = currentLocale === 'zh-CN' ? 'zh-CN' : 'en-US';
+    try {
+      return new Date(timestamp).toLocaleString(locale);
+    } catch (_error) {
+      return new Date(timestamp).toLocaleString();
+    }
+  }
+
+  /** 语言切换后按最近状态重绘动态文案（applyStaticText 时调用） */
+  function applyWeatherText() {
+    if (!elements.weatherWidget || elements.weatherWidget.hidden) {
+      return;
+    }
+    if (weatherState) {
+      renderWeatherData(weatherState);
+    } else if (weatherErrorCode) {
+      renderWeatherError(weatherErrorCode, null);
+    }
+  }
+
   /* 设置页 */
   function showSettingsView() {
     elements.chatView.hidden = true;
@@ -1349,7 +1586,9 @@
         model: saved.model,
         persona: saved.persona,
         language: saved.language,
-        idleEnabled: saved.idleEnabled !== false
+        idleEnabled: saved.idleEnabled !== false,
+        weatherEnabled: saved.weatherEnabled === true,
+        weatherCity: saved.weatherCity
       });
     } catch (_error) {
       // 本地设置损坏时静默回退默认值
@@ -1390,6 +1629,7 @@
     renderServiceStatus();
     applyMeta();
     applyOnboardingText(); // T-20：引导与人格模板静态文案（内联双语）
+    applyWeatherText(); // T-22：语言切换后重绘天气动态文案
   }
 
   /** 底部 meta（平台/版本）；renderer.js 先行写入中文，这里按当前语言覆盖 */
@@ -1431,6 +1671,7 @@
         : t('app.defaultPetName');
     elements.petName.value = currentPetName;
     elements.idleEnabled.checked = currentSettings.idleEnabled !== false;
+    applyWeatherSettings(currentSettings); // T-22：天气开关/城市输入 + 可见性 + 刷新
 
     const persona =
       currentSettings.persona && typeof currentSettings.persona === 'object'
@@ -1489,7 +1730,9 @@
         persona,
         language,
         idleEnabled: elements.idleEnabled.checked,
-        personaTemplate
+        personaTemplate,
+        weatherEnabled: elements.weatherEnabled.checked,
+        weatherCity: elements.weatherCity.value.trim()
       });
       showSettingsStatus(t('settings.savedLocalFallback'), 'ok');
       return;
@@ -1504,7 +1747,9 @@
         persona,
         language,
         idleEnabled: elements.idleEnabled.checked,
-        personaTemplate
+        personaTemplate,
+        weatherEnabled: elements.weatherEnabled.checked,
+        weatherCity: elements.weatherCity.value.trim()
       });
       // 回填清洗后的规范值，保证表单与持久化一致
       applySettings(saved || { petName, persona, language });
