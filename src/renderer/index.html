@@ -81,17 +81,18 @@
         data-i18n-aria-label="settings.title"
         hidden
       >
-        <div class="settings-header">
-          <button
-            id="settings-back"
-            class="icon-btn"
-            type="button"
-            aria-label="返回"
-            data-i18n-aria-label="settings.back"
-          >←</button>
-          <h2 class="settings-title" data-i18n="settings.title">设置</h2>
-        </div>
-        <div class="settings-body">
+        <div id="settings-home" class="settings-page">
+          <div class="settings-header">
+            <button
+              id="settings-back"
+              class="icon-btn"
+              type="button"
+              aria-label="返回"
+              data-i18n-aria-label="settings.back"
+            >←</button>
+            <h2 class="settings-title" data-i18n="settings.title">设置</h2>
+          </div>
+          <div class="settings-body">
           <label class="field">
             <span class="field-label" data-i18n="settings.apiKey">API Key</span>
             <input
@@ -180,13 +181,42 @@
               data-i18n-placeholder="settings.backstoryPlaceholder"
             ></textarea>
           </label>
-          <button id="settings-save" class="primary-btn" type="button" data-i18n="settings.save"
-            >保存设置</button
-          >
-          <p id="settings-status" class="settings-status" role="status" hidden></p>
-          <p class="settings-note" data-i18n="settings.note">
-            设置通过 petAPI.settings 持久化到本地，重启后仍生效；性格标签、语气与背景会进入桌宠的对话人格。
-          </p>
+          <button
+            id="memory-manage-btn"
+            class="secondary-btn"
+            type="button"
+            data-i18n="settings.memoryManage"
+          >记忆管理</button>
+            <button id="settings-save" class="primary-btn" type="button" data-i18n="settings.save"
+              >保存设置</button
+            >
+            <p id="settings-status" class="settings-status" role="status" hidden></p>
+            <p class="settings-note" data-i18n="settings.note">
+              设置通过 petAPI.settings 持久化到本地，重启后仍生效；性格标签、语气与背景会进入桌宠的对话人格。
+            </p>
+          </div>
+        </div>
+        <div id="memory-page" class="settings-page" hidden>
+          <div class="settings-header">
+            <button
+              id="memory-back"
+              class="icon-btn"
+              type="button"
+              aria-label="返回"
+              data-i18n-aria-label="settings.back"
+            >←</button>
+            <h2 class="settings-title" data-i18n="settings.memory">记忆</h2>
+          </div>
+          <div class="settings-body">
+            <p class="memory-hint" data-i18n="settings.memoryHint">
+              长期记忆由对话自动提取，可在此查看、修正或删除。
+            </p>
+            <p id="memory-status" class="settings-status" role="status" hidden></p>
+            <p id="memory-empty" class="memory-empty" data-i18n="settings.memoryEmpty" hidden
+              >暂无长期记忆，聊天中的关键事实会自动保存到这里。</p
+            >
+            <div id="memory-list" class="memory-list"></div>
+          </div>
         </div>
       </section>
 

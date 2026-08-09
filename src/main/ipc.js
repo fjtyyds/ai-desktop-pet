@@ -38,7 +38,10 @@ const CHANNELS = {
   historyGet: 'history:get',
   idleEvent: 'idle:event', // T-15：主进程 -> 渲染层 空闲互动触发
   activityPoke: 'activity:poke', // T-15：渲染层 -> 主进程 交互心跳
-  moodGet: 'mood:get' // T-16：读取当前情绪
+  moodGet: 'mood:get', // T-16：读取当前情绪
+  memoryList: 'memory:list', // T-17：长期记忆列表
+  memoryDelete: 'memory:delete', // T-17：删除长期记忆
+  memoryUpdate: 'memory:update' // T-17：修正长期记忆
 };
 
 let store = null;
@@ -219,6 +222,45 @@ function handleMoodGet() {
   return { ...state };
 }
 
+function handleMemoryList() {
+  return getMemoryStore().listMemories();
+}
+
+function handleMemoryDelete(_event, id) {
+  try {
+    if (typeof id !== 'string' || !id.trim()) {
+      return { ok: false, error: 'memory-invalid-id' };
+    }
+    const deleted = getMemoryStore().deleteMemory(id);
+    return deleted ? { ok: true } : { ok: false, error: 'memory-not-found' };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error && error.message ? error.message : String(error)
+    };
+  }
+}
+
+function handleMemoryUpdate(_event, id, patch) {
+  try {
+    if (typeof id !== 'string' || !id.trim()) {
+      return { ok: false, error: 'memory-invalid-id' };
+    }
+    const content =
+      patch && typeof patch.content === 'string' ? patch.content.trim() : '';
+    if (!content) {
+      return { ok: false, error: 'memory-empty-content' };
+    }
+    const item = getMemoryStore().updateMemory(id, { content });
+    return item ? { ok: true, item } : { ok: false, error: 'memory-not-found' };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error && error.message ? error.message : String(error)
+    };
+  }
+}
+
 function registerIpcHandlers() {
   if (registered) {
     return;
@@ -233,6 +275,9 @@ function registerIpcHandlers() {
   ipcMain.handle(CHANNELS.historyGet, handleHistoryGet);
   ipcMain.on(CHANNELS.activityPoke, handleActivityPoke);
   ipcMain.handle(CHANNELS.moodGet, handleMoodGet);
+  ipcMain.handle(CHANNELS.memoryList, handleMemoryList);
+  ipcMain.handle(CHANNELS.memoryDelete, handleMemoryDelete);
+  ipcMain.handle(CHANNELS.memoryUpdate, handleMemoryUpdate);
 }
 
 // 被 src/main/main.js require 后自动注册（M1 集成时由协调者加入 require('./ipc')）

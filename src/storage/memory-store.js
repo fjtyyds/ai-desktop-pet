@@ -253,6 +253,36 @@ function createMemoryStore(baseDir) {
   }
 
   /**
+   * 修正长期记忆内容并落盘（T-17）。content 必填且非空；
+   * 更新 updatedAt，lastUsedAt 保持不变（仅表示最近被对话引用）。
+   * 返回更新后的条目；未找到返回 null。
+   */
+  function updateMemory(id, patch) {
+    const content =
+      patch && typeof patch.content === 'string' ? patch.content.trim() : '';
+    if (!content) {
+      throw new Error('记忆内容不能为空');
+    }
+    const current = readJsonFile(memoriesFile, []);
+    if (!Array.isArray(current)) {
+      return null;
+    }
+    let updated = null;
+    const next = current.map((item) => {
+      if (item && item.id === id) {
+        updated = { ...item, content, updatedAt: Date.now() };
+        return updated;
+      }
+      return item;
+    });
+    if (!updated) {
+      return null;
+    }
+    writeJsonFile(memoriesFile, next);
+    return { ...updated };
+  }
+
+  /**
    * 删除长期记忆；返回是否实际删除。
    */
   function deleteMemory(id) {
@@ -275,6 +305,7 @@ function createMemoryStore(baseDir) {
     getMemories,
     addMemory,
     touchMemory,
+    updateMemory,
     deleteMemory
   };
 }

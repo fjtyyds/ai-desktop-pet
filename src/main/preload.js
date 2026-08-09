@@ -12,7 +12,10 @@ const CHANNELS = {
   historyGet: 'history:get',
   idleEvent: 'idle:event',
   activityPoke: 'activity:poke',
-  moodGet: 'mood:get'
+  moodGet: 'mood:get',
+  memoryList: 'memory:list',
+  memoryDelete: 'memory:delete',
+  memoryUpdate: 'memory:update'
 };
 
 contextBridge.exposeInMainWorld('petAPI', {
@@ -60,5 +63,10 @@ contextBridge.exposeInMainWorld('petAPI', {
   },
   mood: {
     get: () => ipcRenderer.invoke(CHANNELS.moodGet)
+  },
+  memory: {
+    list: () => ipcRenderer.invoke(CHANNELS.memoryList),
+    delete: (id) => ipcRenderer.invoke(CHANNELS.memoryDelete, id),
+    update: (id, patch) => ipcRenderer.invoke(CHANNELS.memoryUpdate, id, patch)
   }
 });
