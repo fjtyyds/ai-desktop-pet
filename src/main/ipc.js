@@ -1,55 +1,85 @@
 'use strict';
 
-const { app, ipcMain } = require('electron');
-const { getSettings, updateSettings } = require('../storage/settings-store');
-const { appendMessage } = require('../storage/message-store');
-const { sendChatMessage } = require('../llm');
-
-let registered = false;
+const { ipcMain, app } = require('electron');
+const { createProvider } = require('../llm');
+const { createDefaultStore } = require('../storage');
+const { createChatService } = require('../llm/chat');
 
 /**
- * 注册 petAPI 对应的 IPC handler。
- * 协调者在 src/main/main.js 中 require('./ipc') 后自动调用。
+ * IPC 通道名。与 preload.js 中的常量保持一致。
  */
-function registerIpcHandlers() {
-  if (registered) return;
-  registered = true;
+const CHANNELS = {
+  chatSend: 'chat:send',
+  settingsGet: 'settings:get',
+  settingsSet: 'settings:set'
+};
 
-  ipcMain.handle('chat:send', async (_event, payload) => {
-    const text = payload?.text;
-    const history = Array.isArray(payload?.history) ? payload.history : [];
-    if (typeof text !== 'string' || !text.trim()) {
-      return { ok: false, reply: '', error: '消息不能为空' };
-    }
+let store = null;
+let settings = null;
+let provider = null;
+let chatService = null;
+let registered = false;
 
-    const settings = await getSettings();
-    await appendMessage({ role: 'user', content: text.trim() });
-
-    const result = await sendChatMessage({
-      text: text.trim(),
-      history,
-      settings
-    });
-
-    if (result.ok) {
-      await appendMessage({ role: 'assistant', content: result.reply });
-    }
-    return result;
-  });
-
-  ipcMain.handle('settings:get', async () => getSettings());
-
-  ipcMain.handle('settings:set', async (_event, patch) => {
-    const safePatch =
-      patch && typeof patch === 'object' && !Array.isArray(patch) ? patch : {};
-    return updateSettings(safePatch);
-  });
+function getStore() {
+  if (!store) {
+    store = createDefaultStore();
+  }
+  return store;
 }
 
-if (app.isReady()) {
-  registerIpcHandlers();
-} else {
+function getSettings() {
+  if (!settings) {
+    settings = getStore().readSettings();
+  }
+  return settings;
+}
+
+function getProvider() {
+  if (!provider) {
+    provider = createProvider(getSettings());
+  }
+  return provider;
+}
+
+function getChatService() {
+  if (!chatService) {
+    chatService = createChatService({ provider: getProvider(), store: getStore() });
+    chatService.loadHistory();
+  }
+  return chatService;
+}
+
+async function handleChatSend(_event, payload) {
+  const text = payload && typeof payload.text === 'string' ? payload.text : '';
+  const clientHistory = payload && Array.isArray(payload.history) ? payload.history : [];
+  return getChatService().send(text, clientHistory);
+}
+
+function handleSettingsGet() {
+  return { ...getSettings() };
+}
+
+function handleSettingsSet(_event, patch) {
+  settings = getStore().writeSettings(patch && typeof patch === 'object' ? patch : {});
+  // 设置变化后重建 Provider 与聊天服务（例如 apiKey/model 变更即时生效）
+  provider = null;
+  chatService = null;
+  return { ...settings };
+}
+
+function registerIpcHandlers() {
+  if (registered) {
+    return;
+  }
+  registered = true;
+  ipcMain.handle(CHANNELS.chatSend, handleChatSend);
+  ipcMain.handle(CHANNELS.settingsGet, handleSettingsGet);
+  ipcMain.handle(CHANNELS.settingsSet, handleSettingsSet);
+}
+
+// 被 src/main/main.js require 后自动注册（M1 集成时由协调者加入 require('./ipc')）
+if (app && typeof app.whenReady === 'function') {
   app.whenReady().then(registerIpcHandlers);
 }
 
-module.exports = { registerIpcHandlers };
+module.exports = { registerIpcHandlers, CHANNELS };

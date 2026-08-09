@@ -1,31 +1,19 @@
 'use strict';
 
-const { DEFAULT_MODEL } = require('../shared/contracts');
-const { MockChatProvider } = require('./mock');
-const { DeepSeekChatProvider } = require('./deepseek');
+const { createDeepSeekProvider } = require('./provider');
+const { createMockProvider } = require('./mock');
 
 /**
- * 发送聊天消息：有 API Key（环境变量 DEEPSEEK_API_KEY 优先，其次设置）走 DeepSeek，
- * 否则走 Mock。模型名可用环境变量 DEEPSEEK_MODEL 覆盖，便于真实联调。
- *
- * @param {object} params
- * @param {string} params.text
- * @param {Array<{role: string, content: string}>} [params.history]
- * @param {object} [params.settings]
- * @returns {Promise<{ok: boolean, reply: string, error: string | null}>}
+ * 按设置创建 Provider（ADR-002：LLM 层可替换）：
+ * - 有 API Key（设置或环境变量 DEEPSEEK_API_KEY）→ DeepSeek
+ * - 否则 → Mock
  */
-async function sendChatMessage({ text, history = [], settings = {} }) {
-  const apiKey = process.env.DEEPSEEK_API_KEY || settings.apiKey || '';
-  const model = process.env.DEEPSEEK_MODEL || settings.model || DEFAULT_MODEL;
-
-  if (!apiKey) {
-    return new MockChatProvider().send({
-      text,
-      petName: settings.petName || 'AI 桌宠'
-    });
+function createProvider(settings) {
+  const apiKey = (settings && settings.apiKey) || process.env.DEEPSEEK_API_KEY || '';
+  if (apiKey) {
+    return createDeepSeekProvider({ apiKey, model: settings && settings.model });
   }
-
-  return new DeepSeekChatProvider({ apiKey, model }).send({ text, history });
+  return createMockProvider();
 }
 
-module.exports = { sendChatMessage };
+module.exports = { createProvider, createDeepSeekProvider, createMockProvider };

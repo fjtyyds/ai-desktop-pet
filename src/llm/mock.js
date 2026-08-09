@@ -1,16 +1,22 @@
 'use strict';
 
 /**
- * Mock 聊天提供方：未配置 API Key 时使用，返回确定性回复。
+ * Mock Provider：无 API Key 时的降级实现，返回固定风格回复。
+ * 与 DeepSeek Provider 实现同一接口：chat({ messages }) -> Promise<{ reply }>。
  */
-class MockChatProvider {
-  async send({ text, petName = 'AI 桌宠' }) {
-    return {
-      ok: true,
-      reply: `（Mock）我是${petName}，已收到你的消息：「${text}」。配置 DEEPSEEK_API_KEY 后即可接入真实对话。`,
-      error: null
-    };
+function createMockProvider() {
+  async function chat({ messages }) {
+    const lastUser = Array.isArray(messages)
+      ? [...messages]
+          .reverse()
+          .find((item) => item && item.role === 'user')
+      : null;
+    const text = lastUser && typeof lastUser.content === 'string' ? lastUser.content : '';
+    const reply = `（mock）收到：“${text}”。我是 AI 桌宠，接入 DeepSeek 后就能正式回答你啦～`;
+    return { reply };
   }
+
+  return { chat };
 }
 
-module.exports = { MockChatProvider };
+module.exports = { createMockProvider };
