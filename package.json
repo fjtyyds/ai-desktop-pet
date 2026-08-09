@@ -1,0 +1,16 @@
+{
+  "name": "ai-desktop-pet",
+  "version": "0.1.0",
+  "description": "桌面 AI 桌宠：可对话、可记忆的角色助手",
+  "main": "src/main/main.js",
+  "private": true,
+  "scripts": {
+    "dev": "electron .",
+    "start": "electron .",
+    "check": "node scripts/check.js",
+    "smoke": "electron scripts/smoke.js"
+  },
+  "devDependencies": {
+    "electron": "^37.0.0"
+  }
+}
