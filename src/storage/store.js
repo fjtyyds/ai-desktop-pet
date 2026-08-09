@@ -35,6 +35,9 @@ const DEFAULT_SETTINGS = {
   petName: 'AI 桌宠',
   language: 'system',
   idleEnabled: true, // T-15：空闲主动互动开关，默认开启
+  dockEnabled: true, // T-19：贴边隐藏开关，默认开启
+  shortcutEnabled: true, // T-19：全局快捷键呼出开关，默认开启
+  windowBounds: null, // T-19：上次窗口位置 { x, y }；null 表示未保存
   persona: { ...DEFAULT_PERSONA }
 };
 
@@ -81,6 +84,27 @@ function sanitizeLanguage(value, current) {
 /** 清洗布尔设置项：非布尔值丢弃，保留当前值（T-15 idleEnabled） */
 function sanitizeBoolean(value, current) {
   return typeof value === 'boolean' ? value : current;
+}
+
+/**
+ * 清洗窗口位置（T-19）：
+ * - 必须是 { x, y } 且均为有限数值，非法值丢弃（保留当前值）
+ * - 显式 null 允许（表示未保存/重置）
+ * - 坐标取整，防止浮点抖动
+ */
+function sanitizeWindowBounds(value, current) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  if (typeof value !== 'object' || Array.isArray(value)) {
+    return current;
+  }
+  const x = Number(value.x);
+  const y = Number(value.y);
+  if (!Number.isFinite(x) || !Number.isFinite(y)) {
+    return current;
+  }
+  return { x: Math.round(x), y: Math.round(y) };
 }
 
 /**
@@ -163,12 +187,33 @@ function createStore(baseDir) {
       merged.idleEnabled,
       DEFAULT_SETTINGS.idleEnabled
     );
+    merged.dockEnabled = sanitizeBoolean(
+      merged.dockEnabled,
+      DEFAULT_SETTINGS.dockEnabled
+    );
+    merged.shortcutEnabled = sanitizeBoolean(
+      merged.shortcutEnabled,
+      DEFAULT_SETTINGS.shortcutEnabled
+    );
+    merged.windowBounds = sanitizeWindowBounds(
+      merged.windowBounds,
+      DEFAULT_SETTINGS.windowBounds
+    );
     return merged;
   }
 
   function writeSettings(patch) {
     const current = readSettings();
-    const allowed = ['apiKey', 'model', 'petName', 'language', 'idleEnabled'];
+    const allowed = [
+      'apiKey',
+      'model',
+      'petName',
+      'language',
+      'idleEnabled',
+      'dockEnabled',
+      'shortcutEnabled',
+      'windowBounds'
+    ];
     const next = { ...current };
     for (const key of allowed) {
       if (patch && patch[key] !== undefined) {
@@ -195,6 +240,17 @@ function createStore(baseDir) {
         }
         if (key === 'idleEnabled') {
           next.idleEnabled = sanitizeBoolean(patch.idleEnabled, current.idleEnabled);
+          continue;
+        }
+        if (key === 'dockEnabled' || key === 'shortcutEnabled') {
+          next[key] = sanitizeBoolean(patch[key], current[key]);
+          continue;
+        }
+        if (key === 'windowBounds') {
+          next.windowBounds = sanitizeWindowBounds(
+            patch.windowBounds,
+            current.windowBounds
+          );
           continue;
         }
         next[key] = typeof patch[key] === 'string' ? patch[key].trim() : String(patch[key]);

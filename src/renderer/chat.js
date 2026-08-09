@@ -10,6 +10,8 @@
  * - T-14：流式回复优先（chat.sendStream + chat.onDelta），"正在思考…" 占位、
  *   打字机增量更新、流式中发送按钮变为"停止"（chat.cancelStream）
  * - T-15 空闲主动互动：窗口内交互心跳上报主进程；主进程触发后随机展示互动气泡
+ * - T-19 窗口体验：设置页注入“贴边隐藏/全局快捷键”开关与提示（ADR-022 冻结契约
+ *   petAPI.window.toggleDock / setShortcutEnabled；提示文案为本地双语映射，不依赖 locale 文件）
  */
 (function () {
   'use strict';
@@ -19,6 +21,30 @@
   const DEFAULT_LANGUAGE = 'system';
   const ACTIVITY_POKE_MIN_INTERVAL_MS = 5000; // T-15: 交互心跳节流
   const MOOD_POLL_MS = 3000;
+  /** T-19：设置页窗口行为区块文案（双语内联，因 locale 文件不在任务边界内） */
+  const WINDOW_FEATURE_HINTS = {
+    'zh-CN': {
+      title: '窗口行为',
+      dockLabel: '贴边隐藏',
+      dockHint: '拖到屏幕边缘自动收起成细条，鼠标靠近自动滑出；可随时关闭。',
+      shortcutLabel: '全局快捷键',
+      shortcutHint: '按 Ctrl+Alt+P 可从任意位置呼出窗口；按键被占用时自动尝试备用键。',
+      shortcutUnavailable: '快捷键注册失败（可能与其他应用冲突），已自动关闭。',
+      shortcutChanged: '全局快捷键设置已保存。'
+    },
+    en: {
+      title: 'Window behavior',
+      dockLabel: 'Edge docking',
+      dockHint:
+        'Drag to a screen edge to auto-collapse; hover near the edge to slide out.',
+      shortcutLabel: 'Global shortcut',
+      shortcutHint:
+        'Press Ctrl+Alt+P to summon the window from anywhere; fallbacks are tried if taken.',
+      shortcutUnavailable:
+        'Shortcut registration failed (possibly in use by another app) and was disabled.',
+      shortcutChanged: 'Global shortcut setting saved.'
+    }
+  };
   /** 情绪带：valence 从高到低匹配；face 为角色表情，className 对应配色主题 */
   const MOOD_BANDS = [
     { min: 85, className: 'mood-excited', face: '🤩' },
@@ -36,6 +62,8 @@
   let streaming = false;
   let lastActivityPokeAt = 0;
   let memoryItems = [];
+  let currentSettings = {};
+  let windowFeatureEls = {};
 
   async function init() {
     cacheElements();
@@ -45,6 +73,7 @@
     // 先加载两份语言包，确保任何文案渲染不会回退到键名
     await window.PetLocales.ready;
     await restoreSettings();
+    ensureWindowFeatureControls(); // T-19: 注入窗口行为开关与提示
     void restoreHistory();
     void initMood();
   }
@@ -92,6 +121,171 @@
     };
     showExportStatus = makeStatusShower(elements.exportStatus);
     showClearStatus = makeStatusShower(elements.clearStatus);
+  }
+
+  /* ---------------- T-19：窗口行为开关与提示（ADR-022 冻结契约） ---------------- */
+
+  function hasWindowApi() {
+    return Boolean(
+      window.petAPI &&
+        window.petAPI.window &&
+        typeof window.petAPI.window.toggleDock === 'function' &&
+        typeof window.petAPI.window.setShortcutEnabled === 'function'
+    );
+  }
+
+  function makeWindowFeatureSwitch(kind, id) {
+    const label = document.createElement('label');
+    label.className = 'field field-switch';
+    label.dataset.windowFeature = kind;
+
+    const text = document.createElement('span');
+    text.className = 'field-label';
+
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.className = 'field-checkbox';
+    input.id = id;
+
+    const hint = document.createElement('span');
+    hint.className = 'field-hint';
+
+    label.append(text, input, hint);
+    return { label, text, input, hint };
+  }
+
+  /** 在“宠物名称”之前插入窗口行为区块（index.html 只读，由 chat.js 动态注入） */
+  function ensureWindowFeatureControls() {
+    if (windowFeatureEls.block || !elements.petName || !hasWindowApi()) {
+      return;
+    }
+    const anchor = elements.petName.closest('.field');
+    if (!anchor || !anchor.parentNode) {
+      return;
+    }
+
+    const block = document.createElement('div');
+    block.className = 'field';
+    block.id = 'window-feature-block';
+    const title = document.createElement('span');
+    title.className = 'field-label';
+    block.appendChild(title);
+
+    const dock = makeWindowFeatureSwitch('dock', 'dock-enabled');
+    const shortcut = makeWindowFeatureSwitch('shortcut', 'shortcut-enabled');
+    block.append(dock.label, shortcut.label);
+    anchor.parentNode.insertBefore(block, anchor);
+
+    windowFeatureEls = {
+      block,
+      title,
+      dockText: dock.text,
+      dockCheckbox: dock.input,
+      dockHint: dock.hint,
+      shortcutText: shortcut.text,
+      shortcutCheckbox: shortcut.input,
+      shortcutHint: shortcut.hint
+    };
+
+    windowFeatureEls.dockCheckbox.addEventListener('change', () => {
+      void toggleWindowDock();
+    });
+    windowFeatureEls.shortcutCheckbox.addEventListener('change', () => {
+      void toggleWindowShortcut();
+    });
+
+    applyWindowFeatureSettings(currentSettings);
+    updateWindowFeatureText();
+  }
+
+  function windowFeatureHints() {
+    return (
+      WINDOW_FEATURE_HINTS[currentLocale] || WINDOW_FEATURE_HINTS['zh-CN']
+    );
+  }
+
+  function updateWindowFeatureText() {
+    if (!windowFeatureEls.block) {
+      return;
+    }
+    const hints = windowFeatureHints();
+    windowFeatureEls.title.textContent = hints.title;
+    windowFeatureEls.dockText.textContent = hints.dockLabel;
+    windowFeatureEls.dockHint.textContent = hints.dockHint;
+    windowFeatureEls.shortcutText.textContent = hints.shortcutLabel;
+    windowFeatureEls.shortcutHint.textContent = hints.shortcutHint;
+  }
+
+  /** 从主进程设置同步开关状态（缺省开启，与 store.js DEFAULT_SETTINGS 一致） */
+  function applyWindowFeatureSettings(settings) {
+    if (!windowFeatureEls.block) {
+      return;
+    }
+    windowFeatureEls.dockCheckbox.checked =
+      !settings || settings.dockEnabled !== false;
+    windowFeatureEls.shortcutCheckbox.checked =
+      !settings || settings.shortcutEnabled !== false;
+  }
+
+  async function toggleWindowDock() {
+    const api =
+      window.petAPI &&
+      window.petAPI.window &&
+      typeof window.petAPI.window.toggleDock === 'function'
+        ? window.petAPI.window
+        : null;
+    if (!api) {
+      applyWindowFeatureSettings(currentSettings);
+      return;
+    }
+    try {
+      const result = await api.toggleDock();
+      if (result && typeof result.docked === 'boolean') {
+        windowFeatureEls.dockCheckbox.checked = result.docked;
+        currentSettings = { ...currentSettings, dockEnabled: result.docked };
+      } else {
+        applyWindowFeatureSettings(currentSettings);
+      }
+    } catch (error) {
+      console.warn('切换贴边隐藏失败：', error);
+      applyWindowFeatureSettings(currentSettings);
+    }
+  }
+
+  async function toggleWindowShortcut() {
+    const api =
+      window.petAPI &&
+      window.petAPI.window &&
+      typeof window.petAPI.window.setShortcutEnabled === 'function'
+        ? window.petAPI.window
+        : null;
+    if (!api) {
+      applyWindowFeatureSettings(currentSettings);
+      return;
+    }
+    const requested = windowFeatureEls.shortcutCheckbox.checked;
+    try {
+      const result = await api.setShortcutEnabled(requested);
+      if (result && typeof result.enabled === 'boolean') {
+        windowFeatureEls.shortcutCheckbox.checked = result.enabled;
+        currentSettings = {
+          ...currentSettings,
+          shortcutEnabled: result.enabled
+        };
+        const hints = windowFeatureHints();
+        showSettingsStatus(
+          requested && !result.enabled
+            ? hints.shortcutUnavailable
+            : hints.shortcutChanged,
+          requested && !result.enabled ? 'error' : 'ok'
+        );
+      } else {
+        applyWindowFeatureSettings(currentSettings);
+      }
+    } catch (error) {
+      console.warn('切换全局快捷键失败：', error);
+      applyWindowFeatureSettings(currentSettings);
+    }
   }
 
   function bindEvents() {
@@ -801,31 +995,33 @@
 
   /** 将设置应用到表单与标题（缺失字段回退默认值） */
   function applySettings(settings) {
+    currentSettings = settings && typeof settings === 'object' ? settings : {};
     const language =
-      settings && typeof settings.language === 'string'
-        ? settings.language
+      typeof currentSettings.language === 'string'
+        ? currentSettings.language
         : DEFAULT_LANGUAGE;
     elements.language.value = language;
     currentLocale = resolveEffectiveLocale(language);
     const t = window.PetLocales.createTranslator(currentLocale);
 
     elements.apiKey.value =
-      settings && typeof settings.apiKey === 'string' ? settings.apiKey : '';
+      typeof currentSettings.apiKey === 'string' ? currentSettings.apiKey : '';
     elements.model.value =
-      settings && typeof settings.model === 'string' && settings.model.trim()
-        ? settings.model.trim()
+      typeof currentSettings.model === 'string' && currentSettings.model.trim()
+        ? currentSettings.model.trim()
         : DEFAULT_MODEL;
 
     currentPetName =
-      settings && typeof settings.petName === 'string' && settings.petName.trim()
-        ? settings.petName.trim()
+      typeof currentSettings.petName === 'string' &&
+      currentSettings.petName.trim()
+        ? currentSettings.petName.trim()
         : t('app.defaultPetName');
     elements.petName.value = currentPetName;
-    elements.idleEnabled.checked = !settings || settings.idleEnabled !== false;
+    elements.idleEnabled.checked = currentSettings.idleEnabled !== false;
 
     const persona =
-      settings && settings.persona && typeof settings.persona === 'object'
-        ? settings.persona
+      currentSettings.persona && typeof currentSettings.persona === 'object'
+        ? currentSettings.persona
         : {};
     const traits = Array.isArray(persona.traits) ? persona.traits : [];
     elements.personaTraits.value = traits.join(t('settings.traitsDelimiter'));
@@ -834,6 +1030,8 @@
       typeof persona.backstory === 'string' ? persona.backstory : '';
 
     applyStaticText();
+    applyWindowFeatureSettings(currentSettings); // T-19
+    updateWindowFeatureText(); // T-19: 语言切换后刷新提示文案
     if (elements.memoryPage && !elements.memoryPage.hidden) {
       renderMemoryList();
     }

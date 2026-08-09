@@ -17,7 +17,9 @@ const CHANNELS = {
   memoryDelete: 'memory:delete',
   memoryUpdate: 'memory:update',
   historyExport: 'history:export',
-  historyClear: 'history:clear'
+  historyClear: 'history:clear',
+  windowToggleDock: 'window:toggle-dock',
+  windowSetShortcut: 'window:set-shortcut'
 };
 
 contextBridge.exposeInMainWorld('petAPI', {
@@ -46,7 +48,10 @@ contextBridge.exposeInMainWorld('petAPI', {
     set: (patch) => ipcRenderer.invoke(CHANNELS.settingsSet, patch)
   },
   window: {
-    hide: () => ipcRenderer.invoke(CHANNELS.windowHide)
+    hide: () => ipcRenderer.invoke(CHANNELS.windowHide),
+    toggleDock: () => ipcRenderer.invoke(CHANNELS.windowToggleDock),
+    setShortcutEnabled: (enabled) =>
+      ipcRenderer.invoke(CHANNELS.windowSetShortcut, enabled)
   },
   history: {
     get: () => ipcRenderer.invoke(CHANNELS.historyGet),
