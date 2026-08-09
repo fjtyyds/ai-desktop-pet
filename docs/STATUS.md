@@ -2,9 +2,9 @@
 
 - 更新时间：2026-08-09
 - 当前阶段：M3 打磨（打包/崩溃日志/i18n 与无障碍/密钥加密）
-- 当前任务：M3 规划完成，等待 T-10~T-13 并行线程开发
-- 最近完成：M0~M2 全部验收通过（含 T-09 目检）；M3 规划（ADR-016~019、任务卡与 worktree）
-- 下一步：打开 codex/m3-packaging、codex/m3-crash、codex/m3-i18n、codex/m3-secure 四个 worktree 线程并行开发
+- 当前任务：T-11/T-12/T-13 已合并；T-10 依赖已获批，待完成打包冒烟后合并
+- 最近完成：M0~M2 全部验收通过；M3 规划；T-11（崩溃日志）、T-12（i18n/无障碍）、T-13（密钥加密）开发与集成
+- 下一步：T-10 完成 dist 打包冒烟 → 合并 → M3 整体目检
 - 阻塞：无
 - 交接提示：新会话先读 `AGENTS.md` → `PLAN.md` → 自己的任务卡（docs/tasks/T-xx.md）
 
@@ -74,3 +74,11 @@
 - ADR-018：i18n（zh-CN/en）与无障碍走查。
 - ADR-019：API Key 加密存储（safeStorage/DPAPI，旧明文自动迁移）。
 - 任务卡：T-10（codex/m3-packaging）、T-11（codex/m3-crash）、T-12（codex/m3-i18n）、T-13（codex/m3-secure）；worktree 目录见任务卡；scripts/check.js 由协调者维护。
+
+## M3 集成记录（2026-08-09，T-11~T-13）
+
+- T-11 崩溃日志：crash.js（uncaughtException/unhandledRejection → logs/app.log，crashReporter 本地 dump）已并入 main。
+- T-12 i18n/无障碍：locales zh-CN/en、语言切换与持久化、托盘菜单本地化、对比度修正（主按钮 #4160de）已并入 main。
+- T-13 密钥加密：secure-settings.js（safeStorage enc:v1:，明文自动迁移，不可用回退告警；apiKey 原始读写绕过 256 清洗上限，避免密文截断）已并入 main。
+- 校验：`npm run check`、`npm run smoke` 通过；合并后集成验证通过（i18n 15 个 data-i18n 节点生效、无 CSP 错误；256 字符密钥密文落盘 enc:v1: 长度 387、get/set 往返一致）。
+- T-10 状态：前置工作（assets 图标、electron-builder.yml、tray/main 图标读取）在 worktree 中未提交；依赖变更已获批，待 T-10 合并 main 后执行 npm install + npm run dist 并提交。
