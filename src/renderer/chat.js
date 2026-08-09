@@ -12,6 +12,17 @@
   const STORAGE_KEY = 'ai-pet-settings';
   const DEFAULT_MODEL = 'deepseek-v4-flash';
   const DEFAULT_LANGUAGE = 'system';
+  const MOOD_POLL_MS = 3000;
+  /** 情绪带：valence 从高到低匹配；face 为角色表情，className 对应配色主题 */
+  const MOOD_BANDS = [
+    { min: 85, className: 'mood-excited', face: '🤩' },
+    { min: 70, className: 'mood-happy', face: '😄' },
+    { min: 55, className: 'mood-happy', face: '😊' },
+    { min: 45, className: 'mood-neutral', face: '🙂' },
+    { min: 35, className: 'mood-neutral', face: '😐' },
+    { min: 15, className: 'mood-sad', face: '😔' },
+    { min: 0, className: 'mood-sad', face: '😢' }
+  ];
   let messages = [];
   let elements = {};
   let currentLocale = 'zh-CN';
@@ -24,12 +35,17 @@
     await window.PetLocales.ready;
     await restoreSettings();
     void restoreHistory();
+    void initMood();
   }
 
   function cacheElements() {
     elements = {
+      petCard: document.getElementById('pet-card'),
       chatView: document.getElementById('chat-view'),
       settingsView: document.getElementById('settings-view'),
+      moodIndicator: document.getElementById('mood-indicator'),
+      moodFace: document.getElementById('mood-face'),
+      moodLabel: document.getElementById('mood-label'),
       messageList: document.getElementById('message-list'),
       serviceStatus: document.getElementById('service-status'),
       chatForm: document.getElementById('chat-form'),
@@ -110,6 +126,11 @@
 
     elements.sendBtn.disabled = true;
     elements.sendBtn.textContent = '…';
+    // T-16：等待回复期间表情呈“思考”动效；文案仍保留当前 mood，避免与
+    // T-14 的“正在思考…”气泡抢占同一视觉/文案通道。
+    if (elements.moodIndicator) {
+      elements.moodIndicator.classList.add('is-thinking');
+    }
     try {
       // M2：主进程统一组装上下文，渲染层只传当前消息（ADR-012）
       const result = await window.petAPI.chat.send({ text });
@@ -130,8 +151,87 @@
     } finally {
       elements.sendBtn.disabled = false;
       elements.sendBtn.textContent = t('chat.send');
+      if (elements.moodIndicator) {
+        elements.moodIndicator.classList.remove('is-thinking');
+      }
+      void refreshMood();
       elements.chatInput.focus();
     }
+  }
+
+  /* T-16 情绪可视化：mood.get -> 表情/配色（ADR-022） */
+
+  function hasMoodApi() {
+    return Boolean(
+      window.petAPI &&
+        window.petAPI.mood &&
+        typeof window.petAPI.mood.get === 'function'
+    );
+  }
+
+  async function initMood() {
+    if (!hasMoodApi()) {
+      return;
+    }
+    await refreshMood();
+    setInterval(refreshMood, MOOD_POLL_MS);
+  }
+
+  async function refreshMood() {
+    if (!hasMoodApi()) {
+      return;
+    }
+    try {
+      const mood = await window.petAPI.mood.get();
+      applyMood(mood);
+    } catch (error) {
+      console.warn('读取情绪失败，保持上次显示：', error);
+    }
+  }
+
+  /**
+   * 把 mood（label/valence/intensity）映射为角色表情与配色。
+   * 使用 data 属性（data-mood-label/data-valence/data-intensity）记录原始状态，
+   * 用 mood-* 类驱动 CSS 主题；保持文案对比度与 aria-live 无障碍广播。
+   * 暴露给 window.ChatUI.applyMood，便于冒烟与注入假 mood 验证。
+   */
+  function applyMood(mood) {
+    if (!elements.moodIndicator || !mood || typeof mood !== 'object') {
+      return;
+    }
+    const valence = Number(mood.valence);
+    const intensity = Number(mood.intensity);
+    const label =
+      typeof mood.label === 'string' && mood.label.trim() ? mood.label.trim() : '平静';
+    const safeValence = Number.isFinite(valence)
+      ? Math.min(100, Math.max(0, valence))
+      : 60;
+    const safeIntensity = Number.isFinite(intensity)
+      ? Math.min(1, Math.max(0, intensity))
+      : 0.35;
+
+    const band =
+      MOOD_BANDS.find((item) => safeValence >= item.min) ||
+      MOOD_BANDS[MOOD_BANDS.length - 1];
+
+    elements.moodIndicator.hidden = false;
+    elements.moodIndicator.dataset.moodLabel = label;
+    elements.moodIndicator.dataset.valence = String(safeValence);
+    elements.moodIndicator.dataset.intensity = String(safeIntensity);
+
+    if (elements.moodFace.textContent !== band.face) {
+      elements.moodFace.textContent = band.face;
+    }
+    if (elements.moodLabel.textContent !== label) {
+      elements.moodLabel.textContent = label;
+      // 仅在文案变化时更新 aria-label，避免屏幕阅读器重复广播
+      elements.moodIndicator.setAttribute('aria-label', `当前情绪：${label}`);
+    }
+
+    const bandClasses = MOOD_BANDS.map((item) => item.className);
+    elements.petCard.classList.remove(...bandClasses);
+    elements.petCard.classList.add(band.className);
+    elements.petCard.classList.toggle('mood-intense', safeIntensity >= 0.7);
   }
 
   /**
@@ -394,5 +494,5 @@
     }, 4000);
   }
 
-  window.ChatUI = { init };
+  window.ChatUI = { init, applyMood };
 })();

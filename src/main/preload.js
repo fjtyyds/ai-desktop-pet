@@ -6,7 +6,8 @@ const CHANNELS = {
   settingsGet: 'settings:get',
   settingsSet: 'settings:set',
   windowHide: 'window:hide',
-  historyGet: 'history:get'
+  historyGet: 'history:get',
+  moodGet: 'mood:get'
 };
 
 contextBridge.exposeInMainWorld('petAPI', {
@@ -24,5 +25,8 @@ contextBridge.exposeInMainWorld('petAPI', {
   },
   history: {
     get: () => ipcRenderer.invoke(CHANNELS.historyGet)
+  },
+  mood: {
+    get: () => ipcRenderer.invoke(CHANNELS.moodGet)
   }
 });

@@ -302,3 +302,112 @@
   opacity: 0.7;
   line-height: 1.6;
 }
+
+/* T-16 情绪可视化：表情与配色随 mood 变化（ADR-022 mood.get） */
+.mood-indicator {
+  flex: 0 0 auto;
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 8px 12px;
+  padding: 4px 10px;
+  border: 1px solid var(--mood-accent, rgba(255, 255, 255, 0.18));
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--mood-accent, #e8eaf6);
+  font-size: 12px;
+  line-height: 1;
+  transition:
+    border-color 0.25s ease,
+    color 0.25s ease;
+}
+
+.mood-indicator[hidden] {
+  display: none;
+}
+
+.mood-face {
+  font-size: 15px;
+  line-height: 1;
+}
+
+.mood-label {
+  font-weight: 600;
+}
+
+/* 情绪配色主题：亮色 accent 保证在深色卡片上有足够对比度 */
+.pet-card.mood-excited {
+  --mood-accent: #ffd166;
+  --mood-glow: rgba(255, 209, 102, 0.5);
+  border-color: rgba(255, 209, 102, 0.32);
+}
+
+.pet-card.mood-happy {
+  --mood-accent: #81c784;
+  --mood-glow: rgba(129, 199, 132, 0.45);
+  border-color: rgba(129, 199, 132, 0.3);
+}
+
+.pet-card.mood-neutral {
+  --mood-accent: #8ab4ff;
+  --mood-glow: rgba(138, 180, 255, 0.4);
+  border-color: rgba(138, 180, 255, 0.28);
+}
+
+.pet-card.mood-sad {
+  --mood-accent: #9fa8da;
+  --mood-glow: rgba(159, 168, 218, 0.4);
+  border-color: rgba(159, 168, 218, 0.3);
+}
+
+.pet-card.mood-excited,
+.pet-card.mood-happy,
+.pet-card.mood-neutral,
+.pet-card.mood-sad {
+  background-image:
+    radial-gradient(circle at 50% 0%, var(--mood-glow, transparent), transparent 60%),
+    linear-gradient(160deg, #2b2f45, #171a2b);
+}
+
+/* 高强度情绪：表情呼吸动效（尊重 prefers-reduced-motion） */
+.pet-card.mood-intense .mood-face {
+  animation: mood-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes mood-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.12);
+    opacity: 0.85;
+  }
+}
+
+/* 等待回复时：仅表情轻微“思考”动效，文案仍保持当前 mood，
+   与 T-14 的“正在思考…”气泡互不冲突 */
+.mood-indicator.is-thinking .mood-face {
+  animation: mood-think 1.2s ease-in-out infinite;
+}
+
+@keyframes mood-think {
+  0%,
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  50% {
+    transform: translateY(-2px);
+    opacity: 0.7;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pet-card.mood-intense .mood-face,
+  .mood-indicator.is-thinking .mood-face {
+    animation: none;
+  }
+}
