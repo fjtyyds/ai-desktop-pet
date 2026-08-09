@@ -64,3 +64,37 @@
 - 背景：无边框窗口没有系统关闭按钮，补齐 ✕ 按钮时发现 Electron 43 下 renderer 调用 `window.close()` 不会触发主进程 `BrowserWindow` 的 close 事件（最小复现：close 事件未触发、`window-all-closed` 直接触发），导致窗口关闭后应用默认退出、托盘一并消失。
 - 决策：关闭按钮调用新增契约 `petAPI.window.hide()`（IPC `window:hide`，主进程用 `BrowserWindow.fromWebContents` 隐藏窗口）；同时在 main.js 增加 `window-all-closed` 空监听作为兜底，防止任何路径下窗口销毁导致应用退出。
 - 后果：点击 ✕ 保留窗口位置与内存状态、隐藏到托盘；契约新增一个方法，preload/ipc/chat.js 同步更新；后续如恢复使用 `window.close()` 需先验证目标 Electron 版本的 close 事件行为。
+
+## ADR-010：M2 记忆模型——短期窗口 + 长期事实记忆（本地 JSON）
+
+- 状态：Accepted
+- 背景：M1 仅持久化 messages.json 全量消息；M2 要求“重启后记得关键上下文”。全量历史直接入 Prompt 会超长且成本高，需要短期窗口与可检索的长期事实。
+- 决策：
+  - 消息升级：每条消息带 sessionId 与 timestamp，旧数据兼容（缺省 sessionId='default'）。
+  - 短期记忆：最近 N 条消息窗口，默认 N=20（`contracts.DEFAULT_SHORT_TERM_WINDOW`）。
+  - 长期记忆：`src/storage/memory-store.js` 管理 memories.json，条目 `{id, content, sessionId, createdAt, updatedAt, lastUsedAt}`；由聊天服务在对话后异步调用 LLM 抽取关键事实（失败不阻塞回复）。
+  - 检索：MVP 用“最近使用时间 + 关键词匹配”的简单相关度，最多取 3 条注入上下文（`contracts.MAX_MEMORIES_IN_CONTEXT`）；不引入向量库。
+  - petAPI 新增 `history.get()`：渲染层启动时恢复历史显示。
+- 后果：无新增依赖、完全本地；长期记忆质量取决于抽取 prompt；后续需要语义检索时再评估向量存储（修订本 ADR）。
+
+## ADR-011：M2 人格与情绪
+
+- 状态：Accepted
+- 背景：M1 只有 petName，回复无角色一致性；“桌宠”需要有可配置人格与可感知的情绪状态。
+- 决策：
+  - 人格：`settings.persona = { traits: string[], tone: string, backstory: string }`，默认内置“热情友善的 AI 桌宠”；M2 设置页至少开放 traits/tone 输入。
+  - 情绪：`src/llm/mood.js` 纯函数状态机，valence 0-100 + 强度，按交互更新（积极/消极反馈、长时间无交互缓慢回归默认），生成情绪描述词。
+  - system prompt 由 `src/llm/persona.js` 的 `buildSystemPrompt({ settings, mood })` 生成，由 T-07 注入。
+  - 情绪 MVP 仅存内存、不持久化（避免跨线程文件冲突与复杂度）；持久化放到 M2.1 评估。
+- 后果：回复风格可配置且有状态；mood 更新需限幅防抖；情绪不跨重启保持（不在 M2 验收内）。
+
+## ADR-012：M2 上下文组装与渲染层历史恢复
+
+- 状态：Accepted
+- 背景：M1 的 chat.send 由渲染层传 history 且启动时不显示历史；“记得关键上下文”需要主进程统一组装。
+- 决策：
+  - chat service 组装 messages：`[system(persona+mood)] + 短期窗口（最近 N 条） + 长期记忆（<=3 条，标注为记忆） + 当前用户消息`。
+  - chat.send 保持 `{ text, history? }` 兼容；history 缺省时由主进程从 storage 读取，渲染层不再传全量历史。
+  - 每轮成功后：追加消息到 storage；异步触发记忆抽取（失败仅记录，不阻塞 UI）。
+  - 渲染层 init 时调用 `petAPI.history.get()` 恢复历史气泡。
+- 后果：主进程持有完整对话状态，渲染层更薄；历史恢复补齐 M1 遗留缺口。

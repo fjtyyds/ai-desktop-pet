@@ -4,7 +4,7 @@
 
 ## 当前里程碑
 
-**M1：MVP 桌宠（并行模式）**
+**M1：MVP 桌宠（并行模式）——已完成（2026-08-09）**
 
 目标：托盘/窗口、聊天面板 UI、DeepSeek Provider 与存储三路并行开发，最终在 main 集成。
 
@@ -28,6 +28,29 @@
 - [x] 协调者合并到 main 并集成验证
 - [x] T-04 M1 人工验收与收尾
 
+**M2：智能层（进行中）**
+
+目标：人格/情绪 + 短期与长期记忆，重启后记得关键上下文。
+
+任务卡：
+
+- `docs/tasks/T-05.md` — 记忆存储与历史接口（codex/m2-memory）
+- `docs/tasks/T-06.md` — 人格与情绪引擎（codex/m2-persona）
+- `docs/tasks/T-07.md` — 上下文组装与端到端集成（codex/m2-context）
+
+验收标准：
+
+1. 三个 worktree 分支并行开发，契约已由协调者冻结（ADR-010~012）。
+2. 合并到 main 后 `npm run check`、`npm run smoke` 通过。
+3. 手动 `npm run dev`：重启后历史恢复；人格/情绪设置生效；对话可引用记忆。
+
+任务清单：
+
+- [ ] T-05 记忆存储与历史接口
+- [ ] T-06 人格与情绪引擎
+- [ ] T-07 上下文组装与端到端集成
+- [ ] 协调者合并到 main 并集成验证
+
 ## Progress
 
 - 2026-08-09：M0 完成（Electron 43.3.0、文档体系、CI）。
@@ -35,6 +58,7 @@
 - 2026-08-09：M1 集成完成：codex/m1-tray（T-01，此前已并入）→ codex/m1-chat（T-02 渲染层 + 其上的 e95c411 T-03）→ codex/m1-llm（T-03，842f18a）依次合并；T-03 冲突采用 842f18a 并删除 e95c411 重复文件；main.js 增加 `require('./ipc')`。`npm run check`、`npm run smoke` 通过。
 - 2026-08-09：T-04 人工验收与收尾完成：`npm run dev` 目检通过（托盘图标/菜单/聊天收发/设置保存/单实例/关闭隐藏到托盘）；渲染页补 CSP（ADR-008）；关闭按钮改用 petAPI `window.hide`，修复 Electron 43 下 `window.close()` 绕过 close 事件导致应用退出的问题（ADR-009）。
 - 2026-08-09：真实 DeepSeek 调用验证通过：`deepseek-v4-flash`（契约默认模型）与 `deepseek-chat` 均返回 200 与正确中文回复；密钥经环境变量传入，未入库。首次测试中文乱码为 PowerShell 管道编码问题，改用 UTF-8 脚本文件后正常。
+- 2026-08-09：M2 设计完成：ADR-010~012（记忆模型/人格情绪/上下文组装）、SPEC 与 ROADMAP 更新、契约冻结（contracts.js 扩展）、任务卡 T-05~T-07 与 worktree 分支（codex/m2-*）就绪。
 
 ## Surprises & Discoveries
 
@@ -61,6 +85,9 @@
 - ADR-007：T-03 采用 m1-llm 842f18a 实现，删除 m1-chat e95c411 重复实现。
 - ADR-008：渲染页启用 CSP。
 - ADR-009：关闭按钮通过 petAPI.window.hide 隐藏到托盘。
+- ADR-010：M2 记忆模型——短期窗口 + 长期事实记忆（本地 JSON）。
+- ADR-011：M2 人格与情绪。
+- ADR-012：M2 上下文组装与渲染层历史恢复。
 
 详见 `docs/DECISIONS.md`。
 
@@ -70,3 +97,4 @@
 - M1 集成完成：T-01/T-02/T-03 已合并到 main，`npm run check` 与 `npm run smoke` 通过；mock 模式可发消息、设置可保存/读取、消息可持久化。
 - M1 验收完成（含人工目检）：托盘可用、聊天可发消息（mock）、设置可保存、关闭隐藏到托盘、CSP 无警告。
 - 下一步：M2 智能层（人格/情绪、短期与长期记忆）规划。
+- M2 设计完成：契约冻结、任务卡与 worktree 就绪，三个线程可并行开始。

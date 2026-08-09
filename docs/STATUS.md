@@ -1,10 +1,10 @@
 # 项目状态
 
 - 更新时间：2026-08-09
-- 当前阶段：M1 MVP 桌宠（并行模式）
-- 当前任务：T-04 已完成，M1 全部验收通过
-- 最近完成：M0；M1 并行工作台；T-01/T-02/T-03 集成；T-04 人工验收与收尾
-- 下一步：规划并启动 M2 智能层（人格/情绪、短期与长期记忆）
+- 当前阶段：M2 智能层（人格/情绪 + 短期与长期记忆）
+- 当前任务：M2 设计已完成，等待三个并行线程开发（T-05/T-06/T-07）
+- 最近完成：M0~M1 全部验收通过；真实 DeepSeek 调用验证；M2 设计（ADR-010~012、契约冻结、任务卡与 worktree）
+- 下一步：打开 codex/m2-memory、codex/m2-persona、codex/m2-context 三个 worktree 线程并行开发
 - 阻塞：无
 - 交接提示：新会话先读 `AGENTS.md` → `PLAN.md` → 自己的任务卡（docs/tasks/T-xx.md）
 
@@ -23,3 +23,11 @@
 - 关闭按钮：无边框窗口补 ✕；因 Electron 43 的 renderer `window.close()` 绕过 close 事件导致应用退出，改为 petAPI `window.hide` IPC 隐藏窗口并加 `window-all-closed` 兜底（ADR-009）。
 - 校验：`npm run check`、`npm run smoke` 通过；window.hide 端到端验证通过（隐藏后窗口未销毁、应用存活）。
 - 真实调用：`deepseek-v4-flash`（默认模型）与 `deepseek-chat` 均验证成功，密钥仅经环境变量传入。
+
+## M2 设计完成记录（2026-08-09）
+
+- ADR-010：记忆模型（短期窗口 20 条 + 长期事实记忆 memories.json，无向量库）。
+- ADR-011：人格（settings.persona）+ 情绪（内存态状态机）+ system prompt 注入。
+- ADR-012：chat service 统一组装上下文；渲染层通过 petAPI.history.get 恢复历史。
+- 契约冻结：contracts.js 新增 ChatMessage.sessionId/timestamp、Persona、MoodState、MemoryItem、history.get、DEFAULT_SHORT_TERM_WINDOW、MAX_MEMORIES_IN_CONTEXT。
+- 任务卡：T-05（codex/m2-memory）、T-06（codex/m2-persona）、T-07（codex/m2-context），worktree 目录见任务卡。
