@@ -9,11 +9,11 @@
 ## 铁律（防止上下文丢失）
 
 1. 事实只存在于文件里：需求、决策、进度分别写入 `docs/SPEC.md`、`docs/DECISIONS.md`、`docs/STATUS.md`、`PLAN.md`。不要依赖会话记忆。
-2. 一个会话只做一个任务，任务边界以 `docs/STATUS.md` 的“当前任务”为准。
-3. 开始任务前：先读 `AGENTS.md`、`PLAN.md`、`docs/STATUS.md`；需要时再读 `docs/SPEC.md`、`docs/DECISIONS.md`。
-4. 结束或中断会话前：更新 `PLAN.md` 的 Progress、Surprises & Discoveries、Decision Log、Outcomes & Retrospective 四个区块，更新 `docs/STATUS.md`，然后提交 git。
+2. 一个会话只做一个任务，任务边界以任务卡（`docs/tasks/T-xx.md`）为准。
+3. 开始任务前：先读 `AGENTS.md`、`PLAN.md`、`docs/STATUS.md`、自己的任务卡；需要时再读 `docs/SPEC.md`、`docs/DECISIONS.md`。
+4. 结束或中断会话前：更新任务卡状态、`PLAN.md`、`docs/STATUS.md`，然后提交 git。
 5. 任何需求或技术变更，先写进 `docs/DECISIONS.md`（ADR），再实施。
-6. 不要在一个会话里跨多个里程碑；不要跳过 `npm run check` 直接交付。
+6. 不要在一个会话里跨多个任务；不要跳过 `npm run check` 直接交付。
 7. 发现文档与现实矛盾时，先更新文档并记录决策，不要静默猜测。
 
 ## 常用命令
@@ -24,13 +24,25 @@
 - `npm install`：安装依赖（首次或 package.json 变更后）
 - 若 `npm run check` 提示 Electron 未安装（二进制缺失）：`$env:ELECTRON_MIRROR='https://npmmirror.com/mirrors/electron/'; node node_modules/electron/install.js`
 
+## 并行开发模式（M1 起）
+
+- 每个任务一张任务卡，位于 `docs/tasks/`；一个线程只做一张卡。
+- 每个任务使用独立 git worktree 与分支（`codex/m1-*`），工作树目录见任务卡。
+- 只允许修改任务卡“涉及文件”列出的内容；其他文件只读。
+- 依赖（package.json）变更只允许 T-03 或协调者执行。
+- 子任务完成后，由协调者在 main 分支合并并更新 STATUS.md/PLAN.md；子线程只更新自己的任务卡。
+- 各任务必须遵守 `src/shared/contracts.js` 的接口契约；修改契约需先经协调者。
+- 新 worktree 首次使用时需运行 `npm install`（二进制下载慢时使用上面的镜像命令）。
+
 ## 目录地图
 
-- `src/main` — Electron 主进程（窗口、生命周期、系统能力）
+- `src/main` — Electron 主进程（窗口、生命周期、系统能力、IPC）
 - `src/renderer` — 渲染进程（UI、动画、交互）
-- `src/shared` — 未来共享类型/常量（M1 引入）
+- `src/shared` — 共享类型/契约（协调者维护）
+- `src/llm` — LLM Provider（T-03 新建）
+- `src/storage` — 本地存储（T-03 新建）
 - `scripts` — 校验与自动化脚本
-- `docs` — 产品、决策、状态文档
+- `docs` — 产品、决策、状态、任务卡
 - `.github/workflows` — CI
 
 ## 验收要求

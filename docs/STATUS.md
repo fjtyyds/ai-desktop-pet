@@ -1,9 +1,9 @@
 # 项目状态
 
 - 更新时间：2026-08-09
-- 当前阶段：M0 工程骨架（已完成）
-- 当前任务：等待 M1 开工
-- 最近完成：M0 全部完成（文档体系、Electron 壳、CI、Electron 43.3.0）；`npm run check` 与 `npm run smoke` 通过
-- 下一步（M1）：`npm audit` 已确认 0 漏洞；开始 MVP 桌宠 —— 角色显示/动画/拖拽/托盘 + 聊天面板 + DeepSeek 对话
+- 当前阶段：M1 MVP 桌宠（并行模式）
+- 当前任务：三个子任务并行开发（T-01 托盘 / T-02 聊天 UI / T-03 LLM+存储）
+- 最近完成：M0；M1 并行工作台（任务卡、共享契约、worktree 分支）
+- 下一步：分别打开三个 worktree 线程开始 T-01/T-02/T-03；完成后由协调者合并
 - 阻塞：无
-- 交接提示：新 Codex 会话先读 `AGENTS.md` → `PLAN.md` → 本文件
+- 交接提示：新会话先读 `AGENTS.md` → `PLAN.md` → 自己的任务卡（docs/tasks/T-xx.md）
