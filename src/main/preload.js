@@ -11,7 +11,8 @@ const CHANNELS = {
   windowHide: 'window:hide',
   historyGet: 'history:get',
   idleEvent: 'idle:event',
-  activityPoke: 'activity:poke'
+  activityPoke: 'activity:poke',
+  moodGet: 'mood:get'
 };
 
 contextBridge.exposeInMainWorld('petAPI', {
@@ -56,5 +57,8 @@ contextBridge.exposeInMainWorld('petAPI', {
       return () => ipcRenderer.removeListener(CHANNELS.idleEvent, listener);
     },
     poke: () => ipcRenderer.send(CHANNELS.activityPoke)
+  },
+  mood: {
+    get: () => ipcRenderer.invoke(CHANNELS.moodGet)
   }
 });

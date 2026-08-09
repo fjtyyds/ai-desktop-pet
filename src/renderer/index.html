@@ -43,6 +43,19 @@
         aria-label="聊天"
         data-i18n-aria-label="chat.viewAriaLabel"
       >
+        <div
+          id="mood-indicator"
+          class="mood-indicator mood-neutral"
+          role="status"
+          aria-live="polite"
+          data-mood-label="平静"
+          data-valence="60"
+          data-intensity="0.35"
+          hidden
+        >
+          <span id="mood-face" class="mood-face" aria-hidden="true">🙂</span>
+          <span id="mood-label" class="mood-label">平静</span>
+        </div>
         <div id="message-list" class="message-list" aria-live="polite"></div>
         <div id="service-status" class="service-status" role="status"></div>
         <form id="chat-form" class="chat-form">
