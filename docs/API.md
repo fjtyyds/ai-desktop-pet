@@ -42,6 +42,10 @@ window.petAPI = {
 | `settings:get` / `settings:set` | invoke | 设置读写（apiKey 经 secure-settings 加解密） |
 | `window:hide` | invoke | 隐藏主窗口到托盘 |
 | `history:get` | invoke | 返回归一化消息历史 |
+| `mood:get` | invoke | M3.5：返回当前情绪状态 |
+| `memory:list` / `memory:delete` | invoke | M3.5：长期记忆列表/删除 |
+| `history:export` / `history:clear` | invoke | M3.5：导出对话 / 清除数据 |
+| `window:toggle-dock` / `window:set-shortcut` | invoke | M3.5：贴边隐藏开关 / 快捷键开关 |
 
 ## 3. 内部模块接口
 
@@ -63,11 +67,17 @@ window.petAPI = {
 - `DEFAULT_SHORT_TERM_WINDOW = 20`
 - `MAX_MEMORIES_IN_CONTEXT = 3`
 
-## 5. M3.5 已冻结的待扩展契约（ADR-022）
+## 5. M3.5 已冻结的扩展契约（ADR-022，2026-08-09 起生效）
 
-- `petAPI.mood.get()`
-- `petAPI.memory.list() / delete(id)`
-- `petAPI.history.export() / clear()`
-- `petAPI.window.toggleDock() / setShortcutEnabled(boolean)`
+```js
+petAPI.mood.get() -> Promise<MoodState>
+petAPI.memory.list() -> Promise<MemoryItem[]>
+petAPI.memory.delete(id: string) -> Promise<{ ok: boolean, error?: string }>
+petAPI.history.export({ format?: 'markdown' | 'json' }) -> Promise<{ ok: boolean, filePath?: string, error?: string }>
+petAPI.history.clear({ scope?: 'messages' | 'memories' | 'settings' | 'all' }) -> Promise<{ ok: boolean, error?: string }>
+petAPI.window.toggleDock() -> Promise<{ docked: boolean }>
+petAPI.window.setShortcutEnabled(enabled: boolean) -> Promise<{ enabled: boolean }>
+```
 
-以上由对应任务卡实施前在本文档补全详细签名。
+- settings 扩展字段（由对应任务卡在 store.js 白名单登记）：`idleEnabled`（T-15）、`onboardingDone`（T-18/首次引导）、`shortcutEnabled` 与窗口位置（T-19）。
+- 以上签名对 T-15~T-18 及后续任务卡生效；实施前如需调整，先回报协调者修订本文档。

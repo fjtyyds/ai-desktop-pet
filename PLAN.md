@@ -88,8 +88,8 @@
 
 - 批次 1（对话体验）：`docs/tasks/T-14.md` — 流式回复与打字机（codex/m3x-stream）
 - 批次 2（陪伴感）：`docs/tasks/T-15.md` — 空闲主动互动（codex/m3x-idle）；`docs/tasks/T-16.md` — 情绪可视化（codex/m3x-mood-ui）
-- 批次 3（记忆与隐私）：`docs/tasks/T-17.md` — 记忆管理页（codex/m3x-memory-ui）；`docs/tasks/T-20.md` — 对话导出与数据清除（codex/m3x-export）
-- 批次 4（上手与窗口）：`docs/tasks/T-18.md` — 首次引导与人格模板（codex/m3x-onboarding）；`docs/tasks/T-19.md` — 窗口体验（codex/m3x-window）
+- 批次 3（记忆与隐私）：`docs/tasks/T-17.md` — 记忆管理页（codex/m3x-memory-ui）；`docs/tasks/T-18.md` — 对话导出与数据清除（codex/m3x-export）
+- 批次 4（上手与窗口）：`docs/tasks/T-20.md` — 首次引导与人格模板（codex/m3x-onboarding）；`docs/tasks/T-19.md` — 窗口体验（codex/m3x-window）
 - 批次 5（扩展能力，先验证）：`docs/tasks/T-21.md` — 系统状态与番茄钟（codex/m3x-widgets）；`docs/tasks/T-22.md` — 天气小部件（codex/m3x-weather）；`docs/tasks/T-23.md` — 语音与图片（codex/m3x-voice-vision）
 
 验收标准：
@@ -105,9 +105,9 @@
 - [ ] T-15 空闲主动互动
 - [ ] T-16 情绪可视化
 - [ ] T-17 记忆管理页
-- [ ] T-18 首次引导与预设人格模板
+- [ ] T-18 对话导出与数据清除
 - [ ] T-19 窗口体验（贴边/位置记忆/快捷键）
-- [ ] T-20 对话导出与数据清除
+- [ ] T-20 首次引导与预设人格模板
 - [ ] T-21 系统状态与番茄钟
 - [ ] T-22 天气小部件
 - [ ] T-23 语音与图片（验证门禁）
@@ -134,6 +134,7 @@
 - 2026-08-09：T-10 依赖变更获批（electron-builder@^26.15.3）；待其合并 main 后执行 dist 打包冒烟。
 - 2026-08-09：T-10 合并完成：electron-builder + NSIS 产出 AI桌宠-0.1.0-Setup.exe（约 100 MB）；正式图标 assets/icon.ico、icon.png；解包与静默安装/卸载冒烟通过；依赖已安装（0 漏洞），check/smoke 通过。
 - 2026-08-09：M3 整体目检通过；M3.5 内容增强规划完成：ADR-020~023（范围变更与验证门禁）、SPEC 更新（语音/提醒转增强范围）、任务卡 T-14~T-23 与 5 个批次排定。
+- 2026-08-09：用户要求 T-18 与 T-20 内容互换（T-18=对话导出与数据清除，T-20=首次引导与人格模板）；批次 3/4 映射已同步；T-14~T-18 五个线程同时开工。
 
 ## Surprises & Discoveries
 
