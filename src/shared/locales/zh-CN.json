@@ -1,0 +1,55 @@
+{
+  "app": {
+    "name": "AI 桌宠",
+    "defaultPetName": "AI 桌宠"
+  },
+  "meta": {
+    "platformVersion": "平台：{platform} · 版本 {version}"
+  },
+  "chat": {
+    "viewAriaLabel": "聊天",
+    "inputAriaLabel": "聊天输入框",
+    "inputPlaceholder": "对桌宠说点什么…",
+    "send": "发送",
+    "sending": "发送中…",
+    "serviceNotReady": "AI 服务未就绪",
+    "serviceNotReadyReply": "AI 服务未就绪，暂时无法回复。",
+    "emptyReply": "（空回复）",
+    "errorPrefix": "出错了：{error}",
+    "greeting": "你好，我是你的 AI 桌宠 👋 想聊点什么？"
+  },
+  "window": {
+    "close": "关闭",
+    "closeTitle": "关闭（隐藏到托盘）"
+  },
+  "settings": {
+    "title": "设置",
+    "back": "返回",
+    "language": "界面语言",
+    "languageSystem": "跟随系统",
+    "languageZhCN": "简体中文",
+    "languageEn": "English",
+    "apiKey": "API Key",
+    "apiKeyHint": "密钥仅保存在本机，仅用于调用 DeepSeek 接口。",
+    "model": "模型",
+    "petName": "宠物名称",
+    "petNamePlaceholder": "AI 桌宠",
+    "traits": "性格标签（逗号分隔，最多 10 个）",
+    "traitsPlaceholder": "热情、友善、好奇",
+    "tone": "语气",
+    "tonePlaceholder": "温暖活泼",
+    "backstory": "背景",
+    "backstoryPlaceholder": "我是你的 AI 桌宠，喜欢陪你聊天、记住你在意的小事…",
+    "save": "保存设置",
+    "saved": "已保存，密钥仅保存在本机，重启后仍生效",
+    "savedLocalFallback": "已保存（本地降级，petAPI 不可用）",
+    "saveError": "保存失败：{error}",
+    "note": "设置通过 petAPI.settings 持久化到本地，重启后仍生效；性格标签、语气与背景会进入桌宠的对话人格。",
+    "traitsDelimiter": "、"
+  },
+  "tray": {
+    "hideWindow": "隐藏窗口",
+    "showWindow": "显示窗口",
+    "quit": "退出"
+  }
+}

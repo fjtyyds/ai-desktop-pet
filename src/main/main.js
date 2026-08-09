@@ -3,6 +3,7 @@
 const { app, BrowserWindow } = require('electron');
 const path = require('path');
 const { createTray, loadAppIcon } = require('./tray');
+const { initCrash } = require('./crash'); // T-11: 崩溃上报与本地日志
 require('./ipc'); // T-03: 注册 chat/settings IPC
 
 let mainWindow = null;
@@ -78,6 +79,9 @@ function quitApp() {
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
+  // T-11: 尽早初始化 crashReporter（app ready 前），保证渲染进程也受监控
+  initCrash();
+
   app.on('second-instance', () => {
     if (app.isReady()) showMainWindow();
   });

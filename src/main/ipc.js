@@ -6,6 +6,7 @@ const { createDefaultStore } = require('../storage');
 const { createMemoryStore } = require('../storage/memory-store');
 const { resolveBaseDir } = require('../storage');
 const { createChatService } = require('../llm/chat');
+const { createSecureSettings } = require('./secure-settings');
 
 /**
  * IPC 通道名。与 preload.js 中的常量保持一致。
@@ -24,6 +25,7 @@ let settings = null;
 let provider = null;
 let chatService = null;
 let registered = false;
+let secureSettings = null;
 
 function getStore() {
   if (!store) {
@@ -41,9 +43,16 @@ function getMemoryStore() {
 
 function getSettings() {
   if (!settings) {
-    settings = getStore().readSettings();
+    settings = getSecureSettings().readSettings();
   }
   return settings;
+}
+
+function getSecureSettings() {
+  if (!secureSettings) {
+    secureSettings = createSecureSettings({ store: getStore() });
+  }
+  return secureSettings;
 }
 
 function getProvider() {
@@ -72,11 +81,14 @@ async function handleChatSend(_event, payload) {
 }
 
 function handleSettingsGet() {
-  return { ...getSettings() };
+  settings = getSecureSettings().readSettings();
+  return { ...settings };
 }
 
 function handleSettingsSet(_event, patch) {
-  settings = getStore().writeSettings(patch && typeof patch === 'object' ? patch : {});
+  settings = getSecureSettings().writeSettings(
+    patch && typeof patch === 'object' ? patch : {}
+  );
   // 设置变化后重建 Provider 与聊天服务（例如 apiKey/model 变更即时生效）
   provider = null;
   chatService = null;

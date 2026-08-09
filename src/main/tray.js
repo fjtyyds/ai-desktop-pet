@@ -1,8 +1,10 @@
 'use strict';
 
-const { Tray, Menu, nativeImage } = require('electron');
 const fs = require('fs');
 const path = require('path');
+const { Tray, Menu, nativeImage, app } = require('electron');
+const { resolveLocale, createTranslator } = require('../shared/locales');
+const { createDefaultStore, resolveBaseDir } = require('../storage');
 
 /**
  * 正式图标 assets/icon.png；读取失败时回退到内嵌 64x64 PNG（开发兜底）。
@@ -45,21 +47,42 @@ function createTrayIcon() {
  * @param {() => void} handlers.showMainWindow
  * @param {() => void} handlers.toggleMainWindow
  * @param {() => void} handlers.quitApp
+ * @param {() => string} [handlers.getLocale] 可选：主进程注入语言读取器；缺省时从 settings.json 读取
  */
-function createTray({ getMainWindow, showMainWindow, toggleMainWindow, quitApp }) {
+function createTray({ getMainWindow, showMainWindow, toggleMainWindow, quitApp, getLocale }) {
   const tray = new Tray(createTrayIcon());
-  tray.setToolTip('AI 桌宠');
+  let settingsWatcher = null;
+
+  /** 从持久化设置读取语言：'system' 时按主进程系统语言解析（ADR-018） */
+  function readStoredLocale() {
+    try {
+      const settings = createDefaultStore().readSettings();
+      const stored =
+        settings && typeof settings.language === 'string' ? settings.language : 'system';
+      return stored === 'system'
+        ? resolveLocale(app.getLocale())
+        : resolveLocale(stored);
+    } catch (_error) {
+      return resolveLocale(app.getLocale());
+    }
+  }
+
+  function getCurrentLocale() {
+    return typeof getLocale === 'function' ? getLocale() : readStoredLocale();
+  }
 
   function refreshMenu() {
+    const t = createTranslator(getCurrentLocale());
     const visible = Boolean(getMainWindow()?.isVisible());
+    tray.setToolTip(t('app.name'));
     tray.setContextMenu(
       Menu.buildFromTemplate([
         {
-          label: visible ? '隐藏窗口' : '显示窗口',
+          label: visible ? t('tray.hideWindow') : t('tray.showWindow'),
           click: toggleMainWindow
         },
         { type: 'separator' },
-        { label: '退出', click: quitApp }
+        { label: t('tray.quit'), click: quitApp }
       ])
     );
   }
@@ -67,8 +90,23 @@ function createTray({ getMainWindow, showMainWindow, toggleMainWindow, quitApp }
   refreshMenu();
   // 左键单击托盘图标同样切换窗口显示状态
   tray.on('click', toggleMainWindow);
+  // 右键打开菜单前刷新，保证语言/可见状态最新
+  tray.on('right-click', refreshMenu);
 
-  return { tray, refreshMenu };
+  // 设置文件变化时自动刷新菜单（语言切换即时生效；文件尚不存在时跳过）
+  try {
+    const settingsFile = path.join(resolveBaseDir(), 'settings.json');
+    if (fs.existsSync(settingsFile)) {
+      settingsWatcher = fs.watch(settingsFile, () => refreshMenu());
+      settingsWatcher.on('error', () => {
+        settingsWatcher = null;
+      });
+    }
+  } catch (_error) {
+    settingsWatcher = null;
+  }
+
+  return { tray, refreshMenu, dispose: () => settingsWatcher?.close() };
 }
 
 module.exports = { createTray, loadAppIcon };
