@@ -2,9 +2,9 @@
 
 - 更新时间：2026-08-09
 - 当前阶段：M2 智能层（人格/情绪 + 短期与长期记忆）
-- 当前任务：T-09 已建卡待开发（设置页 API Key/模型 输入框，常开真实模式）
-- 最近完成：M0~M1 全部验收通过；真实 DeepSeek 调用验证；M2 设计；T-05~T-08 开发与集成；M2 人工目检；ADR-013~015
-- 下一步：T-09 开发；随后规划 M3 打磨（打包/图标/崩溃上报/i18n/无障碍）
+- 当前任务：T-09 已完成并合并，等待设置页目检（保存密钥后直接真实对话）
+- 最近完成：M0~M1 全部验收通过；真实 DeepSeek 调用验证；M2 设计；T-05~T-09 开发与集成；M2 人工目检；ADR-013~015
+- 下一步：目检 T-09；随后规划 M3 打磨（打包/图标/崩溃上报/i18n/无障碍）
 - 阻塞：无
 - 交接提示：新会话先读 `AGENTS.md` → `PLAN.md` → 自己的任务卡（docs/tasks/T-xx.md）
 
@@ -60,3 +60,9 @@
 
 - ADR-015：设置页补 API Key 与模型输入；触点清单（UI=index.html/chat.js/chat.css、存储=store.js 清洗、IPC=复用 settings.get/set、校验=check.js）。
 - 任务卡与分支：docs/tasks/T-09.md、codex/m2-apikey，worktree E:\codex\AI桌宠-m2-apikey。
+
+## T-09 集成记录（2026-08-09）
+
+- 合并：codex/m2-apikey（T-09）已并入 main；任务卡状态“已完成”（含真实调用验收：设置中的密钥无需环境变量即可调用 deepseek-v4-flash）。
+- 校验：`npm run check` 通过（含 API Key/模型输入存在性与读写/清洗断言）；`npm run smoke` 通过；纯 Node 复核通过（写入→重启重读、apiKey 截断 256、非法 model 回退默认）。
+- 待目检：设置页保存密钥后直接真实对话；随后进入 M3 打磨规划。
