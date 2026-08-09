@@ -116,3 +116,11 @@
   4. 并行边界规则阻止线程顺手补缺，而任务卡也未要求回报“无人认领的功能触点”。
 - 决策：后续拆卡前先列出 SPEC 用户故事并逐条映射到任务卡，生成触点清单（UI/存储/IPC/逻辑）确认归属；契约冻结必须包含运行时行为断言（如 writeSettings 白名单、设置页字段）；SPEC 级验收项必须落到具体任务卡；任务卡增加“发现边界外缺口立即记录并回报”的要求。
 - 后果：拆卡工作量略增，但能避免“集成后才发现用户故事没做完”的返工；ADR-005 的并行模式保持有效。
+
+## ADR-015：设置页补 API Key 与模型输入（常开真实模式）
+
+- 状态：Accepted
+- 背景：SPEC MVP 用户故事 3 要求“用户可在设置中配置 API Key、模型”，但设置页只有宠物名与人格；provider/store 已支持从设置读取 apiKey/model，真实模式只能靠环境变量 `DEEPSEEK_API_KEY` 启动，日常使用不便。
+- 决策：设置页新增 API Key（密码框）与模型输入，经 `petAPI.settings.get/set` 读写；`store.writeSettings` 对 apiKey/model 增加长度清洗（如 apiKey ≤ 256、model ≤ 100，非法/超长丢弃或截断）；明文存储保持现状并在 UI 说明“密钥仅保存在本机”，加密/系统凭据管理列入 M3 评估；契约（contracts.js）不变。
+- 触点清单（ADR-014）：UI=设置页表单（index.html/chat.js/chat.css）、存储=store.js 清洗与默认值、IPC=已存在 settings.get/set（只读）、校验=scripts/check.js 断言。
+- 后果：双击快捷方式即可真实对话，无需环境变量；API Key 仍明文保存在本地 settings.json（MVP 已知限制，已注明）。
