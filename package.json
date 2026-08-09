@@ -11,6 +11,6 @@
     "smoke": "electron scripts/smoke.js"
   },
   "devDependencies": {
-    "electron": "^37.0.0"
+    "electron": "^43.3.0"
   }
 }
