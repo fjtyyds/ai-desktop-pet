@@ -45,6 +45,19 @@
       shortcutChanged: 'Global shortcut setting saved.'
     }
   };
+  /** T-23：语音输出按钮文案（双语内联，原因同 WINDOW_FEATURE_HINTS） */
+  const TTS_HINTS = {
+    'zh-CN': {
+      speak: '朗读',
+      stop: '停止朗读',
+      unavailable: '系统语音不可用'
+    },
+    en: {
+      speak: 'Speak',
+      stop: 'Stop',
+      unavailable: 'System voice unavailable'
+    }
+  };
   /** 情绪带：valence 从高到低匹配；face 为角色表情，className 对应配色主题 */
   const MOOD_BANDS = [
     { min: 85, className: 'mood-excited', face: '🤩' },
@@ -64,12 +77,18 @@
   let memoryItems = [];
   let currentSettings = {};
   let windowFeatureEls = {};
+  // T-23：系统 TTS（Web Speech Synthesis）状态
+  let ttsVoices = [];
+  let ttsReady = false;
+  let currentUtterance = null;
+  let currentSpeakButton = null;
 
   async function init() {
     cacheElements();
     bindEvents();
     bindActivityEvents();
     subscribeIdle();
+    initTts(); // T-23：语音输出能力探测（异步加载系统语音列表）
     // 先加载两份语言包，确保任何文案渲染不会回退到键名
     await window.PetLocales.ready;
     await restoreSettings();
@@ -635,6 +654,9 @@
     bubble.textContent = content;
 
     item.appendChild(bubble);
+    if (role === 'assistant') {
+      attachSpeakButton(item); // T-23：桌宠回复可朗读
+    }
     elements.messageList.appendChild(item);
     messages.push({ role, content });
     scrollToBottom();
@@ -656,6 +678,166 @@
 
   function scrollToBottom() {
     elements.messageList.scrollTop = elements.messageList.scrollHeight;
+  }
+
+  /* ---------------- T-23：语音输出（Web Speech Synthesis / 系统 TTS） ---------------- */
+
+  function ttsEnabled() {
+    return Boolean(window.speechSynthesis && ttsReady);
+  }
+
+  function ttsHints() {
+    return TTS_HINTS[currentLocale] || TTS_HINTS['zh-CN'];
+  }
+
+  /** 语音列表异步加载：voiceschanged 可能先于列表就绪，做多次兜底刷新 */
+  function initTts() {
+    if (
+      typeof window.speechSynthesis === 'undefined' ||
+      typeof window.SpeechSynthesisUtterance !== 'function'
+    ) {
+      ttsReady = false;
+      return;
+    }
+    const refreshVoices = () => {
+      let voices = [];
+      try {
+        voices = window.speechSynthesis.getVoices() || [];
+      } catch (_error) {
+        voices = [];
+      }
+      const seen = new Set();
+      ttsVoices = voices.filter((voice) => {
+        if (!voice || typeof voice.lang !== 'string') {
+          return false;
+        }
+        const key = `${voice.name}|${voice.lang}`;
+        if (seen.has(key)) {
+          return false;
+        }
+        seen.add(key);
+        return true;
+      });
+      ttsReady = ttsVoices.length > 0;
+      if (ttsReady) {
+        updateAllSpeakButtons();
+      }
+    };
+    window.speechSynthesis.addEventListener('voiceschanged', refreshVoices);
+    refreshVoices();
+    setTimeout(refreshVoices, 500);
+    setTimeout(refreshVoices, 2000);
+  }
+
+  /** 按当前界面语言选系统语音（zh 优先 Huihui 类中文语音，en 优先英文语音） */
+  function pickTtsVoice() {
+    const preferred = currentLocale === 'en' ? /^en/i : /^zh/i;
+    return (
+      ttsVoices.find((voice) => preferred.test(voice.lang || '')) ||
+      ttsVoices[0] ||
+      null
+    );
+  }
+
+  function updateSpeakButtonState(button, speaking) {
+    const hints = ttsHints();
+    button.textContent = speaking ? '⏹' : '🔊';
+    button.title = speaking ? hints.stop : hints.speak;
+    button.setAttribute('aria-label', speaking ? hints.stop : hints.speak);
+  }
+
+  function updateSpeakButtonVisibility(button) {
+    button.hidden = !ttsEnabled();
+  }
+
+  function updateAllSpeakButtons() {
+    document.querySelectorAll('.message-assistant .speak-btn').forEach((button) => {
+      updateSpeakButtonState(button, false);
+      updateSpeakButtonVisibility(button);
+    });
+    if (!ttsEnabled()) {
+      stopSpeaking();
+    }
+  }
+
+  function attachSpeakButton(item) {
+    if (!item || item.dataset.speakAttached) {
+      return;
+    }
+    item.dataset.speakAttached = '1';
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'icon-btn speak-btn';
+    button.style.flex = '0 0 auto';
+    button.style.alignSelf = 'flex-end';
+    button.style.marginLeft = '6px';
+    button.style.width = '24px';
+    button.style.height = '24px';
+    button.style.fontSize = '12px';
+    button.style.padding = '0';
+    button.style.borderRadius = '50%';
+    button.addEventListener('click', () => toggleSpeak(button));
+    item.appendChild(button);
+    updateSpeakButtonState(button, false);
+    updateSpeakButtonVisibility(button);
+  }
+
+  function clearSpeakingState(button) {
+    if (currentSpeakButton === button) {
+      currentSpeakButton = null;
+      currentUtterance = null;
+    }
+    updateSpeakButtonState(button, false);
+  }
+
+  function stopSpeaking() {
+    if (window.speechSynthesis) {
+      try {
+        window.speechSynthesis.cancel();
+      } catch (_error) {
+        // 取消失败不影响状态恢复
+      }
+    }
+    currentUtterance = null;
+    const button = currentSpeakButton;
+    currentSpeakButton = null;
+    if (button) {
+      updateSpeakButtonState(button, false);
+    }
+  }
+
+  function toggleSpeak(button) {
+    if (!ttsEnabled()) {
+      return;
+    }
+    if (currentUtterance && currentSpeakButton === button) {
+      stopSpeaking();
+      return;
+    }
+    stopSpeaking();
+    const messageEl = button.closest('.message');
+    const bubble = messageEl && messageEl.querySelector('.bubble');
+    const text = bubble ? bubble.textContent.trim() : '';
+    if (!text) {
+      return;
+    }
+    const synth = window.speechSynthesis;
+    const utter = new SpeechSynthesisUtterance(text);
+    const voice = pickTtsVoice();
+    if (voice) {
+      utter.voice = voice;
+      utter.lang = voice.lang;
+    } else {
+      utter.lang = currentLocale === 'en' ? 'en-US' : 'zh-CN';
+    }
+    utter.rate = 1;
+    utter.onend = () => clearSpeakingState(button);
+    utter.onerror = () => clearSpeakingState(button);
+    currentUtterance = utter;
+    currentSpeakButton = button;
+    synth.cancel();
+    synth.speak(utter);
+    updateSpeakButtonState(button, true);
   }
 
   /* 设置页 */
@@ -1032,6 +1214,8 @@
     applyStaticText();
     applyWindowFeatureSettings(currentSettings); // T-19
     updateWindowFeatureText(); // T-19: 语言切换后刷新提示文案
+    stopSpeaking(); // T-23: 语言切换后停止当前朗读，并刷新按钮文案
+    updateAllSpeakButtons();
     if (elements.memoryPage && !elements.memoryPage.hidden) {
       renderMemoryList();
     }
@@ -1181,6 +1365,7 @@
 
   /** 清空当前聊天视图并恢复到空态问候（不写历史，仅 UI 刷新） */
   function resetChatView() {
+    stopSpeaking(); // T-23: 气泡被清空时停止朗读，避免按钮随 DOM 移除后状态残留
     messages = [];
     elements.messageList.replaceChildren();
     void restoreHistory();
