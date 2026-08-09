@@ -19,6 +19,9 @@
  * - T-22 天气小部件：设置页开关 + 城市配置（weatherEnabled/weatherCity），
  *   角色面板顶部可选展示实时天气；刷新按钮与失败降级（缓存上次成功数据），
  *   数据源 Open-Meteo 无需 API Key，网络请求在主进程完成
+ * - T-21 系统状态与番茄钟：小部件面板展示 CPU/内存/电池（主进程复用 idle:event
+ *   推送 { type: 'system-status' }）；本地番茄钟计时，完成时写入 settings 通知信号
+ *   （pomodoroNotifyAt），由主进程轮询消费并弹系统通知；面板可收起、设置可关闭
  */
 (function () {
   'use strict';
@@ -30,6 +33,8 @@
   const MOOD_POLL_MS = 3000;
   const WEATHER_AUTO_REFRESH_MS = 30 * 60 * 1000; // T-22：开启时每 30 分钟自动刷新
   const WEATHER_MIN_REFRESH_GAP_MS = 30 * 1000; // T-22：自动刷新节流（手动刷新不受限）
+  const DEFAULT_POMODORO_MINUTES = 25; // T-21：与 store.js 默认值一致
+  const POMODORO_TICK_MS = 250; // T-21：番茄钟刷新间隔
   /** T-19：设置页窗口行为区块文案（双语内联，因 locale 文件不在任务边界内） */
   const WINDOW_FEATURE_HINTS = {
     'zh-CN': {
@@ -279,6 +284,16 @@
   let weatherLoading = false;
   let weatherLastFetchAt = 0;
   let weatherTimer = null;
+  // T-21：小部件与番茄钟状态
+  let lastSystemStatus = null;
+  let pomodoroStatusTimer = null;
+  let pomodoroState = {
+    mode: 'idle', // 'idle' | 'running' | 'paused' | 'finished'
+    durationMs: DEFAULT_POMODORO_MINUTES * 60 * 1000,
+    remainingMs: DEFAULT_POMODORO_MINUTES * 60 * 1000,
+    endsAt: 0,
+    timerId: null
+  };
 
   async function init() {
     cacheElements();
@@ -375,7 +390,22 @@
       onboardingBack: document.getElementById('onboarding-back'),
       onboardingNext: document.getElementById('onboarding-next'),
       onboardingFinish: document.getElementById('onboarding-finish'),
-      onboardingStatus: document.getElementById('onboarding-status')
+      onboardingStatus: document.getElementById('onboarding-status'),
+      widgetsPanel: document.getElementById('widgets-panel'),
+      widgetsToggle: document.getElementById('widgets-toggle'),
+      widgetStats: document.getElementById('widget-stats'),
+      statCpu: document.getElementById('stat-cpu'),
+      statMem: document.getElementById('stat-mem'),
+      statBattery: document.getElementById('stat-battery'),
+      statBatteryState: document.getElementById('stat-battery-state'),
+      pomodoroTime: document.getElementById('pomodoro-time'),
+      pomodoroStart: document.getElementById('pomodoro-start'),
+      pomodoroReset: document.getElementById('pomodoro-reset'),
+      pomodoroStop: document.getElementById('pomodoro-stop'),
+      pomodoroStatus: document.getElementById('pomodoro-status'),
+      widgetsEnabled: document.getElementById('widgets-enabled'),
+      pomodoroEnabled: document.getElementById('pomodoro-enabled'),
+      pomodoroMinutes: document.getElementById('pomodoro-minutes')
     };
     showExportStatus = makeStatusShower(elements.exportStatus);
     showClearStatus = makeStatusShower(elements.clearStatus);
@@ -572,6 +602,10 @@
       showOnboardingStep(onboardingStep + 1)
     );
     elements.onboardingFinish.addEventListener('click', () => void finishOnboarding());
+    elements.widgetsToggle.addEventListener('click', () => void toggleWidgets());
+    elements.pomodoroStart.addEventListener('click', () => startPomodoro());
+    elements.pomodoroReset.addEventListener('click', resetPomodoro);
+    elements.pomodoroStop.addEventListener('click', stopPomodoro);
   }
 
   /**
@@ -601,7 +635,8 @@
 
   /**
    * T-15：订阅主进程空闲触发事件；仅在聊天视图随机展示一条互动气泡
-   * （不写入历史，也不调用 LLM）。
+   * （不写入历史，也不调用 LLM）。T-21：同一通道复用为系统状态推送，
+   * 以 payload.type='system-status' 区分。
    */
   function subscribeIdle() {
     const idleApi = window.petAPI && window.petAPI.idle;
@@ -609,6 +644,10 @@
       return;
     }
     idleApi.onTrigger((payload) => {
+      if (payload && payload.type === 'system-status') {
+        void applySystemStatus(payload.status);
+        return;
+      }
       if (!payload || elements.chatView.hidden) {
         return; // 防打扰：设置页打开时忽略本次触发
       }
@@ -623,6 +662,327 @@
       const text = phrases[Math.floor(Math.random() * phrases.length)];
       appendMessage('assistant', text, 'message-idle');
     });
+  }
+
+  /* ---------------- T-21：系统状态小部件（CPU/内存/电池） ---------------- */
+
+  function hasWidgetsPanel() {
+    return Boolean(elements.widgetsPanel);
+  }
+
+  /** 渲染主进程推送的系统状态（数值刷新 + 电池状态文案 + 无障碍标签） */
+  async function applySystemStatus(status) {
+    if (!hasWidgetsPanel() || !status || typeof status !== 'object') {
+      return;
+    }
+    lastSystemStatus = status;
+    await window.PetLocales.ready;
+    const t = window.PetLocales.createTranslator(currentLocale);
+    const fmtPercent = (value) => {
+      const numeric = Number(value);
+      return Number.isFinite(numeric) ? `${Math.round(numeric)}%` : '--%';
+    };
+    const cpuText = fmtPercent(status.cpuPercent);
+    const memText = fmtPercent(status.memPercent);
+    const batteryText = fmtPercent(status.batteryPercent);
+    const batteryStateKey =
+      status.batteryState === 'charging'
+        ? 'batteryCharging'
+        : status.batteryState === 'battery'
+          ? 'batteryOnBattery'
+          : status.batteryState === 'unknown'
+            ? 'batteryUnknown'
+            : 'batteryAc';
+    const batteryStateText = t(`widgets.${batteryStateKey}`);
+
+    if (elements.statCpu) {
+      elements.statCpu.textContent = cpuText;
+    }
+    if (elements.statMem) {
+      elements.statMem.textContent = memText;
+      elements.statMem.title = t('widgets.memDetail', {
+        used: status.memUsedGb != null ? status.memUsedGb : '--',
+        total: status.memTotalGb != null ? status.memTotalGb : '--'
+      });
+    }
+    if (elements.statBattery) {
+      elements.statBattery.textContent = batteryText;
+      elements.statBattery.title = batteryStateText;
+      elements.statBattery.setAttribute(
+        'aria-label',
+        `${batteryText} ${batteryStateText}`
+      );
+      elements.statBattery.dataset.batteryState = status.batteryState || 'ac';
+    }
+    if (elements.statBatteryState) {
+      elements.statBatteryState.textContent = batteryStateText;
+      elements.statBatteryState.dataset.batteryState = status.batteryState || 'ac';
+    }
+    if (elements.widgetStats) {
+      elements.widgetStats.setAttribute(
+        'aria-label',
+        t('widgets.statusAria', {
+          cpu: cpuText,
+          mem: memText,
+          battery: `${batteryText} ${batteryStateText}`
+        })
+      );
+    }
+  }
+
+  /** 按设置显示/隐藏小部件面板（可关闭，关闭状态持久化） */
+  function syncWidgetsVisibility() {
+    if (!hasWidgetsPanel()) {
+      return;
+    }
+    elements.widgetsPanel.hidden = currentSettings.widgetsEnabled === false;
+  }
+
+  /** 面板右上角 ✕：切换小部件开关并持久化 */
+  async function toggleWidgets() {
+    pokeActivity();
+    const next = currentSettings.widgetsEnabled === false;
+    const settingsApi =
+      window.petAPI &&
+      window.petAPI.settings &&
+      typeof window.petAPI.settings.set === 'function';
+    const applyNext = (settings) => {
+      currentSettings =
+        settings && typeof settings === 'object'
+          ? settings
+          : { ...currentSettings, widgetsEnabled: next };
+      syncWidgetsVisibility();
+      if (elements.widgetsEnabled) {
+        elements.widgetsEnabled.checked = currentSettings.widgetsEnabled !== false;
+      }
+    };
+    if (!settingsApi) {
+      saveLocalFallback({ ...currentSettings, widgetsEnabled: next });
+      applyNext({ ...currentSettings, widgetsEnabled: next });
+      return;
+    }
+    try {
+      const saved = await window.petAPI.settings.set({ widgetsEnabled: next });
+      applyNext(saved || { ...currentSettings, widgetsEnabled: next });
+    } catch (error) {
+      console.warn('切换小部件失败：', error);
+      applyNext(currentSettings);
+    }
+  }
+
+  /* ---------------- T-21：本地番茄钟（计时 + 主进程 Notification） ---------------- */
+
+  function pomodoroMinutesFromSettings(settings) {
+    const numeric = Number(settings && settings.pomodoroMinutes);
+    return Number.isFinite(numeric) && numeric >= 1 && numeric <= 120
+      ? Math.round(numeric)
+      : DEFAULT_POMODORO_MINUTES;
+  }
+
+  function pomodoroDurationMs(settings) {
+    return pomodoroMinutesFromSettings(settings) * 60 * 1000;
+  }
+
+  function formatPomodoroTime(ms) {
+    const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  }
+
+  function updatePomodoroDisplay() {
+    if (!elements.pomodoroTime) {
+      return;
+    }
+    const text = formatPomodoroTime(pomodoroState.remainingMs);
+    elements.pomodoroTime.textContent = text;
+    elements.pomodoroTime.setAttribute(
+      'aria-label',
+      window.PetLocales.createTranslator(currentLocale)('pomodoro.remainingAria', {
+        time: text
+      })
+    );
+  }
+
+  function updatePomodoroControls() {
+    if (!elements.pomodoroStart) {
+      return;
+    }
+    const t = window.PetLocales.createTranslator(currentLocale);
+    const label =
+      pomodoroState.mode === 'running'
+        ? t('pomodoro.pause')
+        : pomodoroState.mode === 'paused'
+          ? t('pomodoro.resume')
+          : t('pomodoro.start');
+    if (elements.pomodoroStart.textContent !== label) {
+      elements.pomodoroStart.textContent = label;
+      elements.pomodoroStart.setAttribute('aria-label', label);
+    }
+  }
+
+  function clearPomodoroTimer() {
+    if (pomodoroState.timerId != null) {
+      clearInterval(pomodoroState.timerId);
+      pomodoroState.timerId = null;
+    }
+  }
+
+  function showPomodoroStatus(text, type) {
+    if (!elements.pomodoroStatus) {
+      return;
+    }
+    elements.pomodoroStatus.textContent = text;
+    elements.pomodoroStatus.dataset.type = type || 'ok';
+    elements.pomodoroStatus.hidden = false;
+    clearTimeout(pomodoroStatusTimer);
+    pomodoroStatusTimer = setTimeout(() => {
+      if (elements.pomodoroStatus) {
+        elements.pomodoroStatus.hidden = true;
+      }
+    }, 6000);
+  }
+
+  function hidePomodoroStatus() {
+    clearTimeout(pomodoroStatusTimer);
+    if (elements.pomodoroStatus) {
+      elements.pomodoroStatus.hidden = true;
+    }
+  }
+
+  function resetPomodoro() {
+    clearPomodoroTimer();
+    pomodoroState.mode = 'idle';
+    pomodoroState.remainingMs = pomodoroState.durationMs;
+    pomodoroState.endsAt = 0;
+    hidePomodoroStatus();
+    updatePomodoroDisplay();
+    updatePomodoroControls();
+  }
+
+  /** 停止并复位到初始状态（“可关闭”语义之一） */
+  function stopPomodoro() {
+    resetPomodoro();
+  }
+
+  function tickPomodoro() {
+    const remaining = pomodoroState.endsAt - Date.now();
+    if (remaining <= 0) {
+      finishPomodoro();
+      return;
+    }
+    pomodoroState.remainingMs = remaining;
+    updatePomodoroDisplay();
+  }
+
+  /**
+   * 开始/暂停/继续番茄钟。minutesOverride 仅供测试与快捷入口使用；
+   * 正常运行使用设置中的 pomodoroMinutes。
+   */
+  function startPomodoro(minutesOverride) {
+    pokeActivity();
+    if (pomodoroState.mode === 'running') {
+      pausePomodoro();
+      return;
+    }
+    if (pomodoroState.mode === 'paused') {
+      resumePomodoro();
+      return;
+    }
+    const override = Number(minutesOverride);
+    if (Number.isFinite(override) && override > 0) {
+      // 允许小数分钟（如 0.02 ≈ 1.2 秒）便于快捷入口与自动化验证；
+      // 正常运行时长来自设置中的整数分钟。
+      const minutes = Math.min(120, Math.max(1 / 60, override));
+      pomodoroState.durationMs = minutes * 60 * 1000;
+      pomodoroState.remainingMs = pomodoroState.durationMs;
+    } else {
+      pomodoroState.durationMs = pomodoroDurationMs(currentSettings);
+      pomodoroState.remainingMs = pomodoroState.durationMs;
+    }
+    hidePomodoroStatus();
+    pomodoroState.mode = 'running';
+    pomodoroState.endsAt = Date.now() + pomodoroState.remainingMs;
+    pomodoroState.timerId = setInterval(tickPomodoro, POMODORO_TICK_MS);
+    updatePomodoroDisplay();
+    updatePomodoroControls();
+  }
+
+  function pausePomodoro() {
+    if (pomodoroState.mode !== 'running') {
+      return;
+    }
+    pomodoroState.remainingMs = Math.max(0, pomodoroState.endsAt - Date.now());
+    clearPomodoroTimer();
+    pomodoroState.mode = 'paused';
+    pomodoroState.endsAt = 0;
+    updatePomodoroDisplay();
+    updatePomodoroControls();
+  }
+
+  function resumePomodoro() {
+    if (pomodoroState.mode !== 'paused') {
+      return;
+    }
+    pomodoroState.mode = 'running';
+    pomodoroState.endsAt = Date.now() + pomodoroState.remainingMs;
+    pomodoroState.timerId = setInterval(tickPomodoro, POMODORO_TICK_MS);
+    updatePomodoroControls();
+  }
+
+  /** 计时结束：界面提示 + 写入 settings 通知信号，由主进程弹系统通知 */
+  function finishPomodoro() {
+    clearPomodoroTimer();
+    pomodoroState.mode = 'finished';
+    pomodoroState.remainingMs = 0;
+    pomodoroState.endsAt = 0;
+    updatePomodoroDisplay();
+    updatePomodoroControls();
+    const t = window.PetLocales.createTranslator(currentLocale);
+    showPomodoroStatus(t('pomodoro.finished'), 'ok');
+    if (currentSettings.pomodoroEnabled !== false) {
+      const settingsApi =
+        window.petAPI &&
+        window.petAPI.settings &&
+        typeof window.petAPI.settings.set === 'function';
+      if (settingsApi) {
+        try {
+          void window.petAPI.settings
+            .set({
+              pomodoroNotifyAt: Date.now(),
+              pomodoroNotifyMinutes: pomodoroMinutesFromSettings(currentSettings)
+            })
+            .catch((error) => {
+              console.warn('上报番茄钟完成信号失败：', error);
+            });
+        } catch (error) {
+          console.warn('上报番茄钟完成信号失败：', error);
+        }
+      }
+    }
+  }
+
+  /** 设置变化时同步番茄钟时长（运行中不打断当前倒计时） */
+  function applyPomodoroSettings(settings) {
+    const nextDuration = pomodoroDurationMs(settings);
+    pomodoroState.durationMs = nextDuration;
+    if (pomodoroState.mode === 'idle' || pomodoroState.mode === 'finished') {
+      pomodoroState.remainingMs = nextDuration;
+    }
+    updatePomodoroDisplay();
+    updatePomodoroControls();
+  }
+
+  function getPomodoroState() {
+    const remaining =
+      pomodoroState.mode === 'running'
+        ? Math.max(0, pomodoroState.endsAt - Date.now())
+        : pomodoroState.remainingMs;
+    return {
+      mode: pomodoroState.mode,
+      remainingMs: remaining,
+      durationMs: pomodoroState.durationMs
+    };
   }
 
   function hideToTray() {
@@ -1588,7 +1948,10 @@
         language: saved.language,
         idleEnabled: saved.idleEnabled !== false,
         weatherEnabled: saved.weatherEnabled === true,
-        weatherCity: saved.weatherCity
+        weatherCity: saved.weatherCity,
+        widgetsEnabled: saved.widgetsEnabled !== false,
+        pomodoroEnabled: saved.pomodoroEnabled !== false,
+        pomodoroMinutes: Number(saved.pomodoroMinutes) || DEFAULT_POMODORO_MINUTES
       });
     } catch (_error) {
       // 本地设置损坏时静默回退默认值
@@ -1672,6 +2035,13 @@
     elements.petName.value = currentPetName;
     elements.idleEnabled.checked = currentSettings.idleEnabled !== false;
     applyWeatherSettings(currentSettings); // T-22：天气开关/城市输入 + 可见性 + 刷新
+    elements.widgetsEnabled.checked = currentSettings.widgetsEnabled !== false;
+    elements.pomodoroEnabled.checked = currentSettings.pomodoroEnabled !== false;
+    elements.pomodoroMinutes.value = String(
+      pomodoroMinutesFromSettings(currentSettings)
+    );
+    applyPomodoroSettings(currentSettings);
+    syncWidgetsVisibility();
 
     const persona =
       currentSettings.persona && typeof currentSettings.persona === 'object'
@@ -1685,6 +2055,10 @@
     renderPersonaTemplates(); // T-20：刷新设置页模板选中态
 
     applyStaticText();
+    updatePomodoroControls(); // T-21：applyStaticText 会重置按钮静态文案，需按状态覆盖
+    if (lastSystemStatus) {
+      void applySystemStatus(lastSystemStatus); // T-21：语言切换后按新语言重渲染状态文案
+    }
     applyWindowFeatureSettings(currentSettings); // T-19
     updateWindowFeatureText(); // T-19: 语言切换后刷新提示文案
     syncOnboardingVisibility(); // T-20：首次启动引导（完成标志持久化）
@@ -1732,7 +2106,10 @@
         idleEnabled: elements.idleEnabled.checked,
         personaTemplate,
         weatherEnabled: elements.weatherEnabled.checked,
-        weatherCity: elements.weatherCity.value.trim()
+        weatherCity: elements.weatherCity.value.trim(),
+        widgetsEnabled: elements.widgetsEnabled.checked,
+        pomodoroEnabled: elements.pomodoroEnabled.checked,
+        pomodoroMinutes: Number(elements.pomodoroMinutes.value)
       });
       showSettingsStatus(t('settings.savedLocalFallback'), 'ok');
       return;
@@ -1749,7 +2126,10 @@
         idleEnabled: elements.idleEnabled.checked,
         personaTemplate,
         weatherEnabled: elements.weatherEnabled.checked,
-        weatherCity: elements.weatherCity.value.trim()
+        weatherCity: elements.weatherCity.value.trim(),
+        widgetsEnabled: elements.widgetsEnabled.checked,
+        pomodoroEnabled: elements.pomodoroEnabled.checked,
+        pomodoroMinutes: Number(elements.pomodoroMinutes.value)
       });
       // 回填清洗后的规范值，保证表单与持久化一致
       applySettings(saved || { petName, persona, language });
@@ -2331,5 +2711,13 @@
   let showExportStatus = () => {};
   let showClearStatus = () => {};
 
-  window.ChatUI = { init, applyMood };
+  window.ChatUI = {
+    init,
+    applyMood,
+    applySystemStatus, // T-21：供主进程推送状态注入/冒烟验证
+    startPomodoro, // T-21：可传分钟数覆盖（测试/快捷入口）
+    resetPomodoro,
+    stopPomodoro,
+    getPomodoroState
+  };
 })();

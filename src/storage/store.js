@@ -31,6 +31,10 @@ const PERSONA_TEMPLATE_ID_MAX_LENGTH = 40;
 
 /** 天气城市名清洗上限（T-22） */
 const WEATHER_CITY_MAX_LENGTH = 64;
+/** 番茄钟设置（T-21）：默认 25 分钟，允许 1~120 分钟 */
+const DEFAULT_POMODORO_MINUTES = 25;
+const POMODORO_MINUTES_MIN = 1;
+const POMODORO_MINUTES_MAX = 120;
 
 /**
  * 预设人格模板 id（T-20）。
@@ -58,6 +62,11 @@ const DEFAULT_SETTINGS = {
   personaTemplate: '', // T-20：最近应用的预设人格模板 id；'' 表示自定义/未应用
   weatherEnabled: false, // T-22：角色面板天气小部件开关（可选，默认关闭）
   weatherCity: '', // T-22：天气城市名（Open-Meteo geocoding，中英文均可）
+  widgetsEnabled: true, // T-21：系统状态小部件开关，默认开启，可收起
+  pomodoroEnabled: true, // T-21：番茄钟提醒开关（关闭后仅界面计时，不弹通知）
+  pomodoroMinutes: DEFAULT_POMODORO_MINUTES, // T-21：番茄钟时长（分钟）
+  pomodoroNotifyAt: 0, // T-21：渲染层完成的番茄钟信号（时间戳；主进程消费后清零）
+  pomodoroNotifyMinutes: 0, // T-21：信号携带的时长（分钟；0=未设置）
   persona: { ...DEFAULT_PERSONA }
 };
 
@@ -104,6 +113,34 @@ function sanitizeLanguage(value, current) {
 /** 清洗布尔设置项：非布尔值丢弃，保留当前值（T-15 idleEnabled） */
 function sanitizeBoolean(value, current) {
   return typeof value === 'boolean' ? value : current;
+}
+
+/** 清洗整数设置项：非法值丢弃（保留当前值），数值四舍五入并限制在 [min, max] */
+function sanitizeInteger(value, current, min, max) {
+  const numeric =
+    typeof value === 'number'
+      ? value
+      : typeof value === 'string' && value.trim() !== ''
+        ? Number(value)
+        : NaN;
+  if (!Number.isFinite(numeric)) {
+    return current;
+  }
+  return Math.min(max, Math.max(min, Math.round(numeric)));
+}
+
+/** 清洗非负整数（时间戳等）；非法值保留当前值 */
+function sanitizeNonNegativeInteger(value, current) {
+  const numeric =
+    typeof value === 'number'
+      ? value
+      : typeof value === 'string' && value.trim() !== ''
+        ? Number(value)
+        : NaN;
+  if (!Number.isFinite(numeric)) {
+    return current;
+  }
+  return Math.max(0, Math.round(numeric));
 }
 
 /**
@@ -230,6 +267,30 @@ function createStore(baseDir) {
       merged.onboardingDone,
       DEFAULT_SETTINGS.onboardingDone
     );
+    merged.widgetsEnabled = sanitizeBoolean(
+      merged.widgetsEnabled,
+      DEFAULT_SETTINGS.widgetsEnabled
+    );
+    merged.pomodoroEnabled = sanitizeBoolean(
+      merged.pomodoroEnabled,
+      DEFAULT_SETTINGS.pomodoroEnabled
+    );
+    merged.pomodoroMinutes = sanitizeInteger(
+      merged.pomodoroMinutes,
+      DEFAULT_SETTINGS.pomodoroMinutes,
+      POMODORO_MINUTES_MIN,
+      POMODORO_MINUTES_MAX
+    );
+    merged.pomodoroNotifyAt = sanitizeNonNegativeInteger(
+      merged.pomodoroNotifyAt,
+      DEFAULT_SETTINGS.pomodoroNotifyAt
+    );
+    merged.pomodoroNotifyMinutes = sanitizeInteger(
+      merged.pomodoroNotifyMinutes,
+      DEFAULT_SETTINGS.pomodoroNotifyMinutes,
+      0,
+      POMODORO_MINUTES_MAX
+    );
     merged.personaTemplate = sanitizeText(
       merged.personaTemplate,
       DEFAULT_SETTINGS.personaTemplate,
@@ -264,7 +325,12 @@ function createStore(baseDir) {
       'onboardingDone',
       'personaTemplate',
       'weatherEnabled',
-      'weatherCity'
+      'weatherCity',
+      'widgetsEnabled',
+      'pomodoroEnabled',
+      'pomodoroMinutes',
+      'pomodoroNotifyAt',
+      'pomodoroNotifyMinutes'
     ];
     const next = { ...current };
     for (const key of allowed) {
@@ -334,6 +400,35 @@ function createStore(baseDir) {
           );
           continue;
         }
+        if (key === 'widgetsEnabled' || key === 'pomodoroEnabled') {
+          next[key] = sanitizeBoolean(patch[key], current[key]);
+          continue;
+        }
+        if (key === 'pomodoroMinutes') {
+          next.pomodoroMinutes = sanitizeInteger(
+            patch.pomodoroMinutes,
+            current.pomodoroMinutes,
+            POMODORO_MINUTES_MIN,
+            POMODORO_MINUTES_MAX
+          );
+          continue;
+        }
+        if (key === 'pomodoroNotifyAt') {
+          next.pomodoroNotifyAt = sanitizeNonNegativeInteger(
+            patch.pomodoroNotifyAt,
+            current.pomodoroNotifyAt
+          );
+          continue;
+        }
+        if (key === 'pomodoroNotifyMinutes') {
+          next.pomodoroNotifyMinutes = sanitizeInteger(
+            patch.pomodoroNotifyMinutes,
+            current.pomodoroNotifyMinutes,
+            0,
+            POMODORO_MINUTES_MAX
+          );
+          continue;
+        }
         next[key] = typeof patch[key] === 'string' ? patch[key].trim() : String(patch[key]);
       }
     }
@@ -360,5 +455,8 @@ module.exports = {
   createStore,
   DEFAULT_SETTINGS,
   PERSONA_TEMPLATE_IDS,
-  DEFAULT_PERSONA_TEMPLATE_ID
+  DEFAULT_PERSONA_TEMPLATE_ID,
+  DEFAULT_POMODORO_MINUTES,
+  POMODORO_MINUTES_MIN,
+  POMODORO_MINUTES_MAX
 };
