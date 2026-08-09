@@ -3,6 +3,7 @@
 const { app, BrowserWindow } = require('electron');
 const path = require('path');
 const { createTray } = require('./tray');
+require('./ipc'); // T-03: 注册 chat/settings IPC
 
 let mainWindow = null;
 let trayApi = null;

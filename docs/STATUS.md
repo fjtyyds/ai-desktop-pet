@@ -2,14 +2,16 @@
 
 - 更新时间：2026-08-09
 - 当前阶段：M1 MVP 桌宠（并行模式）
-- 当前任务：T-02 聊天面板 UI、T-03 LLM+存储（仓库中尚无实现）
-- 最近完成：M0；M1 并行工作台；T-01 托盘集成到 main（采用 m1-chat 分支的托盘实现）
-- 下一步：实现 T-02/T-03（或确认其代码位置后继续集成）；全部完成后再做 M1 整体验收
+- 当前任务：M1 集成已完成（T-01/T-02/T-03 已合并到 main）
+- 最近完成：M0；M1 并行工作台；T-01/T-02/T-03 集成到 main
+- 下一步：`npm run dev` 人工目检（托盘菜单、聊天收发、设置保存）；补全 dev 模式 CSP 警告（打包前）
 - 阻塞：无
 - 交接提示：新会话先读 `AGENTS.md` → `PLAN.md` → 自己的任务卡（docs/tasks/T-xx.md）
 
-## M1 集成核查记录（2026-08-09）
+## M1 集成完成记录（2026-08-09）
 
-- 已合并：codex/m1-tray（T-01 托盘，快进）→ codex/m1-chat（其提交内容仍为 T-01 托盘实现，采用该分支更完整的版本解决冲突）→ codex/m1-llm（与 main 无差异，空合并）。
-- 校验：`npm run check` 通过；`npm run smoke` 通过（需真实用户权限运行）。
-- 未完成：T-02 聊天 UI、T-03 LLM/存储在任何分支与 worktree 中均无提交或未提交文件，任务卡仍为“未开始”，详见 `docs/tasks/T-02.md`、`docs/tasks/T-03.md` 与 ADR-006。
+- 合并：codex/m1-tray（T-01，此前已并入）→ codex/m1-chat（T-02 渲染层 + e95c411 T-03）→ codex/m1-llm（T-03，842f18a）。
+- T-03 取舍：保留 m1-llm 842f18a 实现（provider/store/chat + ipc/preload），删除 m1-chat e95c411 重复实现（deepseek.js、json-store.js、message-store.js、settings-store.js），见 ADR-007。
+- 接线：main.js 增加 `require('./ipc')`。
+- 校验：`npm run check` 通过；`npm run smoke` 通过（需真实用户权限）；T-03 纯 Node 功能验证通过。
+- 任务卡：T-01/T-02/T-03 均已标记“已完成”。
