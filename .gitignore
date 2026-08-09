@@ -3,6 +3,10 @@ dist/
 out/
 release/
 *.log
+# T-11: 本地日志与崩溃转储（userData/logs、userData/crashes）
+logs/
+crashes/
+*.dmp
 .DS_Store
 Thumbs.db
 .env
