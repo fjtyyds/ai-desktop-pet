@@ -31,6 +31,33 @@
       "Remember to drink some water even when you're busy ☕"
     ]
   },
+  "widgets": {
+    "sectionAria": "Widgets",
+    "systemStatus": "System status",
+    "cpu": "CPU",
+    "memory": "Memory",
+    "battery": "Battery",
+    "batteryCharging": "Charging",
+    "batteryOnBattery": "On battery",
+    "batteryAc": "AC power",
+    "batteryUnknown": "Unknown",
+    "memDetail": "{used} GB used / {total} GB total",
+    "statusAria": "System status: CPU {cpu}, memory {mem}, battery {battery}",
+    "close": "Collapse widgets",
+    "show": "Expand widgets"
+  },
+  "pomodoro": {
+    "title": "Pomodoro",
+    "start": "Start",
+    "pause": "Pause",
+    "resume": "Resume",
+    "reset": "Reset",
+    "stop": "Stop",
+    "finished": "Time's up! Take a break 🍅",
+    "remainingAria": "{time} remaining",
+    "notificationTitle": "Pomodoro finished",
+    "notificationBody": "Your {minutes}-minute focus session is done. Take a break!"
+  },
   "window": {
     "close": "Close",
     "closeTitle": "Close (hide to tray)"
@@ -44,6 +71,13 @@
     "languageEn": "English",
     "idleEnabled": "Idle chat",
     "idleEnabledHint": "When there has been no interaction for a while, the pet may proactively send a bubble. Saved on submit and can be turned off anytime.",
+    "widgetsSection": "Widgets",
+    "widgetsEnabled": "System status widgets",
+    "widgetsEnabledHint": "Show CPU/memory/battery status at the top of the chat panel. Can be collapsed anytime.",
+    "pomodoroEnabled": "Pomodoro reminder",
+    "pomodoroEnabledHint": "Show a system notification when the timer ends; when off, only the in-panel timer is shown.",
+    "pomodoroMinutes": "Pomodoro length (minutes)",
+    "pomodoroMinutesHint": "1–120 minutes, applied after saving.",
     "apiKey": "API Key",
     "apiKeyHint": "The key is stored only on this device and is used only to call the DeepSeek API.",
     "model": "Model",

@@ -56,6 +56,83 @@
           <span id="mood-face" class="mood-face" aria-hidden="true">🙂</span>
           <span id="mood-label" class="mood-label">平静</span>
         </div>
+        <!-- T-21：系统状态 + 番茄钟小部件（主进程经 idle:event 推送状态；面板可收起） -->
+        <section
+          id="widgets-panel"
+          class="widgets-panel"
+          role="region"
+          aria-label="小部件"
+          data-i18n-aria-label="widgets.sectionAria"
+        >
+          <div id="system-status-widget" class="widget-card">
+            <div class="widget-card-header">
+              <span class="widget-title" data-i18n="widgets.systemStatus"
+                >系统状态</span
+              >
+              <button
+                id="widgets-toggle"
+                class="icon-btn widgets-close-btn"
+                type="button"
+                title="收起小部件"
+                aria-label="收起小部件"
+                data-i18n-title="widgets.close"
+                data-i18n-aria-label="widgets.close"
+              >✕</button>
+            </div>
+            <div
+              id="widget-stats"
+              class="widget-stats"
+              role="group"
+              aria-label="系统状态"
+            >
+              <div class="stat">
+                <span class="stat-label" data-i18n="widgets.cpu">CPU</span>
+                <span id="stat-cpu" class="stat-value">--%</span>
+              </div>
+              <div class="stat">
+                <span class="stat-label" data-i18n="widgets.memory">内存</span>
+                <span id="stat-mem" class="stat-value">--%</span>
+              </div>
+              <div class="stat">
+                <span class="stat-label" data-i18n="widgets.battery">电池</span>
+                <span id="stat-battery" class="stat-value">--%</span>
+                <span id="stat-battery-state" class="stat-sub"></span>
+              </div>
+            </div>
+          </div>
+          <div id="pomodoro-widget" class="widget-card">
+            <div class="widget-card-header">
+              <span class="widget-title" data-i18n="pomodoro.title">番茄钟</span>
+            </div>
+            <div
+              id="pomodoro-time"
+              class="pomodoro-time"
+              role="timer"
+              aria-live="polite"
+            >25:00</div>
+            <div class="pomodoro-controls">
+              <button
+                id="pomodoro-start"
+                class="secondary-btn"
+                type="button"
+                data-i18n="pomodoro.start"
+              >开始</button>
+              <button
+                id="pomodoro-reset"
+                class="secondary-btn"
+                type="button"
+                data-i18n="pomodoro.reset"
+              >重置</button>
+              <button
+                id="pomodoro-stop"
+                class="secondary-btn"
+                type="button"
+                data-i18n="pomodoro.stop"
+              >停止</button>
+            </div>
+            <p id="pomodoro-status" class="widget-status" role="status" hidden></p>
+          </div>
+        </section>
         <div id="message-list" class="message-list" aria-live="polite"></div>
         <div id="service-status" class="service-status" role="status"></div>
         <form id="chat-form" class="chat-form">
@@ -135,6 +212,46 @@
               >长时间无交互时，桌宠会主动冒泡和你打招呼；保存后生效，可随时关闭。</span
             >
           </label>
+          <div class="field">
+            <span class="field-label" data-i18n="settings.widgetsSection"
+              >小部件</span
+            >
+            <label class="field field-switch">
+              <span class="field-label" data-i18n="settings.widgetsEnabled"
+                >系统状态小部件</span
+              >
+              <input id="widgets-enabled" class="field-checkbox" type="checkbox" />
+              <span class="field-hint" data-i18n="settings.widgetsEnabledHint"
+                >在聊天面板顶部显示 CPU/内存/电池状态，可随时收起。</span
+              >
+            </label>
+            <label class="field field-switch">
+              <span class="field-label" data-i18n="settings.pomodoroEnabled"
+                >番茄钟提醒</span
+              >
+              <input id="pomodoro-enabled" class="field-checkbox" type="checkbox" />
+              <span class="field-hint" data-i18n="settings.pomodoroEnabledHint"
+                >计时结束时弹出系统通知；关闭后仅保留界面计时。</span
+              >
+            </label>
+            <label class="field">
+              <span class="field-label" data-i18n="settings.pomodoroMinutes"
+                >番茄钟时长（分钟）</span
+              >
+              <input
+                id="pomodoro-minutes"
+                class="field-input"
+                type="number"
+                min="1"
+                max="120"
+                step="1"
+                inputmode="numeric"
+              />
+              <span class="field-hint" data-i18n="settings.pomodoroMinutesHint"
+                >1–120 分钟，保存后生效。</span
+              >
+            </label>
+          </div>
           <label class="field">
             <span class="field-label" data-i18n="settings.petName">宠物名称</span>
             <input

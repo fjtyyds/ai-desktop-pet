@@ -31,6 +31,33 @@
       "工作再忙也要记得喝口水哦 ☕"
     ]
   },
+  "widgets": {
+    "sectionAria": "小部件",
+    "systemStatus": "系统状态",
+    "cpu": "CPU",
+    "memory": "内存",
+    "battery": "电池",
+    "batteryCharging": "充电中",
+    "batteryOnBattery": "使用电池",
+    "batteryAc": "电源",
+    "batteryUnknown": "状态未知",
+    "memDetail": "已用 {used} GB / 共 {total} GB",
+    "statusAria": "系统状态：CPU {cpu}，内存 {mem}，电池 {battery}",
+    "close": "收起小部件",
+    "show": "展开小部件"
+  },
+  "pomodoro": {
+    "title": "番茄钟",
+    "start": "开始",
+    "pause": "暂停",
+    "resume": "继续",
+    "reset": "重置",
+    "stop": "停止",
+    "finished": "时间到！休息一下吧 🍅",
+    "remainingAria": "剩余 {time}",
+    "notificationTitle": "番茄钟时间到",
+    "notificationBody": "专注 {minutes} 分钟已完成，休息一下吧！"
+  },
   "window": {
     "close": "关闭",
     "closeTitle": "关闭（隐藏到托盘）"
@@ -44,6 +71,13 @@
     "languageEn": "English",
     "idleEnabled": "空闲互动",
     "idleEnabledHint": "长时间无交互时，桌宠会主动冒泡和你打招呼；保存后生效，可随时关闭。",
+    "widgetsSection": "小部件",
+    "widgetsEnabled": "系统状态小部件",
+    "widgetsEnabledHint": "在聊天面板顶部显示 CPU/内存/电池状态，可随时收起。",
+    "pomodoroEnabled": "番茄钟提醒",
+    "pomodoroEnabledHint": "计时结束时弹出系统通知；关闭后仅保留界面计时。",
+    "pomodoroMinutes": "番茄钟时长（分钟）",
+    "pomodoroMinutesHint": "1–120 分钟，保存后生效。",
     "apiKey": "API Key",
     "apiKeyHint": "密钥仅保存在本机，仅用于调用 DeepSeek 接口。",
     "model": "模型",
