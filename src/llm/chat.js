@@ -56,20 +56,11 @@ function createChatService({ provider, store, memoryStore }) {
   }
 
   /**
-   * T-05 合入后优先使用 memory-store（消息归一化 + 长期记忆）；
-   * 未合入时回退到 M1 store（仅消息读写）。两者都缺失时返回 null 降级。
+   * 返回调用方注入的 memory-store（T-05）；未注入时返回 null。
+   * 集成修正：不再在服务内部自动创建存储实例，由 ipc.js 注入单例，
+   * 保证消息读写与长期记忆使用同一实例，且测试可注入 fake store。
    */
   function getMemoryStore() {
-    if (memoryStoreRef) {
-      return memoryStoreRef;
-    }
-    try {
-      const { createMemoryStore } = require('../storage/memory-store');
-      const { resolveBaseDir } = require('../storage');
-      memoryStoreRef = createMemoryStore(resolveBaseDir());
-    } catch (_error) {
-      memoryStoreRef = null;
-    }
     return memoryStoreRef;
   }
 
@@ -127,10 +118,19 @@ function createChatService({ provider, store, memoryStore }) {
     if (!engine) {
       return null;
     }
+    // T-06 mood.js：时间推进（无交互回归默认）后再读取状态
+    if (typeof engine.tick === 'function') {
+      try {
+        engine.tick();
+      } catch (_error) {
+        // 时间推进失败不影响读取
+      }
+    }
     const getter =
       (typeof engine.getState === 'function' && engine.getState) ||
       (typeof engine.get === 'function' && engine.get) ||
       (typeof engine.current === 'function' && engine.current) ||
+      (typeof engine.snapshot === 'function' && engine.snapshot) ||
       null;
     if (!getter) {
       return null;
@@ -148,19 +148,58 @@ function createChatService({ provider, store, memoryStore }) {
     if (!engine) {
       return;
     }
+    const text = typeof content === 'string' ? content : '';
+    // 通用观察接口（observe/update(role, content)）
     const observer =
       (typeof engine.observe === 'function' && engine.observe) ||
       (typeof engine.update === 'function' && engine.update) ||
-      (typeof engine.feedback === 'function' && engine.feedback) ||
       null;
-    if (!observer) {
+    if (observer) {
+      try {
+        observer.call(engine, role, text);
+        return;
+      } catch (_error) {
+        // 继续尝试 T-06 的 applyFeedback 接口
+      }
+    }
+    // T-06 mood.js：applyFeedback('positive'|'negative', { amount })，
+    // 用简单情感词猜测反馈方向；中性消息不改变情绪。
+    if (typeof engine.applyFeedback === 'function') {
+      const feedback = guessFeedback(text);
+      if (feedback) {
+        try {
+          engine.applyFeedback(feedback);
+        } catch (_error) {
+          // 情绪更新失败不影响对话
+        }
+      }
       return;
     }
-    try {
-      observer.call(engine, role, content);
-    } catch (_error) {
-      // 情绪更新失败不影响对话
+    // 兼容 feedback(role, content) 形态
+    if (typeof engine.feedback === 'function') {
+      try {
+        engine.feedback(role, text);
+      } catch (_error) {
+        // 情绪更新失败不影响对话
+      }
     }
+  }
+
+  /** 极简情感词猜测：命中积极词返回 positive，命中消极词返回 negative，否则 null。 */
+  const POSITIVE_WORDS = ['喜欢', '谢谢', '开心', '棒', '赞', '爱', '满意', '太好了', '哈哈'];
+  const NEGATIVE_WORDS = ['讨厌', '生气', '难过', '伤心', '失望', '不好', '差', '烦', '糟糕'];
+
+  function guessFeedback(text) {
+    const lower = String(text).toLowerCase();
+    const hasPositive = POSITIVE_WORDS.some((word) => lower.includes(word));
+    const hasNegative = NEGATIVE_WORDS.some((word) => lower.includes(word));
+    if (hasPositive && !hasNegative) {
+      return 'positive';
+    }
+    if (hasNegative && !hasPositive) {
+      return 'negative';
+    }
+    return null;
   }
 
   function buildDefaultSystemPrompt(settings, mood) {

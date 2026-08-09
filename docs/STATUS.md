@@ -2,9 +2,9 @@
 
 - 更新时间：2026-08-09
 - 当前阶段：M2 智能层（人格/情绪 + 短期与长期记忆）
-- 当前任务：M2 设计已完成，等待三个并行线程开发（T-05/T-06/T-07）
-- 最近完成：M0~M1 全部验收通过；真实 DeepSeek 调用验证；M2 设计（ADR-010~012、契约冻结、任务卡与 worktree）
-- 下一步：打开 codex/m2-memory、codex/m2-persona、codex/m2-context 三个 worktree 线程并行开发
+- 当前任务：M2 三线程开发与协调者集成已完成（T-05/T-06/T-07 已合并到 main）
+- 最近完成：M0~M1 全部验收通过；真实 DeepSeek 调用验证；M2 设计；T-05/T-06/T-07 并行开发与集成
+- 下一步：`npm run dev` 人工目检 M2（重启历史恢复、人格/情绪、记忆引用）；真实 API Key 下验证异步记忆抽取
 - 阻塞：无
 - 交接提示：新会话先读 `AGENTS.md` → `PLAN.md` → 自己的任务卡（docs/tasks/T-xx.md）
 
@@ -31,3 +31,10 @@
 - ADR-012：chat service 统一组装上下文；渲染层通过 petAPI.history.get 恢复历史。
 - 契约冻结：contracts.js 新增 ChatMessage.sessionId/timestamp、Persona、MoodState、MemoryItem、history.get、DEFAULT_SHORT_TERM_WINDOW、MAX_MEMORIES_IN_CONTEXT。
 - 任务卡：T-05（codex/m2-memory）、T-06（codex/m2-persona）、T-07（codex/m2-context），worktree 目录见任务卡。
+
+## M2 集成完成记录（2026-08-09）
+
+- 合并：codex/m2-memory（T-05）→ codex/m2-persona（T-06）→ codex/m2-context（T-07，先在 m2-context worktree 合并 main 完成集成）依次并入 main。
+- 集成修正：① chat.js 不再自动创建 memory-store，改由 ipc.js 注入单例（修复测试写用户主目录问题）；② chat.js 适配 mood.js 实际接口（snapshot/applyFeedback/tick），情绪读取与反馈更新生效。
+- 校验：`npm run check` 通过；`npm run smoke` 通过（含启动历史恢复与表单端到端断言）；真实模块集成验证通过（人格注入、情绪 60→76 变化、长期记忆注入、历史持久化）。
+- 任务卡：T-05/T-06/T-07 均已标记“已完成”，集成待办已核对并记录。

@@ -46,10 +46,10 @@
 
 任务清单：
 
-- [ ] T-05 记忆存储与历史接口
-- [ ] T-06 人格与情绪引擎
-- [ ] T-07 上下文组装与端到端集成
-- [ ] 协调者合并到 main 并集成验证
+- [x] T-05 记忆存储与历史接口
+- [x] T-06 人格与情绪引擎
+- [x] T-07 上下文组装与端到端集成
+- [x] 协调者合并到 main 并集成验证
 
 ## Progress
 
@@ -59,6 +59,7 @@
 - 2026-08-09：T-04 人工验收与收尾完成：`npm run dev` 目检通过（托盘图标/菜单/聊天收发/设置保存/单实例/关闭隐藏到托盘）；渲染页补 CSP（ADR-008）；关闭按钮改用 petAPI `window.hide`，修复 Electron 43 下 `window.close()` 绕过 close 事件导致应用退出的问题（ADR-009）。
 - 2026-08-09：真实 DeepSeek 调用验证通过：`deepseek-v4-flash`（契约默认模型）与 `deepseek-chat` 均返回 200 与正确中文回复；密钥经环境变量传入，未入库。首次测试中文乱码为 PowerShell 管道编码问题，改用 UTF-8 脚本文件后正常。
 - 2026-08-09：M2 设计完成：ADR-010~012（记忆模型/人格情绪/上下文组装）、SPEC 与 ROADMAP 更新、契约冻结（contracts.js 扩展）、任务卡 T-05~T-07 与 worktree 分支（codex/m2-*）就绪。
+- 2026-08-09：M2 集成完成：codex/m2-memory（T-05）→ codex/m2-persona（T-06）→ codex/m2-context（T-07，先在 worktree 中合并 main 完成集成）依次并入 main；`npm run check`、`npm run smoke` 通过；真实模块集成验证通过（历史恢复、短期窗口、长期记忆注入、人格/情绪生效）。
 
 ## Surprises & Discoveries
 
@@ -73,6 +74,7 @@
 - smoke 在沙箱内会因 Electron 无法写入用户 AppData 缓存而 GPU 进程崩溃；需以真实用户权限运行。
 - 集成完成后在纯 Node 下复核 T-03：mock 回复、设置读写、消息持久化、空输入校验均通过。
 - Electron 43 下 renderer 的 `window.close()` 不触发主进程可拦截的 BrowserWindow close 事件，窗口直接关闭并触发 `window-all-closed` 导致应用退出（最小复现确认）；关闭按钮改用 IPC hide 并加 `window-all-closed` 兜底（ADR-009）。
+- M2 集成发现并修正两处并行期兼容问题：① chat.js 原“服务内部自动创建 memory-store”在 T-05 合入后生效，导致测试写入 `~/.ai-desktop-pet` 并在沙箱/CI 失败，改为由 ipc.js 注入单例；② T-06 mood.js 实际接口为 `snapshot/applyFeedback/tick`，与 chat.js 原探针（getState/update）不一致，已在 chat.js 适配（含情感词反馈猜测，情绪变化体现在下一轮 system prompt）。
 
 ## Decision Log
 
@@ -98,3 +100,5 @@
 - M1 验收完成（含人工目检）：托盘可用、聊天可发消息（mock）、设置可保存、关闭隐藏到托盘、CSP 无警告。
 - 下一步：M2 智能层（人格/情绪、短期与长期记忆）规划。
 - M2 设计完成：契约冻结、任务卡与 worktree 就绪，三个线程可并行开始。
+- M2 集成完成：T-05/T-06/T-07 已合并到 main，check/smoke 与真实模块集成验证通过。
+- 待办：`npm run dev` 人工目检 M2（重启历史恢复、人格/情绪设置、记忆引用）；真实 API Key 下验证异步记忆抽取。

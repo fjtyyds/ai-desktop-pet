@@ -55,7 +55,11 @@ function getProvider() {
 
 function getChatService() {
   if (!chatService) {
-    chatService = createChatService({ provider: getProvider(), store: getStore() });
+    chatService = createChatService({
+      provider: getProvider(),
+      store: getStore(),
+      memoryStore: getMemoryStore()
+    });
     chatService.loadHistory();
   }
   return chatService;
