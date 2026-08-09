@@ -44,6 +44,33 @@
         data-i18n-aria-label="chat.viewAriaLabel"
       >
         <div
+          id="weather-widget"
+          class="weather-widget"
+          role="region"
+          aria-label="天气小部件"
+          data-i18n-aria-label="weather.widgetAriaLabel"
+          hidden
+        >
+          <div class="weather-main">
+            <span id="weather-icon" class="weather-icon" aria-hidden="true">🌡️</span>
+            <div class="weather-info">
+              <span id="weather-location" class="weather-location"></span>
+              <span id="weather-desc" class="weather-desc"></span>
+            </div>
+            <span id="weather-temp" class="weather-temp"></span>
+            <button
+              id="weather-refresh"
+              class="icon-btn weather-refresh-btn"
+              type="button"
+              title="刷新"
+              aria-label="刷新"
+              data-i18n-title="weather.refresh"
+              data-i18n-aria-label="weather.refresh"
+            >↻</button>
+          </div>
+          <div id="weather-meta" class="weather-meta" role="status"></div>
+        </div>
+        <div
           id="mood-indicator"
           class="mood-indicator mood-neutral"
           role="status"
@@ -134,6 +161,28 @@
             <span class="field-hint" data-i18n="settings.idleEnabledHint"
               >长时间无交互时，桌宠会主动冒泡和你打招呼；保存后生效，可随时关闭。</span
             >
+          </label>
+          <label class="field field-switch">
+            <span class="field-label" data-i18n="weather.settingsLabel"
+              >天气小部件</span
+            >
+            <input id="weather-enabled" class="field-checkbox" type="checkbox" />
+            <span class="field-hint" data-i18n="weather.settingsHint"
+              >在角色面板显示实时天气，城市可自由配置；数据来自 Open-Meteo，无需 API Key。</span
+            >
+          </label>
+          <label class="field">
+            <span class="field-label" data-i18n="weather.city">城市</span>
+            <input
+              id="weather-city"
+              class="field-input"
+              type="text"
+              maxlength="64"
+              autocomplete="off"
+              spellcheck="false"
+              placeholder="如：上海 / Shanghai"
+              data-i18n-placeholder="weather.cityPlaceholder"
+            />
           </label>
           <label class="field">
             <span class="field-label" data-i18n="settings.petName">宠物名称</span>

@@ -35,6 +35,26 @@
     "close": "关闭",
     "closeTitle": "关闭（隐藏到托盘）"
   },
+  "weather": {
+    "widgetAriaLabel": "天气小部件",
+    "settingsLabel": "天气小部件",
+    "settingsHint": "在角色面板显示实时天气，城市可自由配置；数据来自 Open-Meteo，无需 API Key。",
+    "city": "城市",
+    "cityPlaceholder": "如：上海 / Shanghai",
+    "refresh": "刷新",
+    "loading": "正在获取天气…",
+    "updatedAt": "更新于 {time}",
+    "feelsLike": "体感 {temp}°",
+    "humidity": "湿度 {value}%",
+    "wind": "风速 {value} km/h",
+    "unavailable": "天气暂不可用",
+    "notConfigured": "请先在设置中填写城市，再刷新天气。",
+    "cityNotFound": "未找到城市“{city}”，请检查名称。",
+    "networkError": "网络请求失败，请稍后重试。",
+    "invalidResponse": "天气服务返回异常，请稍后重试。",
+    "errorPrefix": "天气获取失败：{error}",
+    "cachedNotice": "当前显示上次成功获取的数据。"
+  },
   "settings": {
     "title": "设置",
     "back": "返回",

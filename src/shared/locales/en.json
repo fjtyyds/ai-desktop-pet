@@ -35,6 +35,26 @@
     "close": "Close",
     "closeTitle": "Close (hide to tray)"
   },
+  "weather": {
+    "widgetAriaLabel": "Weather widget",
+    "settingsLabel": "Weather widget",
+    "settingsHint": "Show live weather in the pet panel. The city is configurable; data comes from Open-Meteo and needs no API key.",
+    "city": "City",
+    "cityPlaceholder": "e.g. Shanghai",
+    "refresh": "Refresh",
+    "loading": "Fetching weather…",
+    "updatedAt": "Updated {time}",
+    "feelsLike": "Feels like {temp}°",
+    "humidity": "Humidity {value}%",
+    "wind": "Wind {value} km/h",
+    "unavailable": "Weather unavailable",
+    "notConfigured": "Enter a city in settings, then refresh the weather.",
+    "cityNotFound": "City “{city}” not found. Please check the name.",
+    "networkError": "Network request failed. Please try again later.",
+    "invalidResponse": "The weather service returned an unexpected response.",
+    "errorPrefix": "Failed to fetch weather: {error}",
+    "cachedNotice": "Showing the last successful data."
+  },
   "settings": {
     "title": "Settings",
     "back": "Back",

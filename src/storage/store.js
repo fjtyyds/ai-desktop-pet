@@ -29,6 +29,9 @@ const MODEL_MAX_LENGTH = 100;
 /** personaTemplate id 清洗上限（T-20） */
 const PERSONA_TEMPLATE_ID_MAX_LENGTH = 40;
 
+/** 天气城市名清洗上限（T-22） */
+const WEATHER_CITY_MAX_LENGTH = 64;
+
 /**
  * 预设人格模板 id（T-20）。
  * 与渲染层 chat.js 内联双语模板表（PERSONA_TEMPLATES）的键一一对应；
@@ -53,6 +56,8 @@ const DEFAULT_SETTINGS = {
   windowBounds: null, // T-19：上次窗口位置 { x, y }；null 表示未保存
   onboardingDone: false, // T-20：首次启动三步引导是否已完成
   personaTemplate: '', // T-20：最近应用的预设人格模板 id；'' 表示自定义/未应用
+  weatherEnabled: false, // T-22：角色面板天气小部件开关（可选，默认关闭）
+  weatherCity: '', // T-22：天气城市名（Open-Meteo geocoding，中英文均可）
   persona: { ...DEFAULT_PERSONA }
 };
 
@@ -120,6 +125,17 @@ function sanitizeWindowBounds(value, current) {
     return current;
   }
   return { x: Math.round(x), y: Math.round(y) };
+}
+
+/** 清洗天气城市名（T-22）：非字符串丢弃；去空白、压缩连续空格、截断到 64 字 */
+function sanitizeWeatherCity(value, current) {
+  if (typeof value !== 'string') {
+    return current;
+  }
+  return value
+    .trim()
+    .replace(/\s+/g, ' ')
+    .slice(0, WEATHER_CITY_MAX_LENGTH);
 }
 
 /**
@@ -223,6 +239,14 @@ function createStore(baseDir) {
       merged.windowBounds,
       DEFAULT_SETTINGS.windowBounds
     );
+    merged.weatherEnabled = sanitizeBoolean(
+      merged.weatherEnabled,
+      DEFAULT_SETTINGS.weatherEnabled
+    );
+    merged.weatherCity = sanitizeWeatherCity(
+      merged.weatherCity,
+      DEFAULT_SETTINGS.weatherCity
+    );
     return merged;
   }
 
@@ -238,7 +262,9 @@ function createStore(baseDir) {
       'shortcutEnabled',
       'windowBounds',
       'onboardingDone',
-      'personaTemplate'
+      'personaTemplate',
+      'weatherEnabled',
+      'weatherCity'
     ];
     const next = { ...current };
     for (const key of allowed) {
@@ -291,6 +317,20 @@ function createStore(baseDir) {
             patch.personaTemplate,
             current.personaTemplate,
             PERSONA_TEMPLATE_ID_MAX_LENGTH
+          );
+          continue;
+        }
+        if (key === 'weatherEnabled') {
+          next.weatherEnabled = sanitizeBoolean(
+            patch.weatherEnabled,
+            current.weatherEnabled
+          );
+          continue;
+        }
+        if (key === 'weatherCity') {
+          next.weatherCity = sanitizeWeatherCity(
+            patch.weatherCity,
+            current.weatherCity
           );
           continue;
         }

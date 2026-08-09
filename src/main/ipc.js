@@ -10,6 +10,7 @@ const { DEFAULT_SETTINGS } = require('../storage/store');
 const { createChatService } = require('../llm/chat');
 const { createSecureSettings } = require('./secure-settings');
 const { createTranslator } = require('../shared/locales');
+const { getWeather } = require('./weather'); // T-22：天气小部件（主进程网络请求）
 
 /**
  * T-16：情绪引擎共享单例（ADR-022 mood.get；src/llm/** 只读）。
@@ -46,7 +47,8 @@ const CHANNELS = {
   memoryDelete: 'memory:delete', // T-17：删除长期记忆
   memoryUpdate: 'memory:update', // T-17：修正长期记忆
   historyExport: 'history:export', // T-18：导出对话
-  historyClear: 'history:clear' // T-18：清除数据
+  historyClear: 'history:clear', // T-18：清除数据
+  weatherGet: 'weather:get' // T-22：天气小部件
 };
 
 /** history.clear 允许的范围（契约：messages / memories / settings / all） */
@@ -442,6 +444,26 @@ async function handleHistoryClear(event, payload) {
   return { ok: true, error: null };
 }
 
+/**
+ * 天气：读取设置中的城市（渲染层也可显式传 city），
+ * 描述语言跟随界面语言；force 跳过 10 分钟天气缓存（T-22）。
+ */
+async function handleWeatherGet(_event, payload) {
+  const current = getSettings();
+  const city =
+    payload && typeof payload.city === 'string'
+      ? payload.city
+      : current && typeof current.weatherCity === 'string'
+        ? current.weatherCity
+        : '';
+  const language =
+    current && typeof current.language === 'string'
+      ? current.language
+      : 'system';
+  const force = Boolean(payload && payload.force);
+  return getWeather({ city, language, force });
+}
+
 function registerIpcHandlers() {
   if (registered) {
     return;
@@ -461,6 +483,7 @@ function registerIpcHandlers() {
   ipcMain.handle(CHANNELS.memoryUpdate, handleMemoryUpdate);
   ipcMain.handle(CHANNELS.historyExport, handleHistoryExport);
   ipcMain.handle(CHANNELS.historyClear, handleHistoryClear);
+  ipcMain.handle(CHANNELS.weatherGet, handleWeatherGet);
 }
 
 // 被 src/main/main.js require 后自动注册（M1 集成时由协调者加入 require('./ipc')）

@@ -763,3 +763,102 @@
   word-break: break-word;
   white-space: pre-wrap;
 }
+
+/* T-22：天气小部件（角色面板顶部，可选，设置页开关 + 城市配置） */
+.weather-widget {
+  flex: 0 0 auto;
+  margin: 0 12px 8px;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.weather-widget[hidden] {
+  display: none;
+}
+
+.weather-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.weather-icon {
+  flex: 0 0 auto;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.weather-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.weather-location {
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  user-select: text;
+}
+
+.weather-desc {
+  font-size: 11px;
+  opacity: 0.75;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  user-select: text;
+}
+
+.weather-temp {
+  flex: 0 0 auto;
+  font-size: 18px;
+  font-weight: 700;
+  user-select: text;
+}
+
+.weather-refresh-btn {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  font-size: 13px;
+}
+
+.weather-refresh-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.weather-meta {
+  margin-top: 4px;
+  font-size: 11px;
+  opacity: 0.72;
+  line-height: 1.45;
+  user-select: text;
+}
+
+.weather-meta[data-type='ok'] {
+  color: #81c784;
+  opacity: 1;
+}
+
+.weather-meta[data-type='warning'] {
+  color: #ffb74d;
+  opacity: 1;
+}
+
+.weather-meta[data-type='error'] {
+  color: #ef9a9a;
+  opacity: 1;
+}
+
+.weather-meta[data-type='loading'] {
+  color: #8ab4ff;
+  opacity: 1;
+}
