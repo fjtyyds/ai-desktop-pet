@@ -5,6 +5,8 @@
  * - 设置页（petAPI.settings.get/set 初始化与保存宠物名 + 人格 + API Key + 模型 + 语言，
  *   ADR-013/ADR-015/ADR-018；localStorage 仅作 petAPI 缺失时的降级）
  * - 文案经 src/shared/locales 获取，默认跟随系统，设置页可选并持久化
+ * - T-14：流式回复优先（chat.sendStream + chat.onDelta），"正在思考…" 占位、
+ *   打字机增量更新、流式中发送按钮变为"停止"（chat.cancelStream）
  */
 (function () {
   'use strict';
@@ -16,6 +18,7 @@
   let elements = {};
   let currentLocale = 'zh-CN';
   let currentPetName = 'AI 桌宠';
+  let streaming = false;
 
   async function init() {
     cacheElements();
@@ -72,7 +75,18 @@
     return Boolean(
       window.petAPI &&
       window.petAPI.chat &&
-      typeof window.petAPI.chat.send === 'function'
+      (typeof window.petAPI.chat.send === 'function' ||
+        typeof window.petAPI.chat.sendStream === 'function')
+    );
+  }
+
+  /** T-14：流式通道齐全（sendStream + onDelta）时优先使用流式 */
+  function canStream() {
+    return Boolean(
+      window.petAPI &&
+      window.petAPI.chat &&
+      typeof window.petAPI.chat.sendStream === 'function' &&
+      typeof window.petAPI.chat.onDelta === 'function'
     );
   }
 
@@ -90,6 +104,10 @@
 
   function handleSubmit(event) {
     event.preventDefault();
+    if (streaming) {
+      void cancelStreaming();
+      return;
+    }
     const text = elements.chatInput.value.trim();
     if (!text) {
       return;
@@ -97,6 +115,30 @@
     elements.chatInput.value = '';
     appendMessage('user', text);
     void sendMessage(text);
+  }
+
+  function setStreaming(active) {
+    streaming = active;
+    const t = window.PetLocales.createTranslator(currentLocale);
+    elements.sendBtn.textContent = active ? t('chat.stop') : t('chat.send');
+    elements.sendBtn.setAttribute('aria-label', elements.sendBtn.textContent);
+  }
+
+  async function cancelStreaming() {
+    const cancelApi =
+      window.petAPI &&
+      window.petAPI.chat &&
+      typeof window.petAPI.chat.cancelStream === 'function'
+        ? window.petAPI.chat.cancelStream
+        : null;
+    if (!cancelApi) {
+      return;
+    }
+    try {
+      await cancelApi();
+    } catch (error) {
+      console.warn('取消流式回复失败：', error);
+    }
   }
 
   async function sendMessage(text) {
@@ -108,30 +150,71 @@
       return;
     }
 
-    elements.sendBtn.disabled = true;
-    elements.sendBtn.textContent = '…';
+    setStreaming(true);
+    const bubble = appendMessage('assistant', t('chat.thinking'));
+    let received = '';
+    let unsubscribe = null;
     try {
-      // M2：主进程统一组装上下文，渲染层只传当前消息（ADR-012）
-      const result = await window.petAPI.chat.send({ text });
-      if (result && result.ok) {
-        appendMessage('assistant', result.reply || t('chat.emptyReply'));
-      } else if (result && result.error) {
-        appendMessage('assistant', t('chat.errorPrefix', { error: result.error }));
+      if (canStream()) {
+        // 先订阅增量再发起请求，避免首段增量丢失
+        unsubscribe = window.petAPI.chat.onDelta((delta) => {
+          if (typeof delta !== 'string' || delta.length === 0) {
+            return;
+          }
+          received += delta;
+          updateBubble(bubble, received);
+        });
+        const result = await window.petAPI.chat.sendStream({ text });
+        applyStreamResult(result, bubble, received, t);
       } else {
-        appendMessage('assistant', t('chat.serviceNotReadyReply'));
+        // 兼容旧契约：无流式通道时走非流式发送
+        const result = await window.petAPI.chat.send({ text });
+        if (result && result.ok) {
+          updateBubble(bubble, result.reply || t('chat.emptyReply'));
+        } else {
+          updateBubble(bubble, formatSendError(result, '', t));
+        }
       }
     } catch (error) {
-      appendMessage(
-        'assistant',
+      updateBubble(
+        bubble,
         t('chat.errorPrefix', {
           error: error && error.message ? error.message : String(error)
         })
       );
     } finally {
-      elements.sendBtn.disabled = false;
-      elements.sendBtn.textContent = t('chat.send');
+      if (typeof unsubscribe === 'function') {
+        try {
+          unsubscribe();
+        } catch (_error) {
+          // 取消订阅失败不影响状态恢复
+        }
+      }
+      setStreaming(false);
       elements.chatInput.focus();
     }
+  }
+
+  /** 处理流式结束结果：成功整段展示；取消展示已收到部分；失败展示部分文本 + 错误 */
+  function applyStreamResult(result, bubble, received, t) {
+    if (result && result.ok) {
+      updateBubble(bubble, result.reply || received || t('chat.emptyReply'));
+      return;
+    }
+    if (result && result.error === '已取消') {
+      updateBubble(bubble, result.reply || received || t('chat.cancelled'));
+      return;
+    }
+    updateBubble(bubble, formatSendError(result, received, t));
+  }
+
+  function formatSendError(result, received, t) {
+    const partial = result && result.reply ? result.reply : received;
+    const errorText =
+      result && result.error
+        ? t('chat.errorPrefix', { error: result.error })
+        : t('chat.serviceNotReadyReply');
+    return partial ? `${partial}\n${errorText}` : errorText;
   }
 
   /**
@@ -176,6 +259,20 @@
     item.appendChild(bubble);
     elements.messageList.appendChild(item);
     messages.push({ role, content });
+    scrollToBottom();
+    return { item, bubble };
+  }
+
+  /** T-14：流式增量更新已有回复气泡（打字机效果） */
+  function updateBubble(ref, content) {
+    if (!ref || !ref.bubble) {
+      return;
+    }
+    ref.bubble.textContent = content;
+    const last = messages[messages.length - 1];
+    if (last) {
+      last.content = content;
+    }
     scrollToBottom();
   }
 

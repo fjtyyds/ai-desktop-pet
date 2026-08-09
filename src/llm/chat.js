@@ -15,7 +15,8 @@ const MEMORY_EXTRACT_PROMPT =
   '不要输出任何其他文字。';
 
 /**
- * 聊天服务：组合 Provider 与 Store，提供 send()、持久化历史与 M2 上下文组装（ADR-012）。
+ * 聊天服务：组合 Provider 与 Store，提供 send()/sendStream()、持久化历史与
+ * M2 上下文组装（ADR-012）、T-14 流式回复（ADR-021）。
  *
  * 上下文组装：
  * - system = persona + mood（T-06 persona.js/mood.js 未合入时使用内置默认人格降级）
@@ -478,7 +479,100 @@ function createChatService({ provider, store, memoryStore }) {
     }
   }
 
-  return { send, loadHistory, getHistory };
+  /**
+   * 流式发送（T-14，ADR-021）。上下文组装、成功持久化与记忆抽取与 send() 完全一致；
+   * 增量经 streamOptions.onDelta 回调输出，取消经 streamOptions.signal 传播。
+   * 结果约定：
+   * - 成功：{ ok:true, reply: 完整文本, error:null }
+   * - 取消：{ ok:false, reply: 已收到的部分文本, error:'已取消' }
+   * - 其他失败：{ ok:false, reply: 已收到的部分文本, error }
+   * 取消/失败不持久化（与 send() 的错误路径一致，避免半截回复进入历史）。
+   */
+  async function sendStream(input, clientHistory, streamOptions) {
+    const isObject = input && typeof input === 'object' && !Array.isArray(input);
+    const text =
+      typeof (isObject ? input.text : input) === 'string'
+        ? (isObject ? input.text : input).trim()
+        : '';
+    const historyArg = isObject
+      ? Array.isArray(input.history)
+        ? input.history
+        : clientHistory
+      : clientHistory;
+    if (!text) {
+      return { ok: false, reply: '', error: '消息不能为空' };
+    }
+
+    const sessionHistory =
+      Array.isArray(historyArg) && historyArg.length > 0
+        ? historyArg
+        : history.length > 0
+          ? history
+          : loadHistory();
+    const { messages } = assembleRequestMessages(text, sessionHistory);
+
+    const options = streamOptions && typeof streamOptions === 'object' ? streamOptions : {};
+    const onDelta = typeof options.onDelta === 'function' ? options.onDelta : null;
+    let partial = '';
+
+    function emitDelta(chunk) {
+      if (typeof chunk !== 'string' || chunk.length === 0) {
+        return;
+      }
+      partial += chunk;
+      if (onDelta) {
+        onDelta(chunk);
+      }
+    }
+
+    try {
+      let reply = '';
+      if (typeof provider.chatStream === 'function') {
+        const result = await provider.chatStream(
+          { messages },
+          { onDelta: emitDelta, signal: options.signal }
+        );
+        reply =
+          result && typeof result.reply === 'string' ? result.reply : partial;
+      } else {
+        // 降级：老 Provider 无流式接口时整段返回，仍推送一次增量保证 UI 一致性
+        const result = await provider.chat({ messages });
+        reply = result && typeof result.reply === 'string' ? result.reply : '';
+        emitDelta(reply);
+      }
+
+      const timestamp = Date.now();
+      const userMessage = {
+        role: 'user',
+        content: text,
+        sessionId: DEFAULT_SESSION_ID,
+        timestamp
+      };
+      const assistantMessage = {
+        role: 'assistant',
+        content: reply,
+        sessionId: DEFAULT_SESSION_ID,
+        timestamp
+      };
+      history = [...history, userMessage, assistantMessage];
+      appendMessages([userMessage, assistantMessage]);
+      observeMoodInteraction('user', text);
+      observeMoodInteraction('assistant', reply);
+      // 异步抽取，不 await：失败只降级记录（与 send() 一致）
+      void extractMemories([userMessage, assistantMessage]);
+      return { ok: true, reply, error: null };
+    } catch (error) {
+      const message = error && error.message ? error.message : String(error);
+      const isCancel = Boolean(
+        (error && error.name === 'AbortError') ||
+          (options.signal && options.signal.aborted) ||
+          message === '已取消'
+      );
+      return { ok: false, reply: partial, error: isCancel ? '已取消' : message };
+    }
+  }
+
+  return { send, sendStream, loadHistory, getHistory };
 }
 
 module.exports = { createChatService };
