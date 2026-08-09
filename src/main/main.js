@@ -1,101 +1,94 @@
-'use strict';
-
 const { app, BrowserWindow } = require('electron');
 const path = require('path');
-const { createTray, refreshMenu } = require('./tray');
+const { createTray } = require('./tray');
 
 let mainWindow = null;
-let tray = null;
-let isQuitting = false;
 
-function createMainWindow() {
-  const win = new BrowserWindow({
-    width: 320,
-    height: 420,
-    frame: false,
-    transparent: true,
-    alwaysOnTop: true,
-    resizable: false,
-    hasShadow: false,
-    backgroundColor: '#00000000',
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true
-    }
-  });
+// 单实例锁：桌宠只允许一个实例；重复启动时唤起已有窗口
+const gotTheLock = app.requestSingleInstanceLock();
 
-  // 关闭窗口时隐藏到托盘而不是退出应用；真正退出走托盘菜单
-  win.on('close', (event) => {
-    if (!isQuitting) {
-      event.preventDefault();
-      win.hide();
-    }
-  });
-
-  win.on('closed', () => {
-    mainWindow = null;
-  });
-
-  // 窗口显示状态变化时同步托盘菜单文案
-  win.on('show', () => refreshMenu(mainWindow, trayCallbacks));
-  win.on('hide', () => refreshMenu(mainWindow, trayCallbacks));
-
-  win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
-  return win;
-}
-
-function toggleWindow() {
-  if (!mainWindow || mainWindow.isDestroyed()) return;
-  if (mainWindow.isVisible()) {
-    mainWindow.hide();
-  } else {
-    mainWindow.show();
-    mainWindow.focus();
-  }
-}
-
-function quitApp() {
-  isQuitting = true;
-  app.quit();
-}
-
-const trayCallbacks = { quit: quitApp };
-
-// 单实例锁：第二次启动直接退出，并通知已运行实例显示窗口
-const gotSingleInstanceLock = app.requestSingleInstanceLock();
-
-if (!gotSingleInstanceLock) {
+if (!gotTheLock) {
   app.quit();
 } else {
   app.on('second-instance', () => {
-    if (!mainWindow || mainWindow.isDestroyed()) return;
-    if (mainWindow.isMinimized()) mainWindow.restore();
-    mainWindow.show();
-    mainWindow.focus();
-  });
-
-  app.whenReady().then(() => {
-    mainWindow = createMainWindow();
-    tray = createTray(mainWindow, trayCallbacks);
-  });
-
-  app.on('activate', () => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.show();
-    } else if (BrowserWindow.getAllWindows().length === 0) {
-      mainWindow = createMainWindow();
+    if (app.isReady()) {
+      showMainWindow();
     }
   });
 
+  function createMainWindow() {
+    mainWindow = new BrowserWindow({
+      width: 320,
+      height: 420,
+      frame: false,
+      transparent: true,
+      alwaysOnTop: true,
+      resizable: false,
+      hasShadow: false,
+      backgroundColor: '#00000000',
+      webPreferences: {
+        preload: path.join(__dirname, 'preload.js'),
+        contextIsolation: true,
+        nodeIntegration: false,
+        sandbox: true
+      }
+    });
+
+    mainWindow.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
+
+    // 关闭窗口 = 隐藏到托盘；仅真正的退出流程才销毁窗口
+    mainWindow.on('close', (event) => {
+      if (!app.isQuitting) {
+        event.preventDefault();
+        mainWindow.hide();
+      }
+    });
+
+    mainWindow.on('closed', () => {
+      mainWindow = null;
+    });
+
+    return mainWindow;
+  }
+
+  function showMainWindow() {
+    if (!mainWindow) {
+      createMainWindow();
+    }
+    mainWindow.show();
+    mainWindow.focus();
+  }
+
+  function toggleMainWindow() {
+    if (mainWindow && mainWindow.isVisible()) {
+      mainWindow.hide();
+    } else {
+      showMainWindow();
+    }
+  }
+
+  app.whenReady().then(() => {
+    app.isQuitting = false;
+    createMainWindow();
+    createTray({
+      onToggle: toggleMainWindow,
+      onQuit: () => app.quit()
+    });
+
+    // macOS 惯例：点击 Dock 图标时若无窗口则重新创建
+    app.on('activate', () => {
+      showMainWindow();
+    });
+  });
+
   app.on('before-quit', () => {
-    isQuitting = true;
+    app.isQuitting = true;
   });
 
   app.on('window-all-closed', () => {
-    if (process.platform !== 'darwin') {
-      app.quit();
+    // 桌宠驻留托盘：所有窗口关闭时不退出，由托盘菜单“退出”结束进程
+    if (process.platform === 'darwin') {
+      return;
     }
   });
 }
