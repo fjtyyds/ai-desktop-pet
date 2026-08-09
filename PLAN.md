@@ -107,10 +107,10 @@
 - [x] T-17 记忆管理页
 - [x] T-18 对话导出与数据清除
 - [x] T-19 窗口体验（贴边/位置记忆/快捷键）
-- [ ] T-20 首次引导与预设人格模板
-- [ ] T-21 系统状态与番茄钟
-- [ ] T-22 天气小部件
-- [ ] T-23 语音与图片（验证门禁）
+- [x] T-20 首次引导与预设人格模板
+- [x] T-21 系统状态与番茄钟
+- [x] T-22 天气小部件
+- [x] T-23 语音与图片（验证门禁）
 - [ ] M3.5 整体集成与目检
 
 ## Progress
@@ -136,6 +136,7 @@
 - 2026-08-09：M3 整体目检通过；M3.5 内容增强规划完成：ADR-020~023（范围变更与验证门禁）、SPEC 更新（语音/提醒转增强范围）、任务卡 T-14~T-23 与 5 个批次排定。
 - 2026-08-09：用户要求 T-18 与 T-20 内容互换（T-18=对话导出与数据清除，T-20=首次引导与人格模板）；批次 3/4 映射已同步；T-14~T-18 五个线程同时开工。
 - 2026-08-09：T-14~T-18 五个分支已全部合并到 main：流式（SSE/mock 分段/取消）、空闲互动（idle.js + idleEnabled）、情绪可视化（mood.get + 表情配色）、记忆管理页（memory.list/delete/update）、导出与清除（history.export/clear + 设置页 UI）；共享文件冲突（ipc/preload/chat.js/css/index.html）已全部解决；check/smoke 与合并后集成验证通过。
+- 2026-08-10：T-20~T-23 由 orchestrator 全自动完成并合并：T-20 首次引导/人格模板（b2cf869）、T-21 系统状态与番茄钟（eb66fd7，与 T-20/T-22 共享文件冲突由协调者手工合并）、T-22 天气小部件（0d853ed）、T-23 语音（系统 TTS 落地，STT/图片验证不可行并记录降级，1e0463f）；M3.5 十个任务全部完成，待整体目检。
 - 2026-08-09：发现仓库根目录存在未跟踪的“多线程开发/”（约 5.07GB，含 12 个 worktree 副本与 node_modules）与 scripts/orchestrator/（自动化实验产物）；均未入库，删除与否待用户决定。
 
 ## Surprises & Discoveries
@@ -157,6 +158,7 @@
 - 自动化方案评估（scripts/orchestrator）：外部编排器（codex exec 多路循环）设计合理，但 `codex` CLI 为 WindowsApps MSIX 打包，在本工具沙箱/提权环境中均被拒绝运行（Access denied）；可行路径为“用户在自己的终端运行 orchestrator，协调者审查日志并合并”，或继续半自动线程模式。
 - 2026-08-10 协调者复盘（ADR-024）：近期多次错误决策（git add -A 误纳 5GB 目录、Windows spawn .cmd EINVAL、未核对 codex CLI 参数、单实例锁误判、子代理试点未先探测、大目录未及时忽略、空分支误判 already-merged）；已确立七条防错规则并作为长期规范执行。
 - 2026-08-10：T-19 由 orchestrator 全自动完成并合并（40d4a7d）：npm 版 codex CLI 打通（cmd 启动）、--approve-for-me 替代 --full-auto、修复任务卡括号注释导致的边界误判与空分支误判；main check/smoke 通过。
+- orchestrator 实战修复（2026-08-10）：① 任务卡标签解析改用正则捕获组（“涉及文件（待验证后确定）：”与“系统状态采集”干扰 includes 判断）；② stripNote 剥离任意位置括号注解；③ branchHasCommits 由 rev-parse 区间改为 rev-list --count（resume 之前从未生效）；④ 空分支/残留 worktree 自动清理、resume 分支不匹配自动处理；⑤ 多 --task 参数解析只保留最后一个（README 声称可重复但实现不支持，已改为一任务一进程）；⑥ T-21 合并与 T-20/T-22 冲突由协调者手工解决。
 
 ## Decision Log
 

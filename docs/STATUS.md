@@ -2,9 +2,9 @@
 
 - 更新时间：2026-08-09
 - 当前阶段：M3.5 内容增强（T-14~T-18 已合并，待整体目检）
-- 当前任务：T-14~T-19 已合并；T-20/T-21~T-23 由 orchestrator 全自动运行中
-- 最近完成：M0~M3 全部验收通过；M3.5 规划；T-14~T-18 开发与集成；T-19 全自动（orchestrator）完成
-- 下一步：等待 orchestrator 完成 T-20/T-21~T-23；随后 M3.5 整体目检
+- 当前任务：M3.5 十个任务（T-14~T-23）已全部合并，待整体目检
+- 最近完成：M0~M3 全部验收通过；M3.5 规划；T-14~T-18 开发与集成；T-19~T-23 全自动（orchestrator）完成
+- 下一步：`npm run dev` 整体目检 M3.5；随后 M4 分发规划
 - 阻塞：无
 - 交接提示：新会话先读 `AGENTS.md` → `PLAN.md` → 自己的任务卡（docs/tasks/T-xx.md）
 
@@ -114,3 +114,13 @@
 - 方式：orchestrator 全自动闭环（coordinator 直接运行）：resume 验收（边界/check/smoke/任务卡）→ 通过 → 自动合并 40d4a7d → 清理 worktree（保留分支）。
 - 修复：npm 版 codex CLI 经 cmd 启动；`--approve-for-me` 替代 `--full-auto`（与 --sandbox 互斥）；任务卡“涉及文件”括号注释剥离避免边界误判；空分支/残留 worktree 自动清理；resume 分支不匹配改为自动处理。
 - 校验：main `npm run check`、`npm run smoke` 通过。
+
+## T-20~T-23 自动集成记录（2026-08-10）
+
+- T-20 首次引导与预设人格模板：b2cf869 合并。
+- T-21 系统状态与番茄钟：eb66fd7 合并（与 T-20/T-22 共享文件冲突由协调者手工解决）。
+- T-22 天气小部件（Open-Meteo 无密钥）：0d853ed 合并。
+- T-23 语音与图片验证门禁：系统 TTS 落地，STT/图片验证不可行并记录降级；1e0463f 合并。
+- orchestrator 修复：标签正则捕获组、括号注解剥离、resume（branchHasCommits）、空分支/残留 worktree 自动清理、多任务改为一任务一进程。
+- 校验：main `npm run check`、`npm run smoke` 通过。
+- 待办：M3.5 整体目检；未跟踪的“多线程开发/”（约 5GB）与 scripts/orchestrator/ 去留待用户决定。
