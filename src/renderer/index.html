@@ -43,6 +43,31 @@
         </div>
         <div class="settings-body">
           <label class="field">
+            <span class="field-label">API Key</span>
+            <input
+              id="api-key"
+              class="field-input"
+              type="password"
+              maxlength="256"
+              autocomplete="off"
+              spellcheck="false"
+              placeholder="sk-…"
+            />
+            <span class="field-hint">密钥仅保存在本机，仅用于调用 DeepSeek 接口。</span>
+          </label>
+          <label class="field">
+            <span class="field-label">模型</span>
+            <input
+              id="model"
+              class="field-input"
+              type="text"
+              maxlength="100"
+              autocomplete="off"
+              spellcheck="false"
+              placeholder="deepseek-v4-flash"
+            />
+          </label>
+          <label class="field">
             <span class="field-label">宠物名称</span>
             <input id="pet-name" class="field-input" type="text" maxlength="20" placeholder="AI 桌宠" />
           </label>

@@ -22,6 +22,10 @@ const PERSONA_LIMITS = {
   maxBackstoryLength: 500
 };
 
+/** apiKey/model 清洗上限（ADR-015） */
+const API_KEY_MAX_LENGTH = 256;
+const MODEL_MAX_LENGTH = 100;
+
 const DEFAULT_SETTINGS = {
   apiKey: '',
   model: DEFAULT_MODEL,
@@ -45,6 +49,23 @@ function readJsonFile(file, fallback) {
 function writeJsonFile(file, data) {
   ensureDir(path.dirname(file));
   fs.writeFileSync(file, JSON.stringify(data, null, 2), 'utf8');
+}
+
+/**
+ * 清洗字符串设置项（ADR-015）：
+ * - 非字符串视为非法值，丢弃（保留当前值）
+ * - 去首尾空白，超长截断到 maxLength
+ * - allowEmpty=false 时空串视为非法，保留当前值
+ */
+function sanitizeText(value, current, maxLength, { allowEmpty = true } = {}) {
+  if (typeof value !== 'string') {
+    return current;
+  }
+  const trimmed = value.trim();
+  if (!allowEmpty && trimmed.length === 0) {
+    return current;
+  }
+  return trimmed.slice(0, maxLength);
 }
 
 /**
@@ -111,6 +132,17 @@ function createStore(baseDir) {
     const saved = readJsonFile(settingsFile, {});
     const merged = { ...DEFAULT_SETTINGS, ...saved };
     merged.persona = sanitizePersona(merged.persona, DEFAULT_SETTINGS.persona);
+    merged.apiKey = sanitizeText(
+      merged.apiKey,
+      DEFAULT_SETTINGS.apiKey,
+      API_KEY_MAX_LENGTH
+    );
+    merged.model = sanitizeText(
+      merged.model,
+      DEFAULT_SETTINGS.model,
+      MODEL_MAX_LENGTH,
+      { allowEmpty: false }
+    );
     return merged;
   }
 
@@ -119,11 +151,28 @@ function createStore(baseDir) {
     const allowed = ['apiKey', 'model', 'petName'];
     const next = { ...current };
     for (const key of allowed) {
-      if (patch[key] !== undefined) {
+      if (patch && patch[key] !== undefined) {
+        if (key === 'apiKey') {
+          next.apiKey = sanitizeText(
+            patch.apiKey,
+            current.apiKey,
+            API_KEY_MAX_LENGTH
+          );
+          continue;
+        }
+        if (key === 'model') {
+          next.model = sanitizeText(
+            patch.model,
+            current.model,
+            MODEL_MAX_LENGTH,
+            { allowEmpty: false }
+          );
+          continue;
+        }
         next[key] = typeof patch[key] === 'string' ? patch[key].trim() : String(patch[key]);
       }
     }
-    next.persona = sanitizePersona(patch.persona, current.persona);
+    next.persona = sanitizePersona(patch && patch.persona, current.persona);
     writeJsonFile(settingsFile, next);
     return next;
   }

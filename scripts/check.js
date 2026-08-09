@@ -81,6 +81,24 @@ if (
 }
 pass('renderer 设置页 petAPI.settings 集成存在');
 
+const rendererIndexSource = fs.readFileSync(
+  path.join(root, 'src', 'renderer', 'index.html'),
+  'utf8'
+);
+if (
+  !rendererIndexSource.includes('id="api-key"') ||
+  !rendererIndexSource.includes('type="password"')
+) {
+  fail('renderer/index.html 缺少 API Key 密码输入框');
+}
+if (!rendererIndexSource.includes('id="model"')) {
+  fail('renderer/index.html 缺少模型输入框');
+}
+if (!rendererIndexSource.includes('密钥仅保存在本机')) {
+  fail('renderer/index.html 缺少“密钥仅保存在本机”说明');
+}
+pass('renderer 设置页 API Key/模型输入存在');
+
 // T-08：store persona 默认值、读写与清洗（非法值丢弃/超长截断，不破坏 settings.json）
 const { createStore, DEFAULT_SETTINGS } = require(path.join(
   root,
@@ -160,6 +178,44 @@ try {
     fail('settings.json 写入内容损坏');
   }
   pass('store persona 读写与清洗通过');
+
+  // T-09：apiKey/model 默认值、读写与清洗（非法值丢弃/超长截断，不破坏 settings.json）
+  if (DEFAULT_SETTINGS.apiKey !== '') {
+    fail('DEFAULT_SETTINGS.apiKey 应为空串');
+  }
+  if (DEFAULT_SETTINGS.model !== contracts.DEFAULT_MODEL) {
+    fail('DEFAULT_SETTINGS.model 应为契约默认模型');
+  }
+  pass('DEFAULT_SETTINGS apiKey/model 默认值合法');
+
+  const invalidPatch = store.writeSettings({ apiKey: 12345, model: '' });
+  if (invalidPatch.apiKey !== '') {
+    fail('apiKey 非字符串应丢弃（保留当前值）');
+  }
+  if (invalidPatch.model !== contracts.DEFAULT_MODEL) {
+    fail('model 空串应保留默认模型');
+  }
+
+  const longApiKey = `sk-${'a'.repeat(300)}`;
+  const longModel = `deepseek-${'m'.repeat(150)}`;
+  const cleaned = store.writeSettings({ apiKey: longApiKey, model: longModel });
+  if (cleaned.apiKey.length !== 256) {
+    fail(`apiKey 未按 256 截断（实际 ${cleaned.apiKey.length}）`);
+  }
+  if (cleaned.model.length !== 100) {
+    fail(`model 未按 100 截断（实际 ${cleaned.model.length}）`);
+  }
+  const rereadKeyModel = store.readSettings();
+  if (rereadKeyModel.apiKey !== cleaned.apiKey || rereadKeyModel.model !== cleaned.model) {
+    fail('apiKey/model 持久化后读取不一致');
+  }
+  const rawKeyModel = JSON.parse(
+    fs.readFileSync(path.join(checkDir, 'settings.json'), 'utf8')
+  );
+  if (rawKeyModel.apiKey !== cleaned.apiKey || rawKeyModel.model !== cleaned.model) {
+    fail('settings.json 中 apiKey/model 内容损坏');
+  }
+  pass('store apiKey/model 读写与清洗通过');
 } finally {
   fs.rmSync(checkDir, { recursive: true, force: true });
 }

@@ -2,7 +2,8 @@
  * T-02 聊天面板逻辑：
  * - 消息列表渲染（用户/桌宠气泡）
  * - 输入框与发送（通过 window.petAPI.chat.send，接口未实现时优雅降级）
- * - 设置页（petAPI.settings.get/set 初始化与保存宠物名 + 人格，ADR-013；
+ * - 设置页（petAPI.settings.get/set 初始化与保存宠物名 + 人格 + API Key + 模型，
+ *   ADR-013/ADR-015；
  *   localStorage 仅作 petAPI 缺失时的降级）
  */
 (function () {
@@ -33,6 +34,8 @@
       closeBtn: document.getElementById('close-btn'),
       settingsBack: document.getElementById('settings-back'),
       headerTitle: document.getElementById('header-title'),
+      apiKey: document.getElementById('api-key'),
+      model: document.getElementById('model'),
       petName: document.getElementById('pet-name'),
       personaTraits: document.getElementById('persona-traits'),
       personaTone: document.getElementById('persona-tone'),
@@ -205,6 +208,8 @@
       const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
       applySettings({
         petName: saved.petName,
+        apiKey: saved.apiKey,
+        model: saved.model,
         persona: saved.persona
       });
     } catch (_error) {
@@ -214,6 +219,13 @@
 
   /** 将设置应用到表单与标题（缺失字段回退默认值） */
   function applySettings(settings) {
+    elements.apiKey.value =
+      settings && typeof settings.apiKey === 'string' ? settings.apiKey : '';
+    elements.model.value =
+      settings && typeof settings.model === 'string' && settings.model.trim()
+        ? settings.model.trim()
+        : 'deepseek-v4-flash';
+
     const petName =
       settings && typeof settings.petName === 'string' && settings.petName.trim()
         ? settings.petName.trim()
@@ -236,6 +248,9 @@
   async function saveSettings() {
     const petName = elements.petName.value.trim() || 'AI 桌宠';
     elements.petName.value = petName;
+    const apiKey = elements.apiKey.value.trim();
+    const model = elements.model.value.trim() || 'deepseek-v4-flash';
+    elements.model.value = model;
     const traits = elements.personaTraits.value
       .split(/[,，、]/)
       .map((item) => item.trim())
@@ -251,17 +266,17 @@
       window.petAPI.settings &&
       typeof window.petAPI.settings.set === 'function';
     if (!settingsApi) {
-      saveLocalFallback({ petName, persona });
+      saveLocalFallback({ petName, apiKey, model, persona });
       showSettingsStatus('已保存（本地降级，petAPI 不可用）', 'ok');
       return;
     }
 
     elements.settingsSave.disabled = true;
     try {
-      const saved = await window.petAPI.settings.set({ petName, persona });
+      const saved = await window.petAPI.settings.set({ petName, apiKey, model, persona });
       // 回填清洗后的规范值，保证表单与持久化一致
       applySettings(saved || { petName, persona });
-      showSettingsStatus('已保存，重启后仍生效', 'ok');
+      showSettingsStatus('已保存，密钥仅保存在本机，重启后仍生效', 'ok');
     } catch (error) {
       console.warn('保存设置失败：', error);
       showSettingsStatus(
