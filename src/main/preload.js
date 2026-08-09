@@ -5,7 +5,8 @@ const CHANNELS = {
   chatSend: 'chat:send',
   settingsGet: 'settings:get',
   settingsSet: 'settings:set',
-  windowHide: 'window:hide'
+  windowHide: 'window:hide',
+  historyGet: 'history:get'
 };
 
 contextBridge.exposeInMainWorld('petAPI', {
@@ -20,5 +21,8 @@ contextBridge.exposeInMainWorld('petAPI', {
   },
   window: {
     hide: () => ipcRenderer.invoke(CHANNELS.windowHide)
+  },
+  history: {
+    get: () => ipcRenderer.invoke(CHANNELS.historyGet)
   }
 });

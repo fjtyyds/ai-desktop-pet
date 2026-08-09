@@ -2,6 +2,8 @@
 
 const { createDeepSeekProvider } = require('./provider');
 const { createMockProvider } = require('./mock');
+const { buildSystemPrompt, DEFAULT_PERSONA } = require('./persona');
+const { createMood } = require('./mood');
 
 /**
  * 按设置创建 Provider（ADR-002：LLM 层可替换）：
@@ -16,4 +18,11 @@ function createProvider(settings) {
   return createMockProvider();
 }
 
-module.exports = { createProvider, createDeepSeekProvider, createMockProvider };
+module.exports = {
+  createProvider,
+  createDeepSeekProvider,
+  createMockProvider,
+  createMood,
+  buildSystemPrompt,
+  DEFAULT_PERSONA
+};

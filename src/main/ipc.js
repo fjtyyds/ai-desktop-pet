@@ -3,6 +3,8 @@
 const { ipcMain, app, BrowserWindow } = require('electron');
 const { createProvider } = require('../llm');
 const { createDefaultStore } = require('../storage');
+const { createMemoryStore } = require('../storage/memory-store');
+const { resolveBaseDir } = require('../storage');
 const { createChatService } = require('../llm/chat');
 
 /**
@@ -12,10 +14,12 @@ const CHANNELS = {
   chatSend: 'chat:send',
   settingsGet: 'settings:get',
   settingsSet: 'settings:set',
-  windowHide: 'window:hide'
+  windowHide: 'window:hide',
+  historyGet: 'history:get'
 };
 
 let store = null;
+let memoryStore = null;
 let settings = null;
 let provider = null;
 let chatService = null;
@@ -26,6 +30,13 @@ function getStore() {
     store = createDefaultStore();
   }
   return store;
+}
+
+function getMemoryStore() {
+  if (!memoryStore) {
+    memoryStore = createMemoryStore(resolveBaseDir());
+  }
+  return memoryStore;
 }
 
 function getSettings() {
@@ -75,6 +86,10 @@ function handleWindowHide(event) {
   }
 }
 
+function handleHistoryGet() {
+  return getMemoryStore().readMessages();
+}
+
 function registerIpcHandlers() {
   if (registered) {
     return;
@@ -84,6 +99,7 @@ function registerIpcHandlers() {
   ipcMain.handle(CHANNELS.settingsGet, handleSettingsGet);
   ipcMain.handle(CHANNELS.settingsSet, handleSettingsSet);
   ipcMain.handle(CHANNELS.windowHide, handleWindowHide);
+  ipcMain.handle(CHANNELS.historyGet, handleHistoryGet);
 }
 
 // 被 src/main/main.js require 后自动注册（M1 集成时由协调者加入 require('./ipc')）
