@@ -8,7 +8,9 @@
     "dev": "electron .",
     "start": "electron .",
     "check": "node scripts/check.js",
-    "smoke": "electron scripts/smoke.js"
+    "smoke": "electron scripts/smoke.js",
+    "dist": "electron-builder --win --x64",
+    "pack": "electron-builder --dir --win --x64"
   },
   "devDependencies": {
     "electron": "^43.3.0"

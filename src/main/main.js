@@ -2,7 +2,7 @@
 
 const { app, BrowserWindow } = require('electron');
 const path = require('path');
-const { createTray } = require('./tray');
+const { createTray, loadAppIcon } = require('./tray');
 require('./ipc'); // T-03: 注册 chat/settings IPC
 
 let mainWindow = null;
@@ -21,6 +21,7 @@ function createMainWindow() {
     resizable: false,
     hasShadow: false,
     backgroundColor: '#00000000',
+    icon: loadAppIcon(), // T-10: 正式图标（assets/icon.png，内嵌 base64 回退）
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,

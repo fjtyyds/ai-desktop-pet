@@ -1,0 +1,36 @@
+# electron-builder 配置（ADR-016）：Windows NSIS 安装包 + 正式图标
+# 依赖项 electron-builder 由协调者批准后加入 package.json devDependencies。
+appId: com.aideskpet.app
+productName: AI桌宠
+copyright: Copyright © 2026 AI桌宠
+
+directories:
+  output: dist
+  buildResources: assets
+
+files:
+  - src/**/*
+  - assets/**/*
+  - package.json
+
+asar: true
+compression: normal
+
+win:
+  icon: assets/icon.ico
+  target:
+    - target: nsis
+      arch:
+        - x64
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: AI桌宠
+  installerIcon: assets/icon.ico
+  uninstallerIcon: assets/icon.ico
+  installerHeaderIcon: assets/icon.ico
+  artifactName: AI桌宠-${version}-Setup.${ext}
