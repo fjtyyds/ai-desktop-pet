@@ -47,8 +47,16 @@
       personaTone: document.getElementById('persona-tone'),
       personaBackstory: document.getElementById('persona-backstory'),
       settingsSave: document.getElementById('settings-save'),
-      settingsStatus: document.getElementById('settings-status')
+      settingsStatus: document.getElementById('settings-status'),
+      exportMdBtn: document.getElementById('export-md'),
+      exportJsonBtn: document.getElementById('export-json'),
+      exportStatus: document.getElementById('export-status'),
+      clearScope: document.getElementById('clear-scope'),
+      clearDataBtn: document.getElementById('clear-data'),
+      clearStatus: document.getElementById('clear-status')
     };
+    showExportStatus = makeStatusShower(elements.exportStatus);
+    showClearStatus = makeStatusShower(elements.clearStatus);
   }
 
   function bindEvents() {
@@ -57,6 +65,9 @@
     elements.closeBtn.addEventListener('click', hideToTray);
     elements.settingsBack.addEventListener('click', showChatView);
     elements.settingsSave.addEventListener('click', saveSettings);
+    elements.exportMdBtn.addEventListener('click', () => void exportConversation('markdown'));
+    elements.exportJsonBtn.addEventListener('click', () => void exportConversation('json'));
+    elements.clearDataBtn.addEventListener('click', handleClearData);
   }
 
   function hideToTray() {
@@ -393,6 +404,121 @@
       elements.settingsStatus.hidden = true;
     }, 4000);
   }
+
+  /** 为指定状态元素创建带自动隐藏的提示函数 */
+  function makeStatusShower(element) {
+    let timer = null;
+    return (text, type) => {
+      element.textContent = text;
+      element.dataset.type = type || 'ok';
+      element.hidden = false;
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        element.hidden = true;
+      }, 5000);
+    };
+  }
+
+  /**
+   * T-18 导出对话：调用主进程 dialog.showSaveDialog，文件由主进程写入。
+   * 取消（error === 'cancelled'）时静默回到原状态。
+   */
+  async function exportConversation(format) {
+    await window.PetLocales.ready;
+    const t = window.PetLocales.createTranslator(currentLocale);
+    const exportApi =
+      window.petAPI &&
+      window.petAPI.history &&
+      typeof window.petAPI.history.export === 'function';
+    if (!exportApi) {
+      showExportStatus(
+        t('data.exportError', { error: t('data.apiUnavailable') }),
+        'error'
+      );
+      return;
+    }
+
+    elements.exportMdBtn.disabled = true;
+    elements.exportJsonBtn.disabled = true;
+    showExportStatus(t('data.exporting'), 'ok');
+    try {
+      const result = await window.petAPI.history.export({ format });
+      if (result && result.ok && result.filePath) {
+        showExportStatus(t('data.exportSaved', { filePath: result.filePath }), 'ok');
+      } else if (result && result.error && result.error !== 'cancelled') {
+        showExportStatus(t('data.exportError', { error: result.error }), 'error');
+      } else {
+        showExportStatus(t('data.exportCancelled'), 'ok');
+      }
+    } catch (error) {
+      showExportStatus(
+        t('data.exportError', {
+          error: error && error.message ? error.message : String(error)
+        }),
+        'error'
+      );
+    } finally {
+      elements.exportMdBtn.disabled = false;
+      elements.exportJsonBtn.disabled = false;
+    }
+  }
+
+  /** 清空当前聊天视图并恢复到空态问候（不写历史，仅 UI 刷新） */
+  function resetChatView() {
+    messages = [];
+    elements.messageList.replaceChildren();
+    void restoreHistory();
+  }
+
+  /**
+   * T-18 清除数据：主进程弹出确认框，确认后按范围清空；
+   * 聊天记录/全部被清除时刷新聊天视图，设置/全部被清除时重载设置表单。
+   */
+  async function handleClearData() {
+    await window.PetLocales.ready;
+    const t = window.PetLocales.createTranslator(currentLocale);
+    const clearApi =
+      window.petAPI &&
+      window.petAPI.history &&
+      typeof window.petAPI.history.clear === 'function';
+    if (!clearApi) {
+      showClearStatus(t('data.clearError', { error: t('data.apiUnavailable') }), 'error');
+      return;
+    }
+
+    const scope = elements.clearScope.value || 'all';
+    elements.clearDataBtn.disabled = true;
+    showClearStatus(t('data.clearing'), 'ok');
+    try {
+      const result = await window.petAPI.history.clear({ scope });
+      if (result && result.ok) {
+        if (scope === 'messages' || scope === 'all') {
+          resetChatView();
+        }
+        if (scope === 'settings' || scope === 'all') {
+          await restoreSettings();
+        }
+        const scopeLabel = t(`data.scope${scope[0].toUpperCase()}${scope.slice(1)}`);
+        showClearStatus(t('data.clearSuccess', { scope: scopeLabel }), 'ok');
+      } else if (result && result.error && result.error !== 'cancelled') {
+        showClearStatus(t('data.clearError', { error: result.error }), 'error');
+      } else {
+        showClearStatus(t('data.clearCancelled'), 'ok');
+      }
+    } catch (error) {
+      showClearStatus(
+        t('data.clearError', {
+          error: error && error.message ? error.message : String(error)
+        }),
+        'error'
+      );
+    } finally {
+      elements.clearDataBtn.disabled = false;
+    }
+  }
+
+  let showExportStatus = () => {};
+  let showClearStatus = () => {};
 
   window.ChatUI = { init };
 })();
