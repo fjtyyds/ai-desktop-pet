@@ -15,8 +15,8 @@
     cacheElements();
     bindEvents();
     renderServiceStatus();
-    appendMessage('assistant', '你好，我是你的 AI 桌宠 👋 想聊点什么？');
     restoreSettings();
+    void restoreHistory();
   }
 
   function cacheElements() {
@@ -94,12 +94,8 @@
     elements.sendBtn.disabled = true;
     elements.sendBtn.textContent = '…';
     try {
-      const result = await window.petAPI.chat.send({
-        text,
-        history: messages
-          .filter((item) => item.role === 'user' || item.role === 'assistant')
-          .map((item) => ({ role: item.role, content: item.content }))
-      });
+      // M2：主进程统一组装上下文，渲染层只传当前消息（ADR-012）
+      const result = await window.petAPI.chat.send({ text });
       if (result && result.ok) {
         appendMessage('assistant', result.reply || '（空回复）');
       } else if (result && result.error) {
@@ -117,6 +113,34 @@
       elements.sendBtn.textContent = '发送';
       elements.chatInput.focus();
     }
+  }
+
+  /**
+   * M2：启动时通过 petAPI.history.get 恢复历史气泡（ADR-012）。
+   * 接口缺失（T-05 未合入）或读取失败时优雅降级为默认问候。
+   */
+  async function restoreHistory() {
+    const historyApi =
+      window.petAPI && window.petAPI.history && typeof window.petAPI.history.get === 'function';
+    if (historyApi) {
+      try {
+        const items = await window.petAPI.history.get();
+        if (Array.isArray(items) && items.length > 0) {
+          for (const item of items) {
+            if (item && (item.role === 'user' || item.role === 'assistant')) {
+              appendMessage(
+                item.role,
+                typeof item.content === 'string' ? item.content : String(item.content ?? '')
+              );
+            }
+          }
+          return;
+        }
+      } catch (error) {
+        console.warn('恢复历史失败，回退默认问候：', error);
+      }
+    }
+    appendMessage('assistant', '你好，我是你的 AI 桌宠 👋 想聊点什么？');
   }
 
   function appendMessage(role, content) {
