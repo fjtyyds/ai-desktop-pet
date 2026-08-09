@@ -34,6 +34,7 @@
 - 2026-08-09：M1 并行工作台搭建：任务卡、共享契约、worktree 分支。
 - 2026-08-09：M1 集成完成：codex/m1-tray（T-01，此前已并入）→ codex/m1-chat（T-02 渲染层 + 其上的 e95c411 T-03）→ codex/m1-llm（T-03，842f18a）依次合并；T-03 冲突采用 842f18a 并删除 e95c411 重复文件；main.js 增加 `require('./ipc')`。`npm run check`、`npm run smoke` 通过。
 - 2026-08-09：T-04 人工验收与收尾完成：`npm run dev` 目检通过（托盘图标/菜单/聊天收发/设置保存/单实例/关闭隐藏到托盘）；渲染页补 CSP（ADR-008）；关闭按钮改用 petAPI `window.hide`，修复 Electron 43 下 `window.close()` 绕过 close 事件导致应用退出的问题（ADR-009）。
+- 2026-08-09：真实 DeepSeek 调用验证通过：`deepseek-v4-flash`（契约默认模型）与 `deepseek-chat` 均返回 200 与正确中文回复；密钥经环境变量传入，未入库。首次测试中文乱码为 PowerShell 管道编码问题，改用 UTF-8 脚本文件后正常。
 
 ## Surprises & Discoveries
 
