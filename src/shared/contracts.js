@@ -36,6 +36,7 @@ const DEFAULT_MODEL = 'deepseek-v4-flash';
  * - chat.send({ text, history }) -> Promise<ChatSendResult>
  * - settings.get() -> Promise<AppSettings>
  * - settings.set(patch) -> Promise<AppSettings>
+ * - window.hide() -> Promise<void>（隐藏主窗口到托盘，应用不退出）
  */
 
 module.exports = { DEFAULT_MODEL };

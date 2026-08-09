@@ -29,6 +29,7 @@
       chatInput: document.getElementById('chat-input'),
       sendBtn: document.getElementById('send-btn'),
       settingsBtn: document.getElementById('settings-btn'),
+      closeBtn: document.getElementById('close-btn'),
       settingsBack: document.getElementById('settings-back'),
       headerTitle: document.getElementById('header-title'),
       petName: document.getElementById('pet-name'),
@@ -39,8 +40,18 @@
   function bindEvents() {
     elements.chatForm.addEventListener('submit', handleSubmit);
     elements.settingsBtn.addEventListener('click', showSettingsView);
+    elements.closeBtn.addEventListener('click', hideToTray);
     elements.settingsBack.addEventListener('click', showChatView);
     elements.petNameSave.addEventListener('click', savePetName);
+  }
+
+  function hideToTray() {
+    if (window.petAPI && typeof window.petAPI.window?.hide === 'function') {
+      window.petAPI.window.hide();
+    } else {
+      // 契约缺失时兜底：直接关闭窗口（window-all-closed 会保持应用存活）
+      window.close();
+    }
   }
 
   function isChatReady() {

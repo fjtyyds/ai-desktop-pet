@@ -1,6 +1,6 @@
 'use strict';
 
-const { ipcMain, app } = require('electron');
+const { ipcMain, app, BrowserWindow } = require('electron');
 const { createProvider } = require('../llm');
 const { createDefaultStore } = require('../storage');
 const { createChatService } = require('../llm/chat');
@@ -11,7 +11,8 @@ const { createChatService } = require('../llm/chat');
 const CHANNELS = {
   chatSend: 'chat:send',
   settingsGet: 'settings:get',
-  settingsSet: 'settings:set'
+  settingsSet: 'settings:set',
+  windowHide: 'window:hide'
 };
 
 let store = null;
@@ -67,6 +68,13 @@ function handleSettingsSet(_event, patch) {
   return { ...settings };
 }
 
+function handleWindowHide(event) {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (win && !win.isDestroyed()) {
+    win.hide();
+  }
+}
+
 function registerIpcHandlers() {
   if (registered) {
     return;
@@ -75,6 +83,7 @@ function registerIpcHandlers() {
   ipcMain.handle(CHANNELS.chatSend, handleChatSend);
   ipcMain.handle(CHANNELS.settingsGet, handleSettingsGet);
   ipcMain.handle(CHANNELS.settingsSet, handleSettingsSet);
+  ipcMain.handle(CHANNELS.windowHide, handleWindowHide);
 }
 
 // 被 src/main/main.js require 后自动注册（M1 集成时由协调者加入 require('./ipc')）

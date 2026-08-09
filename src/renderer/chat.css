@@ -36,6 +36,18 @@
   background: rgba(255, 255, 255, 0.1);
 }
 
+.drag-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  -webkit-app-region: no-drag;
+}
+
+#close-btn:hover {
+  background: rgba(244, 67, 54, 0.75);
+  color: #fff;
+}
+
 .message-list {
   flex: 1;
   min-height: 0;

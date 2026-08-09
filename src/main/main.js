@@ -31,6 +31,9 @@ function createMainWindow() {
 
   win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
 
+  win.on('show', () => trayApi?.refreshMenu());
+  win.on('hide', () => trayApi?.refreshMenu());
+
   // 关闭窗口时隐藏到托盘，而不是退出应用
   win.on('close', (event) => {
     if (!isQuitting) {
@@ -95,5 +98,9 @@ if (!app.requestSingleInstanceLock()) {
     isQuitting = true;
   });
 
-  // 应用常驻托盘：窗口全部关闭时不退出，由托盘菜单“退出”结束进程
+  // 应用常驻托盘：窗口全部关闭时不退出，由托盘菜单“退出”结束进程。
+  // 若窗口因任何原因被销毁，空监听可阻止 Electron 默认退出行为。
+  app.on('window-all-closed', () => {
+    // 保持应用与托盘存活
+  });
 }

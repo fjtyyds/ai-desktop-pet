@@ -2,6 +2,10 @@
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'"
+    />
     <title>AI 桌宠</title>
     <link rel="stylesheet" href="./styles.css" />
     <link rel="stylesheet" href="./chat.css" />
@@ -10,7 +14,10 @@
     <main id="pet-card" class="pet-card">
       <header class="drag-bar">
         <span id="header-title" class="drag-bar-title">AI 桌宠</span>
-        <button id="settings-btn" class="icon-btn" type="button" title="设置" aria-label="设置">⚙</button>
+        <div class="drag-bar-actions">
+          <button id="settings-btn" class="icon-btn" type="button" title="设置" aria-label="设置">⚙</button>
+          <button id="close-btn" class="icon-btn" type="button" title="关闭（隐藏到托盘）" aria-label="关闭">✕</button>
+        </div>
       </header>
 
       <section id="chat-view" class="chat-view">

@@ -26,12 +26,14 @@
 - [x] T-02 聊天面板 UI
 - [x] T-03 DeepSeek Provider、设置与本地存储
 - [x] 协调者合并到 main 并集成验证
+- [x] T-04 M1 人工验收与收尾
 
 ## Progress
 
 - 2026-08-09：M0 完成（Electron 43.3.0、文档体系、CI）。
 - 2026-08-09：M1 并行工作台搭建：任务卡、共享契约、worktree 分支。
 - 2026-08-09：M1 集成完成：codex/m1-tray（T-01，此前已并入）→ codex/m1-chat（T-02 渲染层 + 其上的 e95c411 T-03）→ codex/m1-llm（T-03，842f18a）依次合并；T-03 冲突采用 842f18a 并删除 e95c411 重复文件；main.js 增加 `require('./ipc')`。`npm run check`、`npm run smoke` 通过。
+- 2026-08-09：T-04 人工验收与收尾完成：`npm run dev` 目检通过（托盘图标/菜单/聊天收发/设置保存/单实例/关闭隐藏到托盘）；渲染页补 CSP（ADR-008）；关闭按钮改用 petAPI `window.hide`，修复 Electron 43 下 `window.close()` 绕过 close 事件导致应用退出的问题（ADR-009）。
 
 ## Surprises & Discoveries
 
@@ -45,6 +47,7 @@
 - m1-chat 分支上除 T-02（ca9e9c7）外还带着一套 T-03 实现（e95c411：deepseek.js、json-store.js/message-store.js/settings-store.js）；T-03 正式实现提交在 m1-llm（842f18a：provider.js、store.js、chat.js 等）。两套无法共存，集成时按用户决定保留 842f18a、删除 e95c411（ADR-007）。
 - smoke 在沙箱内会因 Electron 无法写入用户 AppData 缓存而 GPU 进程崩溃；需以真实用户权限运行。
 - 集成完成后在纯 Node 下复核 T-03：mock 回复、设置读写、消息持久化、空输入校验均通过。
+- Electron 43 下 renderer 的 `window.close()` 不触发主进程可拦截的 BrowserWindow close 事件，窗口直接关闭并触发 `window-all-closed` 导致应用退出（最小复现确认）；关闭按钮改用 IPC hide 并加 `window-all-closed` 兜底（ADR-009）。
 
 ## Decision Log
 
@@ -55,6 +58,8 @@
 - ADR-005：M1 采用多线程 + git worktree 并行开发。
 - ADR-006：集成前核对分支内容与任务卡，禁止把未完成工作标记为完成。
 - ADR-007：T-03 采用 m1-llm 842f18a 实现，删除 m1-chat e95c411 重复实现。
+- ADR-008：渲染页启用 CSP。
+- ADR-009：关闭按钮通过 petAPI.window.hide 隐藏到托盘。
 
 详见 `docs/DECISIONS.md`。
 
@@ -62,4 +67,5 @@
 
 - M0 完成标志已达成：新会话可只读文档冷启动；`npm run check` 与 `npm run smoke` 通过；Electron 窗口可加载。
 - M1 集成完成：T-01/T-02/T-03 已合并到 main，`npm run check` 与 `npm run smoke` 通过；mock 模式可发消息、设置可保存/读取、消息可持久化。
-- 待办：`npm run dev` 人工目检（托盘菜单交互、聊天 UI 收发、设置保存）；dev 模式 CSP 警告补全（打包前）。
+- M1 验收完成（含人工目检）：托盘可用、聊天可发消息（mock）、设置可保存、关闭隐藏到托盘、CSP 无警告。
+- 下一步：M2 智能层（人格/情绪、短期与长期记忆）规划。

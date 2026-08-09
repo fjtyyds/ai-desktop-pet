@@ -4,7 +4,8 @@ const { contextBridge, ipcRenderer } = require('electron');
 const CHANNELS = {
   chatSend: 'chat:send',
   settingsGet: 'settings:get',
-  settingsSet: 'settings:set'
+  settingsSet: 'settings:set',
+  windowHide: 'window:hide'
 };
 
 contextBridge.exposeInMainWorld('petAPI', {
@@ -16,5 +17,8 @@ contextBridge.exposeInMainWorld('petAPI', {
   settings: {
     get: () => ipcRenderer.invoke(CHANNELS.settingsGet),
     set: (patch) => ipcRenderer.invoke(CHANNELS.settingsSet, patch)
+  },
+  window: {
+    hide: () => ipcRenderer.invoke(CHANNELS.windowHide)
   }
 });
