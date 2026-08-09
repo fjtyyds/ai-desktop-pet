@@ -187,36 +187,87 @@
             type="button"
             data-i18n="settings.memoryManage"
           >记忆管理</button>
-            <button id="settings-save" class="primary-btn" type="button" data-i18n="settings.save"
-              >保存设置</button
+          <button id="settings-save" class="primary-btn" type="button" data-i18n="settings.save"
+            >保存设置</button
+          >
+          <p id="settings-status" class="settings-status" role="status" hidden></p>
+
+          <div class="field">
+            <span class="field-label" data-i18n="data.exportTitle">导出对话</span>
+            <span class="field-hint" data-i18n="data.exportHint"
+              >将聊天记录导出为 Markdown 或 JSON 文件，保存在你选择的位置。</span
             >
-            <p id="settings-status" class="settings-status" role="status" hidden></p>
-            <p class="settings-note" data-i18n="settings.note">
-              设置通过 petAPI.settings 持久化到本地，重启后仍生效；性格标签、语气与背景会进入桌宠的对话人格。
-            </p>
-          </div>
-        </div>
-        <div id="memory-page" class="settings-page" hidden>
-          <div class="settings-header">
             <button
-              id="memory-back"
-              class="icon-btn"
+              id="export-md"
+              class="primary-btn"
               type="button"
-              aria-label="返回"
-              data-i18n-aria-label="settings.back"
-            >←</button>
-            <h2 class="settings-title" data-i18n="settings.memory">记忆</h2>
+              data-i18n="data.exportMarkdown"
+            >导出 Markdown</button>
+            <button
+              id="export-json"
+              class="primary-btn"
+              type="button"
+              data-i18n="data.exportJson"
+            >导出 JSON</button>
+            <p id="export-status" class="settings-status" role="status" hidden></p>
           </div>
-          <div class="settings-body">
-            <p class="memory-hint" data-i18n="settings.memoryHint">
-              长期记忆由对话自动提取，可在此查看、修正或删除。
-            </p>
-            <p id="memory-status" class="settings-status" role="status" hidden></p>
-            <p id="memory-empty" class="memory-empty" data-i18n="settings.memoryEmpty" hidden
-              >暂无长期记忆，聊天中的关键事实会自动保存到这里。</p
+
+          <div class="field">
+            <span class="field-label" data-i18n="data.clearTitle">清除数据</span>
+            <span class="field-hint" data-i18n="data.clearHint"
+              >永久删除本地数据，此操作不可恢复。</span
             >
-            <div id="memory-list" class="memory-list"></div>
+            <select
+              id="clear-scope"
+              class="field-select"
+              aria-label="清除范围"
+              data-i18n-aria-label="data.clearScope"
+            >
+              <option value="messages" data-i18n="data.scopeOptionMessages"
+                >仅聊天记录</option
+              >
+              <option value="memories" data-i18n="data.scopeOptionMemories"
+                >仅长期记忆</option
+              >
+              <option value="settings" data-i18n="data.scopeOptionSettings">仅设置</option>
+              <option value="all" data-i18n="data.scopeOptionAll">全部数据</option>
+            </select>
+            <button
+              id="clear-data"
+              class="primary-btn"
+              type="button"
+              data-i18n="data.clearButton"
+            >清除数据</button>
+            <p id="clear-status" class="settings-status" role="status" hidden></p>
           </div>
+
+          <p class="settings-note" data-i18n="settings.note">
+            设置通过 petAPI.settings 持久化到本地，重启后仍生效；性格标签、语气与背景会进入桌宠的对话人格。
+          </p>
+        </div>
+      </div>
+      <div id="memory-page" class="settings-page" hidden>
+        <div class="settings-header">
+          <button
+            id="memory-back"
+            class="icon-btn"
+            type="button"
+            aria-label="返回"
+            data-i18n-aria-label="settings.back"
+          >←</button>
+          <h2 class="settings-title" data-i18n="settings.memory">记忆</h2>
+        </div>
+        <div class="settings-body">
+          <p class="memory-hint" data-i18n="settings.memoryHint">
+            长期记忆由对话自动提取，可在此查看、修正或删除。
+          </p>
+          <p id="memory-status" class="settings-status" role="status" hidden></p>
+          <p id="memory-empty" class="memory-empty" data-i18n="settings.memoryEmpty" hidden
+            >暂无长期记忆，聊天中的关键事实会自动保存到这里。</p
+          >
+          <div id="memory-list" class="memory-list"></div>
+        </div>
+      </div>
         </div>
       </section>
 

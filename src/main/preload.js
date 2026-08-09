@@ -15,7 +15,9 @@ const CHANNELS = {
   moodGet: 'mood:get',
   memoryList: 'memory:list',
   memoryDelete: 'memory:delete',
-  memoryUpdate: 'memory:update'
+  memoryUpdate: 'memory:update',
+  historyExport: 'history:export',
+  historyClear: 'history:clear'
 };
 
 contextBridge.exposeInMainWorld('petAPI', {
@@ -47,7 +49,9 @@ contextBridge.exposeInMainWorld('petAPI', {
     hide: () => ipcRenderer.invoke(CHANNELS.windowHide)
   },
   history: {
-    get: () => ipcRenderer.invoke(CHANNELS.historyGet)
+    get: () => ipcRenderer.invoke(CHANNELS.historyGet),
+    export: (payload) => ipcRenderer.invoke(CHANNELS.historyExport, payload),
+    clear: (payload) => ipcRenderer.invoke(CHANNELS.historyClear, payload)
   },
   idle: {
     onTrigger: (cb) => {
