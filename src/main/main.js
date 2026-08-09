@@ -56,6 +56,7 @@ let dockSlideTimer = null;
 let dockSliding = false;
 let dockLastAnimationAt = 0;
 let dockGraceUntil = 0;
+let positionSaveTimer = null;
 let activeShortcut = null;
 let windowSettingsWriter = null;
 
@@ -470,6 +471,7 @@ function handleWindowMove() {
     }
     return;
   }
+  schedulePositionSave();
   if (!dockEnabled || Date.now() < dockGraceUntil) {
     return;
   }
@@ -500,6 +502,23 @@ function handleWindowMoved() {
     return;
   }
   persistWindowBounds(mainWindow.getBounds());
+}
+
+/** 移动结束后延迟落盘位置（Windows 上程序化移动可能不触发 moved 事件） */
+function schedulePositionSave() {
+  clearTimeout(positionSaveTimer);
+  positionSaveTimer = setTimeout(() => {
+    positionSaveTimer = null;
+    if (
+      !mainWindow ||
+      mainWindow.isDestroyed() ||
+      dockedEdge ||
+      dockSliding
+    ) {
+      return;
+    }
+    persistWindowBounds(mainWindow.getBounds());
+  }, 500);
 }
 
 /* ---------------- T-19：全局快捷键 ---------------- */
@@ -635,6 +654,7 @@ function createMainWindow() {
     stopDockPolling();
     stopDockAnimation();
     clearTimeout(dockHoldTimer);
+    clearTimeout(positionSaveTimer);
   });
 
   mainWindow = win;
