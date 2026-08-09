@@ -4,11 +4,32 @@ const { app, BrowserWindow } = require('electron');
 const path = require('path');
 const { createTray, loadAppIcon } = require('./tray');
 const { initCrash } = require('./crash'); // T-11: 崩溃上报与本地日志
-require('./ipc'); // T-03: 注册 chat/settings IPC
+const ipc = require('./ipc'); // T-03: 注册 chat/settings IPC；T-15: 空闲互动接线
+const {
+  createIdleMonitor,
+  DEFAULT_IDLE_TRIGGER_MS,
+  DEFAULT_MIN_INTERVAL_MS
+} = require('./idle'); // T-15: 空闲主动互动计时
 
 let mainWindow = null;
 let trayApi = null;
 let isQuitting = false;
+let idleMonitor = null;
+
+/** T-15：空闲参数。默认 3 分钟无交互触发、两次至少间隔 90 秒；环境变量可临时调小便于目检 */
+const IDLE_TRIGGER_MS = readPositiveEnvMs(
+  'AI_PET_IDLE_TRIGGER_MS',
+  DEFAULT_IDLE_TRIGGER_MS
+);
+const IDLE_MIN_INTERVAL_MS = readPositiveEnvMs(
+  'AI_PET_IDLE_MIN_INTERVAL_MS',
+  DEFAULT_MIN_INTERVAL_MS
+);
+
+function readPositiveEnvMs(name, fallback) {
+  const value = Number(process.env[name]);
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+}
 
 function createMainWindow() {
   if (mainWindow) return mainWindow;
@@ -33,8 +54,12 @@ function createMainWindow() {
 
   win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
 
-  win.on('show', () => trayApi?.refreshMenu());
+  win.on('show', () => {
+    idleMonitor?.markActivity(); // T-15: 显示窗口视为交互
+    trayApi?.refreshMenu();
+  });
   win.on('hide', () => trayApi?.refreshMenu());
+  win.on('focus', () => idleMonitor?.markActivity()); // T-15: 聚焦视为交互
 
   // 关闭窗口时隐藏到托盘，而不是退出应用
   win.on('close', (event) => {
@@ -94,6 +119,29 @@ if (!app.requestSingleInstanceLock()) {
       toggleMainWindow,
       quitApp
     });
+
+    // T-15: 空闲主动互动（节流、防打扰、可关闭）
+    idleMonitor = createIdleMonitor({
+      triggerMs: IDLE_TRIGGER_MS,
+      minIntervalMs: IDLE_MIN_INTERVAL_MS,
+      isEnabled: () => {
+        try {
+          return ipc.getSettings().idleEnabled !== false;
+        } catch (_error) {
+          return false; // 设置读取失败时不打扰
+        }
+      },
+      onTrigger: () => {
+        const win = mainWindow;
+        if (!win || win.isDestroyed() || !win.isVisible() || !win.webContents) {
+          return false; // 窗口隐藏/不可用时不算触发，等待下一次检查
+        }
+        win.webContents.send(ipc.CHANNELS.idleEvent, { at: Date.now() });
+        return true;
+      }
+    });
+    ipc.onActivity(() => idleMonitor.markActivity());
+    idleMonitor.start();
 
     // macOS 点击 Dock 图标时恢复窗口；Windows 下通常不会触发
     app.on('activate', showMainWindow);

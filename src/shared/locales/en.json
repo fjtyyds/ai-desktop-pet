@@ -21,6 +21,16 @@
     "errorPrefix": "Error: {error}",
     "greeting": "Hi! I am your AI pet 👋 What would you like to chat about?"
   },
+  "idle": {
+    "phrases": [
+      "Are you busy? I'm right here waiting for you 🐾",
+      "We haven't chatted in a while — want to take a break?",
+      "I just took a little nap and I'm full of energy now～",
+      "Miss me? You can talk to me anytime.",
+      "Want me to tell you a little joke?",
+      "Remember to drink some water even when you're busy ☕"
+    ]
+  },
   "window": {
     "close": "Close",
     "closeTitle": "Close (hide to tray)"
@@ -32,6 +42,8 @@
     "languageSystem": "Follow system",
     "languageZhCN": "Chinese (Simplified)",
     "languageEn": "English",
+    "idleEnabled": "Idle chat",
+    "idleEnabledHint": "When there has been no interaction for a while, the pet may proactively send a bubble. Saved on submit and can be turned off anytime.",
     "apiKey": "API Key",
     "apiKeyHint": "The key is stored only on this device and is used only to call the DeepSeek API.",
     "model": "Model",
