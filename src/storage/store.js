@@ -34,6 +34,7 @@ const DEFAULT_SETTINGS = {
   model: DEFAULT_MODEL,
   petName: 'AI 桌宠',
   language: 'system',
+  idleEnabled: true, // T-15：空闲主动互动开关，默认开启
   persona: { ...DEFAULT_PERSONA }
 };
 
@@ -75,6 +76,11 @@ function sanitizeText(value, current, maxLength, { allowEmpty = true } = {}) {
 /** 清洗语言设置：非法值（非字符串/不在支持列表）丢弃，保留当前值 */
 function sanitizeLanguage(value, current) {
   return SUPPORTED_LANGUAGES.includes(value) ? value : current;
+}
+
+/** 清洗布尔设置项：非布尔值丢弃，保留当前值（T-15 idleEnabled） */
+function sanitizeBoolean(value, current) {
+  return typeof value === 'boolean' ? value : current;
 }
 
 /**
@@ -153,12 +159,16 @@ function createStore(baseDir) {
       { allowEmpty: false }
     );
     merged.language = sanitizeLanguage(merged.language, DEFAULT_SETTINGS.language);
+    merged.idleEnabled = sanitizeBoolean(
+      merged.idleEnabled,
+      DEFAULT_SETTINGS.idleEnabled
+    );
     return merged;
   }
 
   function writeSettings(patch) {
     const current = readSettings();
-    const allowed = ['apiKey', 'model', 'petName', 'language'];
+    const allowed = ['apiKey', 'model', 'petName', 'language', 'idleEnabled'];
     const next = { ...current };
     for (const key of allowed) {
       if (patch && patch[key] !== undefined) {
@@ -181,6 +191,10 @@ function createStore(baseDir) {
         }
         if (key === 'language') {
           next.language = sanitizeLanguage(patch.language, current.language);
+          continue;
+        }
+        if (key === 'idleEnabled') {
+          next.idleEnabled = sanitizeBoolean(patch.idleEnabled, current.idleEnabled);
           continue;
         }
         next[key] = typeof patch[key] === 'string' ? patch[key].trim() : String(patch[key]);

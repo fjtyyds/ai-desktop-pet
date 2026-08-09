@@ -18,6 +18,16 @@
     "errorPrefix": "出错了：{error}",
     "greeting": "你好，我是你的 AI 桌宠 👋 想聊点什么？"
   },
+  "idle": {
+    "phrases": [
+      "你在忙吗？我在这儿等你呢 🐾",
+      "好久没说话了，要不要休息一下？",
+      "我刚刚打了个盹，现在精神满满～",
+      "想我了没？随时都可以找我聊天哦。",
+      "要不要我给你讲个小笑话？",
+      "工作再忙也要记得喝口水哦 ☕"
+    ]
+  },
   "window": {
     "close": "关闭",
     "closeTitle": "关闭（隐藏到托盘）"
@@ -29,6 +39,8 @@
     "languageSystem": "跟随系统",
     "languageZhCN": "简体中文",
     "languageEn": "English",
+    "idleEnabled": "空闲互动",
+    "idleEnabledHint": "长时间无交互时，桌宠会主动冒泡和你打招呼；保存后生效，可随时关闭。",
     "apiKey": "API Key",
     "apiKeyHint": "密钥仅保存在本机，仅用于调用 DeepSeek 接口。",
     "model": "模型",

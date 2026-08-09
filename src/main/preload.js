@@ -6,7 +6,9 @@ const CHANNELS = {
   settingsGet: 'settings:get',
   settingsSet: 'settings:set',
   windowHide: 'window:hide',
-  historyGet: 'history:get'
+  historyGet: 'history:get',
+  idleEvent: 'idle:event',
+  activityPoke: 'activity:poke'
 };
 
 contextBridge.exposeInMainWorld('petAPI', {
@@ -24,5 +26,17 @@ contextBridge.exposeInMainWorld('petAPI', {
   },
   history: {
     get: () => ipcRenderer.invoke(CHANNELS.historyGet)
+  },
+  idle: {
+    onTrigger: (cb) => {
+      const listener = (_event, payload) => {
+        if (typeof cb === 'function') {
+          cb(payload);
+        }
+      };
+      ipcRenderer.on(CHANNELS.idleEvent, listener);
+      return () => ipcRenderer.removeListener(CHANNELS.idleEvent, listener);
+    },
+    poke: () => ipcRenderer.send(CHANNELS.activityPoke)
   }
 });

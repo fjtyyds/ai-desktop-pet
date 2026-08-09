@@ -5,6 +5,7 @@
  * - 设置页（petAPI.settings.get/set 初始化与保存宠物名 + 人格 + API Key + 模型 + 语言，
  *   ADR-013/ADR-015/ADR-018；localStorage 仅作 petAPI 缺失时的降级）
  * - 文案经 src/shared/locales 获取，默认跟随系统，设置页可选并持久化
+ * - T-15 空闲主动互动：窗口内交互心跳上报主进程；主进程触发后随机展示互动气泡
  */
 (function () {
   'use strict';
@@ -12,14 +13,18 @@
   const STORAGE_KEY = 'ai-pet-settings';
   const DEFAULT_MODEL = 'deepseek-v4-flash';
   const DEFAULT_LANGUAGE = 'system';
+  const ACTIVITY_POKE_MIN_INTERVAL_MS = 5000; // T-15: 交互心跳节流
   let messages = [];
   let elements = {};
   let currentLocale = 'zh-CN';
   let currentPetName = 'AI 桌宠';
+  let lastActivityPokeAt = 0;
 
   async function init() {
     cacheElements();
     bindEvents();
+    bindActivityEvents();
+    subscribeIdle();
     // 先加载两份语言包，确保任何文案渲染不会回退到键名
     await window.PetLocales.ready;
     await restoreSettings();
@@ -46,6 +51,7 @@
       personaTraits: document.getElementById('persona-traits'),
       personaTone: document.getElementById('persona-tone'),
       personaBackstory: document.getElementById('persona-backstory'),
+      idleEnabled: document.getElementById('idle-enabled'),
       settingsSave: document.getElementById('settings-save'),
       settingsStatus: document.getElementById('settings-status')
     };
@@ -57,6 +63,57 @@
     elements.closeBtn.addEventListener('click', hideToTray);
     elements.settingsBack.addEventListener('click', showChatView);
     elements.settingsSave.addEventListener('click', saveSettings);
+  }
+
+  /**
+   * T-15：窗口内任意交互（鼠标/键盘/触摸/滚动）以 5 秒节流上报主进程，
+   * 主进程据此重置空闲计时——恢复交互后即停止触发。
+   */
+  function bindActivityEvents() {
+    const events = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'wheel', 'scroll'];
+    for (const type of events) {
+      window.addEventListener(type, pokeActivity, { capture: true, passive: true });
+    }
+  }
+
+  function pokeActivity() {
+    const poke =
+      window.petAPI && window.petAPI.idle && window.petAPI.idle.poke;
+    if (typeof poke !== 'function') {
+      return;
+    }
+    const now = Date.now();
+    if (now - lastActivityPokeAt < ACTIVITY_POKE_MIN_INTERVAL_MS) {
+      return;
+    }
+    lastActivityPokeAt = now;
+    poke();
+  }
+
+  /**
+   * T-15：订阅主进程空闲触发事件；仅在聊天视图随机展示一条互动气泡
+   * （不写入历史，也不调用 LLM）。
+   */
+  function subscribeIdle() {
+    const idleApi = window.petAPI && window.petAPI.idle;
+    if (!idleApi || typeof idleApi.onTrigger !== 'function') {
+      return;
+    }
+    idleApi.onTrigger((payload) => {
+      if (!payload || elements.chatView.hidden) {
+        return; // 防打扰：设置页打开时忽略本次触发
+      }
+      const t = window.PetLocales.createTranslator(currentLocale);
+      const phrases =
+        t.messages && t.messages.idle && Array.isArray(t.messages.idle.phrases)
+          ? t.messages.idle.phrases
+          : [];
+      if (phrases.length === 0) {
+        return;
+      }
+      const text = phrases[Math.floor(Math.random() * phrases.length)];
+      appendMessage('assistant', text, 'message-idle');
+    });
   }
 
   function hideToTray() {
@@ -90,6 +147,7 @@
 
   function handleSubmit(event) {
     event.preventDefault();
+    pokeActivity();
     const text = elements.chatInput.value.trim();
     if (!text) {
       return;
@@ -165,9 +223,12 @@
     );
   }
 
-  function appendMessage(role, content) {
+  function appendMessage(role, content, extraClass) {
     const item = document.createElement('div');
     item.className = `message message-${role}`;
+    if (extraClass) {
+      item.classList.add(extraClass);
+    }
 
     const bubble = document.createElement('div');
     bubble.className = 'bubble';
@@ -227,7 +288,8 @@
         apiKey: saved.apiKey,
         model: saved.model,
         persona: saved.persona,
-        language: saved.language
+        language: saved.language,
+        idleEnabled: saved.idleEnabled !== false
       });
     } catch (_error) {
       // 本地设置损坏时静默回退默认值
@@ -305,6 +367,7 @@
         ? settings.petName.trim()
         : t('app.defaultPetName');
     elements.petName.value = currentPetName;
+    elements.idleEnabled.checked = !settings || settings.idleEnabled !== false;
 
     const persona =
       settings && settings.persona && typeof settings.persona === 'object'
@@ -321,6 +384,7 @@
 
   /** 保存设置：优先 petAPI.settings.set；petAPI 缺失时降级 localStorage */
   async function saveSettings() {
+    pokeActivity();
     await window.PetLocales.ready;
     const t = window.PetLocales.createTranslator(currentLocale);
     const petName = elements.petName.value.trim() || t('app.defaultPetName');
@@ -344,7 +408,14 @@
       window.petAPI.settings &&
       typeof window.petAPI.settings.set === 'function';
     if (!settingsApi) {
-      saveLocalFallback({ petName, apiKey, model, persona, language });
+      saveLocalFallback({
+        petName,
+        apiKey,
+        model,
+        persona,
+        language,
+        idleEnabled: elements.idleEnabled.checked
+      });
       showSettingsStatus(t('settings.savedLocalFallback'), 'ok');
       return;
     }
@@ -356,7 +427,8 @@
         apiKey,
         model,
         persona,
-        language
+        language,
+        idleEnabled: elements.idleEnabled.checked
       });
       // 回填清洗后的规范值，保证表单与持久化一致
       applySettings(saved || { petName, persona, language });
