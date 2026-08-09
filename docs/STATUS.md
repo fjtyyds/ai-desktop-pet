@@ -2,9 +2,9 @@
 
 - 更新时间：2026-08-09
 - 当前阶段：M3.5 内容增强（T-14~T-18 已合并，待整体目检）
-- 当前任务：T-14~T-18 五个任务集成完成；剩余 T-19/T-20/T-21~T-23 未启动
-- 最近完成：M0~M3 全部验收通过；M3.5 规划；T-14~T-18 开发与集成（流式/空闲/情绪/记忆/导出清除）
-- 下一步：`npm run dev` 人工目检 T-14~T-18；随后启动 T-19/T-20 与批次 5
+- 当前任务：T-14~T-19 已合并；T-20/T-21~T-23 由 orchestrator 全自动运行中
+- 最近完成：M0~M3 全部验收通过；M3.5 规划；T-14~T-18 开发与集成；T-19 全自动（orchestrator）完成
+- 下一步：等待 orchestrator 完成 T-20/T-21~T-23；随后 M3.5 整体目检
 - 阻塞：无
 - 交接提示：新会话先读 `AGENTS.md` → `PLAN.md` → 自己的任务卡（docs/tasks/T-xx.md）
 
@@ -108,3 +108,9 @@
 - T-18 导出与清除：history:export（showSaveDialog，Markdown/JSON）、history:clear（确认框 + 分范围清空）；分支 37c003a。
 - 集成：共享文件冲突全部解决；`npm run check`、`npm run smoke` 通过；合并后集成验证通过（API 齐全、mock 流式 23 段、mood/memory/export 正常、无 CSP 错误）。
 - 待办：整体目检；仓库根目录未跟踪的“多线程开发/”（约 5GB）与 scripts/orchestrator/ 删除与否待用户决定。
+
+## T-19 自动集成记录（2026-08-10）
+
+- 方式：orchestrator 全自动闭环（coordinator 直接运行）：resume 验收（边界/check/smoke/任务卡）→ 通过 → 自动合并 40d4a7d → 清理 worktree（保留分支）。
+- 修复：npm 版 codex CLI 经 cmd 启动；`--approve-for-me` 替代 `--full-auto`（与 --sandbox 互斥）；任务卡“涉及文件”括号注释剥离避免边界误判；空分支/残留 worktree 自动清理；resume 分支不匹配改为自动处理。
+- 校验：main `npm run check`、`npm run smoke` 通过。
