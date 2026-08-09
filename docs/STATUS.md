@@ -2,9 +2,9 @@
 
 - 更新时间：2026-08-09
 - 当前阶段：M3 打磨（打包/崩溃日志/i18n 与无障碍/密钥加密）
-- 当前任务：T-11/T-12/T-13 已合并；T-10 依赖已获批，待完成打包冒烟后合并
-- 最近完成：M0~M2 全部验收通过；M3 规划；T-11（崩溃日志）、T-12（i18n/无障碍）、T-13（密钥加密）开发与集成
-- 下一步：T-10 完成 dist 打包冒烟 → 合并 → M3 整体目检
+- 当前任务：M3 四个任务（T-10~T-13）已全部合并，等待整体目检
+- 最近完成：M0~M2 全部验收通过；M3 规划；T-11~T-13 集成；T-10 打包与安装包冒烟
+- 下一步：M3 整体目检（dev UI：语言切换/密钥加密/崩溃日志/正式图标；安装包安装验证）
 - 阻塞：无
 - 交接提示：新会话先读 `AGENTS.md` → `PLAN.md` → 自己的任务卡（docs/tasks/T-xx.md）
 
@@ -82,3 +82,10 @@
 - T-13 密钥加密：secure-settings.js（safeStorage enc:v1:，明文自动迁移，不可用回退告警；apiKey 原始读写绕过 256 清洗上限，避免密文截断）已并入 main。
 - 校验：`npm run check`、`npm run smoke` 通过；合并后集成验证通过（i18n 15 个 data-i18n 节点生效、无 CSP 错误；256 字符密钥密文落盘 enc:v1: 长度 387、get/set 往返一致）。
 - T-10 状态：前置工作（assets 图标、electron-builder.yml、tray/main 图标读取）在 worktree 中未提交；依赖变更已获批，待 T-10 合并 main 后执行 npm install + npm run dist 并提交。
+
+## T-10 集成记录（2026-08-09）
+
+- 合并：codex/m3-packaging（T-10）已并入 main；package.json 增加 electron-builder@^26.15.3 与 dist/pack 脚本；electron-builder.yml 与 assets/icon.ico、icon.png 已入库；main.js/tray.js 读取正式图标（内嵌 base64 回退），并与 T-11/T-12 的 initCrash/i18n 共存。
+- 产物：AI桌宠-0.1.0-Setup.exe（约 100 MB）与 dist/win-unpacked/；解包冒烟（临时 userData：petAPI/设置/聊天 mock/历史/密钥密文/单实例锁）与静默安装/卸载冒烟（退出码 0）通过。
+- 校验：main 安装依赖后 `npm run check`、`npm run smoke` 通过。
+- 过程说明：T-10 首次冒烟误写 2 条测试消息到真实历史，已清理恢复（备份在 %TEMP%\ai-pet-messages-backup-16b81fb4396b4178920aedffe64ef103.json）；真实 settings.json 的 apiKey 已由 T-13 自动迁移为密文，属预期行为。
