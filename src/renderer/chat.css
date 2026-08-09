@@ -1,0 +1,214 @@
+/* 聊天面板 */
+.chat-view {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-view[hidden] {
+  display: none;
+}
+
+.drag-bar-title {
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+.icon-btn {
+  -webkit-app-region: no-drag;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #e8eaf6;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.icon-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.message-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+}
+
+.message {
+  display: flex;
+}
+
+.message-user {
+  justify-content: flex-end;
+}
+
+.bubble {
+  max-width: 80%;
+  padding: 8px 10px;
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  word-break: break-word;
+  user-select: text;
+}
+
+.message-user .bubble {
+  background: #4f6ef7;
+  border-bottom-right-radius: 4px;
+}
+
+.message-assistant .bubble {
+  background: rgba(255, 255, 255, 0.09);
+  border-bottom-left-radius: 4px;
+}
+
+.service-status {
+  margin: 0 12px 8px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(255, 183, 77, 0.12);
+  color: #ffb74d;
+  font-size: 12px;
+  text-align: center;
+}
+
+.service-status[hidden] {
+  display: none;
+}
+
+.chat-form {
+  display: flex;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.chat-input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #e8eaf6;
+  font-size: 13px;
+  outline: none;
+  user-select: text;
+}
+
+.chat-input::placeholder {
+  color: rgba(232, 234, 246, 0.4);
+}
+
+.chat-input:focus {
+  border-color: #4f6ef7;
+}
+
+.send-btn {
+  padding: 0 14px;
+  border: none;
+  border-radius: 10px;
+  background: #4f6ef7;
+  color: #fff;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.send-btn:hover {
+  background: #5f7cf9;
+}
+
+.send-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* 设置页骨架 */
+.settings-view {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-view[hidden] {
+  display: none;
+}
+
+.settings-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.settings-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.settings-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 14px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field-label {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.field-input {
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #e8eaf6;
+  font-size: 13px;
+  outline: none;
+  user-select: text;
+}
+
+.field-input:focus {
+  border-color: #4f6ef7;
+}
+
+.primary-btn {
+  padding: 9px 0;
+  border: none;
+  border-radius: 10px;
+  background: #4f6ef7;
+  color: #fff;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.primary-btn:hover {
+  background: #5f7cf9;
+}
+
+.settings-note {
+  font-size: 11px;
+  opacity: 0.55;
+  line-height: 1.6;
+}
