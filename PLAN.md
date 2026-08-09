@@ -55,6 +55,31 @@
 - [x] T-08 设置页人格配置与持久化
 - [x] T-09 设置页 API Key 与模型输入（常开真实模式）
 
+**M3：打磨（进行中）**
+
+目标：打包与正式图标、崩溃日志、i18n/无障碍、密钥加密；打包产物通过测试。
+
+任务卡：
+
+- `docs/tasks/T-10.md` — 打包与正式图标（codex/m3-packaging）
+- `docs/tasks/T-11.md` — 崩溃上报与本地日志（codex/m3-crash）
+- `docs/tasks/T-12.md` — i18n 与无障碍（codex/m3-i18n）
+- `docs/tasks/T-13.md` — API Key 加密存储（codex/m3-secure）
+
+验收标准：
+
+1. 四个 worktree 分支并行开发；scripts/check.js 由协调者维护（任务只读）。
+2. `npm run dist` 产出 Windows 安装包，安装/解包后启动冒烟通过。
+3. `npm run check`、`npm run smoke` 通过；崩溃日志、i18n/无障碍走查、密钥密文落盘完成。
+
+任务清单：
+
+- [ ] T-10 打包与正式图标
+- [ ] T-11 崩溃上报与本地日志
+- [ ] T-12 i18n 与无障碍
+- [ ] T-13 API Key 加密存储
+- [ ] 协调者合并到 main 并集成验证
+
 ## Progress
 
 - 2026-08-09：M0 完成（Electron 43.3.0、文档体系、CI）。
@@ -70,6 +95,8 @@
 - 2026-08-09：M2 人工目检通过（历史恢复、人格设置保存/重启、情绪变化、记忆引用、托盘/关闭/单实例回归）；真实 API Key 会话验证记忆抽取正常（控制台输出“已保存 N 条长期记忆”）；已创建桌面快捷方式“AI桌宠”便于启动/重启。
 - 2026-08-09：T-09 建卡（设置页 API Key/模型，常开真实模式）：完成 SPEC 用户故事 3 的触点清单（UI/存储/校验），新增 ADR-015；worktree 与分支 codex/m2-apikey 就绪。
 - 2026-08-09：T-09 合并完成：设置页 API Key（密码框）与模型输入已接入 petAPI.settings；store 增加 apiKey/model 清洗（apiKey ≤ 256、model ≤ 100）；`npm run check`、`npm run smoke` 与纯 Node 复核（写入/重启重读/清洗）均通过；任务卡记录真实调用验收成功（无需环境变量）。
+- 2026-08-09：T-09 目检通过（设置页可滚动修复、密钥保存后直接真实对话、重启保留）；设置页不可滚动问题已修复（`.settings-body` 增加 overflow-y）。
+- 2026-08-09：M3 规划完成：ADR-016~019（打包/崩溃日志/i18n 与无障碍/密钥加密）、SPEC 与 ROADMAP 更新、任务卡 T-10~T-13 与 worktree 分支（codex/m3-*）就绪。
 
 ## Surprises & Discoveries
 
@@ -104,6 +131,10 @@
 - ADR-013：设置页接入 petAPI.settings 并持久化人格。
 - ADR-014：任务拆分必须按用户故事覆盖全触点。
 - ADR-015：设置页补 API Key 与模型输入（常开真实模式）。
+- ADR-016：M3 打包与正式图标（electron-builder + NSIS）。
+- ADR-017：M3 崩溃上报与本地日志。
+- ADR-018：M3 i18n 与无障碍。
+- ADR-019：M3 API Key 加密存储（safeStorage）。
 
 详见 `docs/DECISIONS.md`。
 
@@ -119,3 +150,4 @@
 - M2 验收完成（含人工目检与真实 API 验证）：历史恢复、人格设置、情绪变化、记忆引用均正常。
 - 待办：T-09（设置页 API Key/模型 输入框，常开真实模式，待建卡）；随后规划 M3 打磨（打包/图标/崩溃上报/i18n/无障碍）。
 - T-09 已合并（codex/m2-apikey）：设置页保存密钥后即可直接真实对话；待人工目检后进入 M3 打磨规划。
+- T-09 目检通过；M3 规划完成，T-10~T-13 四个线程可并行开始。

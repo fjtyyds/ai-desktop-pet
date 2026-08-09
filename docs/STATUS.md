@@ -1,10 +1,10 @@
 # 项目状态
 
 - 更新时间：2026-08-09
-- 当前阶段：M2 智能层（人格/情绪 + 短期与长期记忆）
-- 当前任务：T-09 已完成并合并，等待设置页目检（保存密钥后直接真实对话）
-- 最近完成：M0~M1 全部验收通过；真实 DeepSeek 调用验证；M2 设计；T-05~T-09 开发与集成；M2 人工目检；ADR-013~015
-- 下一步：目检 T-09；随后规划 M3 打磨（打包/图标/崩溃上报/i18n/无障碍）
+- 当前阶段：M3 打磨（打包/崩溃日志/i18n 与无障碍/密钥加密）
+- 当前任务：M3 规划完成，等待 T-10~T-13 并行线程开发
+- 最近完成：M0~M2 全部验收通过（含 T-09 目检）；M3 规划（ADR-016~019、任务卡与 worktree）
+- 下一步：打开 codex/m3-packaging、codex/m3-crash、codex/m3-i18n、codex/m3-secure 四个 worktree 线程并行开发
 - 阻塞：无
 - 交接提示：新会话先读 `AGENTS.md` → `PLAN.md` → 自己的任务卡（docs/tasks/T-xx.md）
 
@@ -65,4 +65,12 @@
 
 - 合并：codex/m2-apikey（T-09）已并入 main；任务卡状态“已完成”（含真实调用验收：设置中的密钥无需环境变量即可调用 deepseek-v4-flash）。
 - 校验：`npm run check` 通过（含 API Key/模型输入存在性与读写/清洗断言）；`npm run smoke` 通过；纯 Node 复核通过（写入→重启重读、apiKey 截断 256、非法 model 回退默认）。
-- 待目检：设置页保存密钥后直接真实对话；随后进入 M3 打磨规划。
+- 目检通过：设置页可滚动（修复 `.settings-body` overflow-y）、密钥保存后直接真实对话、重启保留密钥与历史。
+
+## M3 规划完成记录（2026-08-09）
+
+- ADR-016：electron-builder + NSIS 打包与正式图标（assets/）。
+- ADR-017：崩溃上报与本地日志（crashReporter + logs/app.log）。
+- ADR-018：i18n（zh-CN/en）与无障碍走查。
+- ADR-019：API Key 加密存储（safeStorage/DPAPI，旧明文自动迁移）。
+- 任务卡：T-10（codex/m3-packaging）、T-11（codex/m3-crash）、T-12（codex/m3-i18n）、T-13（codex/m3-secure）；worktree 目录见任务卡；scripts/check.js 由协调者维护。

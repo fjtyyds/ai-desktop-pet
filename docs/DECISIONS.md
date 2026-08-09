@@ -124,3 +124,35 @@
 - 决策：设置页新增 API Key（密码框）与模型输入，经 `petAPI.settings.get/set` 读写；`store.writeSettings` 对 apiKey/model 增加长度清洗（如 apiKey ≤ 256、model ≤ 100，非法/超长丢弃或截断）；明文存储保持现状并在 UI 说明“密钥仅保存在本机”，加密/系统凭据管理列入 M3 评估；契约（contracts.js）不变。
 - 触点清单（ADR-014）：UI=设置页表单（index.html/chat.js/chat.css）、存储=store.js 清洗与默认值、IPC=已存在 settings.get/set（只读）、校验=scripts/check.js 断言。
 - 后果：双击快捷方式即可真实对话，无需环境变量；API Key 仍明文保存在本地 settings.json（MVP 已知限制，已注明）。
+
+## ADR-016：M3 打包与正式图标（electron-builder + NSIS）
+
+- 状态：Accepted
+- 背景：M3 需要可分发安装包；当前无打包配置，应用/托盘图标为内嵌 base64 占位图。
+- 决策：使用 electron-builder + NSIS 产出 Windows 安装包；新增 `assets/` 存放正式 icon.ico/icon.png，应用与托盘图标统一从 assets 读取（内嵌 base64 保留为开发回退）；`dist/` 输出加入 .gitignore；`package.json` 增加 build 配置与 electron-builder devDependency（依赖变更由协调者批准执行）。
+- 触点清单：配置=package.json/electron-builder.yml、资源=assets/、校验=打包产物启动冒烟。
+- 后果：产出可分发安装包；代码签名与商店渠道留待 M4 分发前处理。
+
+## ADR-017：M3 崩溃上报与本地日志
+
+- 状态：Accepted
+- 背景：桌面应用崩溃后无痕迹，问题难以排查。
+- 决策：main 进程启用 Electron `crashReporter` 写入本地 dump；`process` 未捕获异常与 `unhandledRejection` 写入 `userData/logs/app.log`；远程上报不绑定第三方，预留环境变量配置端点（默认关闭）。
+- 触点清单：新增 src/main/crash.js、main.js 引入、.gitignore 忽略日志目录。
+- 后果：崩溃可本地排查；远程上报留接口、默认不发送。
+
+## ADR-018：M3 i18n 与无障碍
+
+- 状态：Accepted
+- 背景：界面与托盘菜单文案硬编码中文；无障碍（ARIA/焦点/对比度）未系统走查。
+- 决策：新增 `src/shared/locales/zh-CN.json` 与 `en.json`，渲染层与托盘菜单文案经 locale 函数获取；语言默认跟随系统（非中文环境用 en），设置页提供语言选择并存入 settings；无障碍走查（ARIA、键盘焦点、对比度）作为验收项。
+- 触点清单：渲染层 index.html/chat.js、托盘 tray.js、新增 locales、设置页语言选项。
+- 后果：文案与逻辑解耦；en 为基础翻译质量，后续可完善。
+
+## ADR-019：M3 API Key 加密存储（safeStorage）
+
+- 状态：Accepted
+- 背景：apiKey 目前明文存 settings.json（ADR-013/015 已知限制）。
+- 决策：加密边界放在主进程：新增 `src/main/secure-settings.js`，用 Electron `safeStorage`（Windows DPAPI）加密 apiKey 后写入 store；读取时解密；旧明文 apiKey 首次读取自动迁移为密文；`safeStorage` 不可用时回退明文并告警；`store.js` 保持纯 JSON、不感知加密，便于纯 Node 测试。
+- 触点清单：主进程加解密封装（新文件）、ipc.js 的 settings.get/set 接入、契约不变、校验=往返一致与迁移。
+- 后果：密钥落盘为密文；解密仅在主进程；用户数据迁移到其他机器后 DPAPI 密文无法解密，需重新输入密钥。
