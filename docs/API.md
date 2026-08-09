@@ -73,6 +73,7 @@ window.petAPI = {
 petAPI.mood.get() -> Promise<MoodState>
 petAPI.memory.list() -> Promise<MemoryItem[]>
 petAPI.memory.delete(id: string) -> Promise<{ ok: boolean, error?: string }>
+petAPI.memory.update(id: string, patch: { content: string }) -> Promise<{ ok: boolean, item?: MemoryItem, error?: string }>
 petAPI.history.export({ format?: 'markdown' | 'json' }) -> Promise<{ ok: boolean, filePath?: string, error?: string }>
 petAPI.history.clear({ scope?: 'messages' | 'memories' | 'settings' | 'all' }) -> Promise<{ ok: boolean, error?: string }>
 petAPI.window.toggleDock() -> Promise<{ docked: boolean }>
