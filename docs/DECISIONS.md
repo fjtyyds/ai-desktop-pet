@@ -105,3 +105,14 @@
 - 背景：M2 逻辑层已支持 settings.persona（ADR-011），但设置页仍是 M1 的 localStorage 骨架，`store.writeSettings` 只允许 apiKey/model/petName，用户无法配置人格，SPEC“人格可配置且影响回复”的验收未达成。
 - 决策：设置页迁移到 `petAPI.settings.get/set`；`store.writeSettings` 允许 persona 字段并清洗（traits 为字符串数组、tone/backstory 为字符串，非法值丢弃或截断）；localStorage 仅作 petAPI 缺失时的降级。
 - 后果：人格设置跨重启生效并进入 system prompt；settings.json 增加 persona 字段；旧 localStorage 数据不再作为主存储。
+
+## ADR-014：任务拆分必须按用户故事覆盖全触点（M2 复盘）
+
+- 状态：Accepted
+- 背景：M2 拆卡时把 T-05/T-06/T-07 按“存储/IPC、LLM 逻辑、上下文组装”分层分配，遗漏了 SPEC 用户故事“用户可在设置中配置人格”的完整触点（设置页 UI 与 `writeSettings` 白名单），导致 T-08 只能在集成后补建。根因：
+  1. 按层拆分时，设置页（renderer）与设置持久化（store.js）恰好落在所有卡的“禁止触碰”里，没有归属；
+  2. 契约冻结只覆盖类型/接口（Persona、settings.persona），未核对运行时接线（writeSettings 白名单、设置页字段）；
+  3. SPEC 级验收项只挂在“协调者人工目检”，没有分配到具体任务卡；
+  4. 并行边界规则阻止线程顺手补缺，而任务卡也未要求回报“无人认领的功能触点”。
+- 决策：后续拆卡前先列出 SPEC 用户故事并逐条映射到任务卡，生成触点清单（UI/存储/IPC/逻辑）确认归属；契约冻结必须包含运行时行为断言（如 writeSettings 白名单、设置页字段）；SPEC 级验收项必须落到具体任务卡；任务卡增加“发现边界外缺口立即记录并回报”的要求。
+- 后果：拆卡工作量略增，但能避免“集成后才发现用户故事没做完”的返工；ADR-005 的并行模式保持有效。

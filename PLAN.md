@@ -63,6 +63,7 @@
 - 2026-08-09：M2 设计完成：ADR-010~012（记忆模型/人格情绪/上下文组装）、SPEC 与 ROADMAP 更新、契约冻结（contracts.js 扩展）、任务卡 T-05~T-07 与 worktree 分支（codex/m2-*）就绪。
 - 2026-08-09：M2 集成完成：codex/m2-memory（T-05）→ codex/m2-persona（T-06）→ codex/m2-context（T-07，先在 worktree 中合并 main 完成集成）依次并入 main；`npm run check`、`npm run smoke` 通过；真实模块集成验证通过（历史恢复、短期窗口、长期记忆注入、人格/情绪生效）。
 - 2026-08-09：M2 缺口核查：SPEC 要求“用户可配置人格”，但 T-05~T-07 任务边界未含设置页 UI 与 persona 持久化；已建 T-08 与 ADR-013（设置页接入 petAPI.settings）。
+- 2026-08-09：M2 复盘（ADR-014）：拆卡按层而非按用户故事，导致“设置人格”触点无人认领；已确立“用户故事→触点清单→任务卡”的拆卡规则。
 
 ## Surprises & Discoveries
 
@@ -78,6 +79,7 @@
 - 集成完成后在纯 Node 下复核 T-03：mock 回复、设置读写、消息持久化、空输入校验均通过。
 - Electron 43 下 renderer 的 `window.close()` 不触发主进程可拦截的 BrowserWindow close 事件，窗口直接关闭并触发 `window-all-closed` 导致应用退出（最小复现确认）；关闭按钮改用 IPC hide 并加 `window-all-closed` 兜底（ADR-009）。
 - M2 集成发现并修正两处并行期兼容问题：① chat.js 原“服务内部自动创建 memory-store”在 T-05 合入后生效，导致测试写入 `~/.ai-desktop-pet` 并在沙箱/CI 失败，改为由 ipc.js 注入单例；② T-06 mood.js 实际接口为 `snapshot/applyFeedback/tick`，与 chat.js 原探针（getState/update）不一致，已在 chat.js 适配（含情感词反馈猜测，情绪变化体现在下一轮 system prompt）。
+- 复盘教训：T-05~T-07 按“存储/逻辑/组装”分层拆卡，把设置页 UI 与 writeSettings 白名单排除在所有边界外，导致 SPEC“人格可配置”直到集成后才被发现缺失；已通过 ADR-014 建立“用户故事→触点清单→任务卡”规则。
 
 ## Decision Log
 
@@ -105,4 +107,5 @@
 - 下一步：M2 智能层（人格/情绪、短期与长期记忆）规划。
 - M2 设计完成：契约冻结、任务卡与 worktree 就绪，三个线程可并行开始。
 - M2 集成完成：T-05/T-06/T-07 已合并到 main，check/smoke 与真实模块集成验证通过。
-- 待办：T-08（设置页人格配置与持久化）；随后 `npm run dev` 人工目检 M2（重启历史恢复、人格/情绪设置、记忆引用）；真实 API Key 下验证异步记忆抽取。
+- 复盘：拆卡必须按用户故事覆盖全触点（ADR-014）；本次“人格可配置”缺口由 T-08 补上。
+- 待办：T-08 合并与 `npm run dev` 人工目检 M2（重启历史恢复、人格/情绪设置、记忆引用）；真实 API Key 下验证异步记忆抽取。
