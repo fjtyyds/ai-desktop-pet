@@ -98,3 +98,10 @@
   - 每轮成功后：追加消息到 storage；异步触发记忆抽取（失败仅记录，不阻塞 UI）。
   - 渲染层 init 时调用 `petAPI.history.get()` 恢复历史气泡。
 - 后果：主进程持有完整对话状态，渲染层更薄；历史恢复补齐 M1 遗留缺口。
+
+## ADR-013：设置页接入 petAPI.settings 并持久化人格（M2 补全）
+
+- 状态：Accepted
+- 背景：M2 逻辑层已支持 settings.persona（ADR-011），但设置页仍是 M1 的 localStorage 骨架，`store.writeSettings` 只允许 apiKey/model/petName，用户无法配置人格，SPEC“人格可配置且影响回复”的验收未达成。
+- 决策：设置页迁移到 `petAPI.settings.get/set`；`store.writeSettings` 允许 persona 字段并清洗（traits 为字符串数组、tone/backstory 为字符串，非法值丢弃或截断）；localStorage 仅作 petAPI 缺失时的降级。
+- 后果：人格设置跨重启生效并进入 system prompt；settings.json 增加 persona 字段；旧 localStorage 数据不再作为主存储。

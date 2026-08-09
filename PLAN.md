@@ -37,6 +37,7 @@
 - `docs/tasks/T-05.md` — 记忆存储与历史接口（codex/m2-memory）
 - `docs/tasks/T-06.md` — 人格与情绪引擎（codex/m2-persona）
 - `docs/tasks/T-07.md` — 上下文组装与端到端集成（codex/m2-context）
+- `docs/tasks/T-08.md` — 设置页人格配置与持久化（codex/m2-settings）
 
 验收标准：
 
@@ -50,6 +51,7 @@
 - [x] T-06 人格与情绪引擎
 - [x] T-07 上下文组装与端到端集成
 - [x] 协调者合并到 main 并集成验证
+- [ ] T-08 设置页人格配置与持久化
 
 ## Progress
 
@@ -60,6 +62,7 @@
 - 2026-08-09：真实 DeepSeek 调用验证通过：`deepseek-v4-flash`（契约默认模型）与 `deepseek-chat` 均返回 200 与正确中文回复；密钥经环境变量传入，未入库。首次测试中文乱码为 PowerShell 管道编码问题，改用 UTF-8 脚本文件后正常。
 - 2026-08-09：M2 设计完成：ADR-010~012（记忆模型/人格情绪/上下文组装）、SPEC 与 ROADMAP 更新、契约冻结（contracts.js 扩展）、任务卡 T-05~T-07 与 worktree 分支（codex/m2-*）就绪。
 - 2026-08-09：M2 集成完成：codex/m2-memory（T-05）→ codex/m2-persona（T-06）→ codex/m2-context（T-07，先在 worktree 中合并 main 完成集成）依次并入 main；`npm run check`、`npm run smoke` 通过；真实模块集成验证通过（历史恢复、短期窗口、长期记忆注入、人格/情绪生效）。
+- 2026-08-09：M2 缺口核查：SPEC 要求“用户可配置人格”，但 T-05~T-07 任务边界未含设置页 UI 与 persona 持久化；已建 T-08 与 ADR-013（设置页接入 petAPI.settings）。
 
 ## Surprises & Discoveries
 
@@ -90,6 +93,7 @@
 - ADR-010：M2 记忆模型——短期窗口 + 长期事实记忆（本地 JSON）。
 - ADR-011：M2 人格与情绪。
 - ADR-012：M2 上下文组装与渲染层历史恢复。
+- ADR-013：设置页接入 petAPI.settings 并持久化人格。
 
 详见 `docs/DECISIONS.md`。
 
@@ -101,4 +105,4 @@
 - 下一步：M2 智能层（人格/情绪、短期与长期记忆）规划。
 - M2 设计完成：契约冻结、任务卡与 worktree 就绪，三个线程可并行开始。
 - M2 集成完成：T-05/T-06/T-07 已合并到 main，check/smoke 与真实模块集成验证通过。
-- 待办：`npm run dev` 人工目检 M2（重启历史恢复、人格/情绪设置、记忆引用）；真实 API Key 下验证异步记忆抽取。
+- 待办：T-08（设置页人格配置与持久化）；随后 `npm run dev` 人工目检 M2（重启历史恢复、人格/情绪设置、记忆引用）；真实 API Key 下验证异步记忆抽取。
