@@ -4,18 +4,49 @@
     <meta charset="UTF-8" />
     <title>AI 桌宠</title>
     <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./chat.css" />
   </head>
   <body>
     <main id="pet-card" class="pet-card">
-      <header class="drag-bar" title="拖动我移动"></header>
-      <section class="pet-body">
-        <div class="pet-avatar" aria-hidden="true">🐾</div>
-        <h1>AI 桌宠</h1>
-        <p class="status"><span class="dot"></span>M0 骨架已就绪</p>
-        <p class="hint">拖动上方把手移动窗口</p>
+      <header class="drag-bar">
+        <span id="header-title" class="drag-bar-title">AI 桌宠</span>
+        <button id="settings-btn" class="icon-btn" type="button" title="设置" aria-label="设置">⚙</button>
+      </header>
+
+      <section id="chat-view" class="chat-view">
+        <div id="message-list" class="message-list" aria-live="polite"></div>
+        <div id="service-status" class="service-status" role="status"></div>
+        <form id="chat-form" class="chat-form">
+          <input
+            id="chat-input"
+            class="chat-input"
+            type="text"
+            placeholder="对桌宠说点什么…"
+            autocomplete="off"
+            aria-label="聊天输入框"
+          />
+          <button id="send-btn" class="send-btn" type="submit">发送</button>
+        </form>
       </section>
+
+      <section id="settings-view" class="settings-view" hidden>
+        <div class="settings-header">
+          <button id="settings-back" class="icon-btn" type="button" aria-label="返回">←</button>
+          <h2 class="settings-title">设置</h2>
+        </div>
+        <div class="settings-body">
+          <label class="field">
+            <span class="field-label">宠物名称</span>
+            <input id="pet-name" class="field-input" type="text" maxlength="20" placeholder="AI 桌宠" />
+          </label>
+          <button id="pet-name-save" class="primary-btn" type="button">保存</button>
+          <p class="settings-note">设置页骨架：当前仅本地保存，更多设置将在后续版本开放。</p>
+        </div>
+      </section>
+
       <footer class="meta" id="meta"></footer>
     </main>
+    <script src="./chat.js"></script>
     <script src="./renderer.js"></script>
   </body>
 </html>

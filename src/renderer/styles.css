@@ -29,45 +29,13 @@ body {
 .drag-bar {
   height: 28px;
   flex: 0 0 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 10px;
   -webkit-app-region: drag;
   cursor: grab;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-.pet-body {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 12px;
-  text-align: center;
-}
-
-.pet-avatar {
-  font-size: 56px;
-}
-
-.status {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  opacity: 0.85;
-}
-
-.dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #4ade80;
-  display: inline-block;
-}
-
-.hint {
-  font-size: 12px;
-  opacity: 0.55;
 }
 
 .meta {
