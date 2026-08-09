@@ -1,6 +1,7 @@
 node_modules/
 dist/
 多线程开发/
+.orchestrator-logs/
 out/
 release/
 *.log
