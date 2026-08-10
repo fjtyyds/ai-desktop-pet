@@ -20,7 +20,8 @@ const CHANNELS = {
   historyClear: 'history:clear',
   weatherGet: 'weather:get',
   windowToggleDock: 'window:toggle-dock',
-  windowMinimize: 'window:minimize' // T-25：最小化到任务栏（ADR-026 冻结契约）
+  windowMinimize: 'window:minimize', // T-25：最小化到任务栏（ADR-026 冻结契约）
+  ttsSpeak: 'tts:speak' // T-34：在线神经语音合成（ADR-029）
 };
 
 contextBridge.exposeInMainWorld('petAPI', {
@@ -80,5 +81,8 @@ contextBridge.exposeInMainWorld('petAPI', {
   },
   weather: {
     get: (payload) => ipcRenderer.invoke(CHANNELS.weatherGet, payload)
+  },
+  tts: {
+    speak: (payload) => ipcRenderer.invoke(CHANNELS.ttsSpeak, payload) // T-34
   }
 });

@@ -11,6 +11,7 @@ const { createChatService } = require('../llm/chat');
 const { createSecureSettings } = require('./secure-settings');
 const { createTranslator } = require('../shared/locales');
 const { getWeather } = require('./weather'); // T-22：天气小部件（主进程网络请求）
+const ttsEdge = require('./tts-edge'); // T-34：Edge 在线神经语音（ADR-029）
 
 /**
  * T-16：情绪引擎共享单例（ADR-022 mood.get；src/llm/** 只读）。
@@ -48,7 +49,8 @@ const CHANNELS = {
   memoryUpdate: 'memory:update', // T-17：修正长期记忆
   historyExport: 'history:export', // T-18：导出对话
   historyClear: 'history:clear', // T-18：清除数据
-  weatherGet: 'weather:get' // T-22：天气小部件
+  weatherGet: 'weather:get', // T-22：天气小部件
+  ttsSpeak: 'tts:speak' // T-34：在线神经语音合成（ADR-029）
 };
 
 /** history.clear 允许的范围（契约：messages / memories / settings / all） */
@@ -494,6 +496,24 @@ async function handleWeatherGet(_event, payload) {
   return getWeather({ city, language, force });
 }
 
+/** T-34（ADR-029）：Edge 在线神经语音合成，返回 { ok, audioDataUrl, error } */
+async function handleTtsSpeak(_event, payload) {
+  const text =
+    payload && typeof payload.text === 'string' ? payload.text : '';
+  if (!text.trim()) {
+    return { ok: false, audioDataUrl: null, error: '文本不能为空' };
+  }
+  const voice =
+    payload && typeof payload.voice === 'string' && payload.voice.trim()
+      ? payload.voice.trim()
+      : '';
+  const rate =
+    payload && typeof payload.rate === 'string' ? payload.rate : '+0%';
+  const pitch =
+    payload && typeof payload.pitch === 'string' ? payload.pitch : '+0Hz';
+  return ttsEdge.synthesize({ text, voice, rate, pitch });
+}
+
 function registerIpcHandlers() {
   if (registered) {
     return;
@@ -514,6 +534,7 @@ function registerIpcHandlers() {
   ipcMain.handle(CHANNELS.historyExport, handleHistoryExport);
   ipcMain.handle(CHANNELS.historyClear, handleHistoryClear);
   ipcMain.handle(CHANNELS.weatherGet, handleWeatherGet);
+  ipcMain.handle(CHANNELS.ttsSpeak, handleTtsSpeak);
 }
 
 // 被 src/main/main.js require 后自动注册（M1 集成时由协调者加入 require('./ipc')）
