@@ -55,7 +55,7 @@ const DEFAULT_SETTINGS = {
   petName: 'AI 桌宠',
   language: 'system',
   idleEnabled: true, // T-15：空闲主动互动开关，默认开启
-  dockEnabled: true, // T-19：贴边隐藏开关，默认开启
+  dockEnabled: true, // T-31：靠边吸附开关（方案 B：不自动隐藏），默认开启
   shortcutEnabled: true, // T-19：全局快捷键呼出开关，默认开启
   windowBounds: null, // T-19：上次窗口位置 { x, y }；null 表示未保存
   onboardingDone: false, // T-20：首次启动三步引导是否已完成

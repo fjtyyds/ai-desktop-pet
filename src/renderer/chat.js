@@ -10,7 +10,8 @@
  * - T-14：流式回复优先（chat.sendStream + chat.onDelta），"正在思考…" 占位、
  *   打字机增量更新、流式中发送按钮变为"停止"（chat.cancelStream）
  * - T-15 空闲主动互动：窗口内交互心跳上报主进程；主进程触发后随机展示互动气泡
- * - T-19 窗口体验：设置页注入“贴边隐藏/全局快捷键”开关与提示（ADR-022 冻结契约
+ * - T-19/T-31 窗口体验：设置页注入“靠边吸附/全局快捷键”开关与提示（ADR-022/026
+ *   冻结契约；贴边方案 B：靠边吸附、不自动隐藏）
  *   petAPI.window.toggleDock / setShortcutEnabled；提示文案为本地双语映射，不依赖 locale 文件）
  * - T-20 首次引导与人格模板：首次启动三步引导（语言 / API Key 与模型 / 人格模板），
  *   完成标志 onboardingDone 持久化；内置 6 套预设人格模板（双语内联，与 store.js
@@ -35,12 +36,12 @@
   const WEATHER_MIN_REFRESH_GAP_MS = 30 * 1000; // T-22：自动刷新节流（手动刷新不受限）
   const DEFAULT_POMODORO_MINUTES = 25; // T-21：与 store.js 默认值一致
   const POMODORO_TICK_MS = 250; // T-21：番茄钟刷新间隔
-  /** T-19：设置页窗口行为区块文案（双语内联，因 locale 文件不在任务边界内） */
+  /** T-31：设置页窗口行为区块文案（双语内联，沿用 T-19 结构，避免无意义的 locale 重构） */
   const WINDOW_FEATURE_HINTS = {
     'zh-CN': {
       title: '窗口行为',
-      dockLabel: '贴边隐藏',
-      dockHint: '拖到屏幕边缘自动收起成细条，鼠标靠近自动滑出；可随时关闭。',
+      dockLabel: '靠边吸附',
+      dockHint: '拖到屏幕边缘自动吸附对齐，不会自动隐藏；拖动离开边缘即可恢复正常位置。',
       shortcutLabel: '全局快捷键',
       shortcutHint: '按 Ctrl+Alt+P 可从任意位置呼出窗口；按键被占用时自动尝试备用键。',
       shortcutUnavailable: '快捷键注册失败（可能与其他应用冲突），已自动关闭。',
@@ -48,9 +49,9 @@
     },
     en: {
       title: 'Window behavior',
-      dockLabel: 'Edge docking',
+      dockLabel: 'Edge snapping',
       dockHint:
-        'Drag to a screen edge to auto-collapse; hover near the edge to slide out.',
+        'Drag to a screen edge to snap it in place — the window never auto-hides. Drag it away from the edge to move it freely.',
       shortcutLabel: 'Global shortcut',
       shortcutHint:
         'Press Ctrl+Alt+P to summon the window from anywhere; fallbacks are tried if taken.',
@@ -535,7 +536,7 @@
         applyWindowFeatureSettings(currentSettings);
       }
     } catch (error) {
-      console.warn('切换贴边隐藏失败：', error);
+      console.warn('切换靠边吸附失败：', error);
       applyWindowFeatureSettings(currentSettings);
     }
   }
