@@ -651,6 +651,50 @@ if (
 }
 pass('T-31 贴边吸附语义同步');
 
+// T-35：Windows 上 moved 事件不触发 → move 防抖判定拖放结束；macOS moved 兼容保留
+const dockDebounceMatch = mainSource.match(
+  /const DOCK_MOVE_DEBOUNCE_MS\s*=\s*(\d+)/
+);
+if (
+  !dockDebounceMatch ||
+  Number(dockDebounceMatch[1]) < 150 ||
+  Number(dockDebounceMatch[1]) > 250
+) {
+  fail('main.js 缺少合理的 move 防抖间隔（DOCK_MOVE_DEBOUNCE_MS ≈200ms）');
+}
+if (!mainSource.includes('function handleDragEnd')) {
+  fail('main.js 缺少共享拖放结束处理函数（handleDragEnd）');
+}
+if (!mainSource.includes('function scheduleDockMoveEnd')) {
+  fail('main.js 缺少 move 防抖调度函数（scheduleDockMoveEnd）');
+}
+if (!mainSource.includes('dockMoveDebounceTimer')) {
+  fail('main.js 缺少 move 防抖定时器状态（dockMoveDebounceTimer）');
+}
+if (
+  !mainSource.includes("win.on('move', handleWindowMove)") ||
+  !mainSource.includes("win.on('moved', handleWindowMoved)")
+) {
+  fail('main.js 未同时保留 move 防抖入口与 moved 兼容监听');
+}
+if (!/function handleWindowMoved[\s\S]{0,120}handleDragEnd\(\)/.test(mainSource)) {
+  fail('main.js moved 兼容入口未复用共享拖放结束处理（handleDragEnd）');
+}
+if (
+  !mainSource.includes('Math.abs(bounds.x - aligned.x) >= 1') ||
+  !mainSource.includes('dockFullBounds = full')
+) {
+  fail('main.js 缺少吸附对齐 ≥1px 判定或 dockFullBounds 状态（防回环）');
+}
+if (
+  !mainSource.includes('function undockWindow') ||
+  !mainSource.includes('function syncDockFullBounds') ||
+  !mainSource.includes('function handleWindowResize')
+) {
+  fail('main.js 缺少取消吸附/沿边同步/缩放贴齐语义（T-35）');
+}
+pass('T-35 贴边吸附拖放结束防抖与 moved 兼容保留');
+
 // T-08：store persona 默认值、读写与清洗（非法值丢弃/超长截断，不破坏 settings.json）
 const { createStore, DEFAULT_SETTINGS } = require(path.join(
   root,
