@@ -99,6 +99,85 @@ if (!rendererIndexSource.includes('密钥仅保存在本机')) {
 }
 pass('renderer 设置页 API Key/模型输入存在');
 
+// T-25：工具栏导出 + 最小化（契约 window:minimize 已冻结，ADR-026）
+const preloadSource = fs.readFileSync(
+  path.join(root, 'src', 'main', 'preload.js'),
+  'utf8'
+);
+const mainSource = fs.readFileSync(
+  path.join(root, 'src', 'main', 'main.js'),
+  'utf8'
+);
+if (!preloadSource.includes("windowMinimize: 'window:minimize'")) {
+  fail('preload.js 缺少 window:minimize 通道');
+}
+if (!preloadSource.includes('minimize: () => ipcRenderer.invoke')) {
+  fail('preload.js 缺少 petAPI.window.minimize 暴露');
+}
+if (!mainSource.includes("minimize: 'window:minimize'")) {
+  fail('main.js 缺少 window:minimize 通道注册');
+}
+if (!mainSource.includes('win.minimize()')) {
+  fail('main.js 缺少 BrowserWindow.minimize 调用');
+}
+if (!rendererChatSource.includes('minimizeBtn')) {
+  fail('renderer/chat.js 缺少最小化按钮集成');
+}
+if (!rendererChatSource.includes('window.petAPI.window.minimize')) {
+  fail('renderer/chat.js 缺少 petAPI.window.minimize 调用');
+}
+if (!rendererChatSource.includes('exportMenu')) {
+  fail('renderer/chat.js 缺少导出菜单逻辑');
+}
+if (!rendererIndexSource.includes('id="minimize-btn"')) {
+  fail('renderer/index.html 缺少最小化按钮');
+}
+if (!rendererIndexSource.includes('id="export-menu"')) {
+  fail('renderer/index.html 缺少工具栏导出菜单');
+}
+if (!rendererIndexSource.includes('data-i18n-title="data.exportTitle"')) {
+  fail('renderer/index.html 工具栏导出按钮缺少导出文案标题');
+}
+const exportMenuIndex = rendererIndexSource.indexOf('id="export-menu"');
+const exportMdIndex = rendererIndexSource.indexOf('id="export-md"');
+const exportJsonIndex = rendererIndexSource.indexOf('id="export-json"');
+const settingsViewIndex = rendererIndexSource.indexOf('id="settings-view"');
+if (
+  exportMenuIndex < 0 ||
+  exportMdIndex < 0 ||
+  exportJsonIndex < 0 ||
+  settingsViewIndex < 0 ||
+  !(exportMenuIndex < exportMdIndex && exportMdIndex < exportJsonIndex && exportJsonIndex < settingsViewIndex)
+) {
+  fail('导出入口未完整位于工具栏（设置页仍可能存在导出区块）');
+}
+if (
+  rendererIndexSource.indexOf('id="export-md"', settingsViewIndex) !== -1 ||
+  rendererIndexSource.indexOf('id="export-json"', settingsViewIndex) !== -1
+) {
+  fail('设置页仍包含导出按钮');
+}
+if (rendererIndexSource.includes('data-i18n="data.exportTitle"')) {
+  fail('设置页仍包含导出区块标题（应移入工具栏）');
+}
+const zhLocale = JSON.parse(
+  fs.readFileSync(path.join(root, 'src', 'shared', 'locales', 'zh-CN.json'), 'utf8')
+);
+const enLocale = JSON.parse(
+  fs.readFileSync(path.join(root, 'src', 'shared', 'locales', 'en.json'), 'utf8')
+);
+if (
+  !zhLocale.window ||
+  typeof zhLocale.window.minimize !== 'string' ||
+  !zhLocale.window.minimize ||
+  !enLocale.window ||
+  typeof enLocale.window.minimize !== 'string' ||
+  !enLocale.window.minimize
+) {
+  fail('locales 缺少 window.minimize 按钮文案');
+}
+pass('T-25 工具栏导出 + 最小化集成存在');
+
 // T-08：store persona 默认值、读写与清洗（非法值丢弃/超长截断，不破坏 settings.json）
 const { createStore, DEFAULT_SETTINGS } = require(path.join(
   root,

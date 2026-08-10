@@ -22,6 +22,8 @@
  * - T-21 系统状态与番茄钟：小部件面板展示 CPU/内存/电池（主进程复用 idle:event
  *   推送 { type: 'system-status' }）；本地番茄钟计时，完成时写入 settings 通知信号
  *   （pomodoroNotifyAt），由主进程轮询消费并弹系统通知；面板可收起、设置可关闭
+ * - T-25 工具栏：导出对话从设置页移入聊天工具栏（下拉菜单），新增最小化按钮
+ *   （petAPI.window.minimize → IPC window:minimize，ADR-026 冻结契约）
  */
 (function () {
   'use strict';
@@ -326,6 +328,10 @@
       sendBtn: document.getElementById('send-btn'),
       settingsBtn: document.getElementById('settings-btn'),
       closeBtn: document.getElementById('close-btn'),
+      minimizeBtn: document.getElementById('minimize-btn'),
+      toolbarExport: document.getElementById('toolbar-export'),
+      exportBtn: document.getElementById('export-btn'),
+      exportMenu: document.getElementById('export-menu'),
       settingsBack: document.getElementById('settings-back'),
       memoryManageBtn: document.getElementById('memory-manage-btn'),
       memoryBack: document.getElementById('memory-back'),
@@ -580,6 +586,8 @@
     elements.chatForm.addEventListener('submit', handleSubmit);
     elements.settingsBtn.addEventListener('click', showSettingsView);
     elements.closeBtn.addEventListener('click', hideToTray);
+    elements.minimizeBtn.addEventListener('click', minimizeWindow);
+    elements.exportBtn.addEventListener('click', toggleExportMenu);
     elements.settingsBack.addEventListener('click', showChatView);
     elements.memoryManageBtn.addEventListener('click', openMemoryView);
     elements.memoryBack.addEventListener('click', closeMemoryView);
@@ -606,6 +614,29 @@
     elements.pomodoroStart.addEventListener('click', () => startPomodoro());
     elements.pomodoroReset.addEventListener('click', resetPomodoro);
     elements.pomodoroStop.addEventListener('click', stopPomodoro);
+
+    // T-25：点击工具栏外关闭导出菜单；Escape 关闭并归还焦点
+    document.addEventListener('click', (event) => {
+      if (!elements.exportMenu || elements.exportMenu.hidden) {
+        return;
+      }
+      const wrap = elements.toolbarExport;
+      if (!wrap || !wrap.contains(event.target)) {
+        closeExportMenu();
+      }
+    });
+    document.addEventListener('keydown', (event) => {
+      if (
+        event.key === 'Escape' &&
+        elements.exportMenu &&
+        !elements.exportMenu.hidden
+      ) {
+        closeExportMenu();
+        if (elements.exportBtn) {
+          elements.exportBtn.focus();
+        }
+      }
+    });
   }
 
   /**
@@ -991,6 +1022,42 @@
     } else {
       // 契约缺失时兜底：直接关闭窗口（window-all-closed 会保持应用存活）
       window.close();
+    }
+  }
+
+  /** T-25：最小化到任务栏（区别于 ✕ 隐藏到托盘；ADR-026 冻结契约） */
+  function minimizeWindow() {
+    pokeActivity();
+    const api = window.petAPI && window.petAPI.window;
+    if (api && typeof window.petAPI.window.minimize === 'function') {
+      void window.petAPI.window.minimize();
+    } else {
+      console.warn('petAPI.window.minimize 不可用');
+    }
+  }
+
+  /** T-25：打开/关闭工具栏导出菜单 */
+  function toggleExportMenu() {
+    pokeActivity();
+    if (!elements.exportMenu || !elements.exportBtn) {
+      return;
+    }
+    if (elements.exportMenu.hidden) {
+      elements.exportMenu.hidden = false;
+      elements.exportBtn.setAttribute('aria-expanded', 'true');
+      elements.exportMdBtn.focus();
+    } else {
+      closeExportMenu();
+    }
+  }
+
+  function closeExportMenu() {
+    if (!elements.exportMenu || elements.exportMenu.hidden) {
+      return;
+    }
+    elements.exportMenu.hidden = true;
+    if (elements.exportBtn) {
+      elements.exportBtn.setAttribute('aria-expanded', 'false');
     }
   }
 
