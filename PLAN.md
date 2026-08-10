@@ -138,8 +138,8 @@
 
 目标：GitHub 开源 + Actions CI/CD + Microsoft Store/Steam + 代码签名与自动更新评估 + 最终打包。
 
-- [ ] P0 开源前仓库整理（.gitignore/LICENSE/README/大目录处置）
-- [ ] P1 GitHub Actions（check/smoke/dist）
+- [x] P0 开源前仓库整理（.gitignore/LICENSE(MIT)/README/CONTRIBUTING/SECURITY/密钥扫描；大目录已排除，物理清理待用户决定）
+- [x] P1 GitHub Actions 配置（check/smoke 尽力/dist/release 工作流已落盘；待真实仓库实测）
 - [ ] P2 代码签名与商店（Store/Steam）
 - [ ] P3 自动更新评估
 - [ ] P4 最终 `npm run dist` 与安装冒烟
@@ -184,6 +184,7 @@
 - 2026-08-10：T-35 经项目内线程闭环完成并合并（98d1de4）：Windows 拖放结束改为 move 防抖（200ms）判定，moved 保留兼容；worker Win32 SetWindowPos 模拟 5 步拖动/缩放/重启验证 + check/smoke 通过；待真人拖动目检。
 - 2026-08-10：T-36 经项目内线程闭环完成并合并（9f90a59）：输出格式 24kHz/96kbps、6 套人格语调参数重调（新参数表见任务卡）；worker 与协调者 check/smoke 全部通过。
 - 2026-08-10：用户决定语音克隆暂缓（ADR-030）：voice-pack-creator skill 保留复用，不实施 app 接入；M4 分发规划落盘（P0~P4），待用户确认启动项与仓库/商店决策。
+- 2026-08-10：M4 P0/P1 实施完成：LICENSE(MIT)/README/CONTRIBUTING/SECURITY 与 .github/workflows/ci.yml 落盘；git 密钥扫描无实际密钥；YAML 与 check 校验通过；待用户提供 GitHub 仓库后实测 Actions。
 
 ## Surprises & Discoveries
 
