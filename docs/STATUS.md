@@ -1,10 +1,10 @@
 # 项目状态
 
 - 更新时间：2026-08-10
-- 当前阶段：M3.5 收尾优化完成（T-34~T-36 已合并）；语音克隆暂缓（ADR-030）；M4 P0/P1 已实施，待 GitHub 仓库实测
-- 当前任务：用户复核 TTS v2 听感与贴边；提供 GitHub 仓库/账号后实测 Actions
-- 最近完成：M4 P0/P1（LICENSE/README/CONTRIBUTING/SECURITY/CI 工作流）；密钥扫描干净；T-34~T-36 验收合并
-- 下一步：创建 GitHub 仓库并推送实测 → P2（签名/商店）预算与注册决策 → 大目录/worktree 清理、UI 大改排期
+- 当前阶段：M3.5 收尾优化完成（T-34~T-36 已合并）；语音克隆暂缓（ADR-030）；M4 P0/P1 完成并实测通过
+- 当前任务：M4 P2（签名/商店）需要预算与注册类决策，暂缓；可先推进 P3 自动更新评估
+- 最近完成：GitHub 公开仓库 fjtyyds/ai-desktop-pet 创建，Actions check/smoke/dist 全绿（安装包 artifact 100MB）
+- 下一步：P3 自动更新评估（无需外部注册，可自行推进）→ P2 前与用户确认签名证书/商店预算 → 大目录/worktree 清理、UI 大改排期
 - 阻塞：无
 - 交接提示：新会话先读 `AGENTS.md` → `PLAN.md` → `docs/STATUS.md` → `docs/reports/2026-08-10-工作对接方案.md` → 自己的任务卡（docs/tasks/T-xx.md）
 

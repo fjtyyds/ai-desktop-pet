@@ -139,7 +139,7 @@
 目标：GitHub 开源 + Actions CI/CD + Microsoft Store/Steam + 代码签名与自动更新评估 + 最终打包。
 
 - [x] P0 开源前仓库整理（.gitignore/LICENSE(MIT)/README/CONTRIBUTING/SECURITY/密钥扫描；大目录已排除，物理清理待用户决定）
-- [x] P1 GitHub Actions 配置（check/smoke 尽力/dist/release 工作流已落盘；待真实仓库实测）
+- [x] P1 GitHub Actions 实测通过（仓库 https://github.com/fjtyyds/ai-desktop-pet ；check/smoke/dist 全绿，安装包 artifact 100MB）
 - [ ] P2 代码签名与商店（Store/Steam）
 - [ ] P3 自动更新评估
 - [ ] P4 最终 `npm run dist` 与安装冒烟
@@ -185,6 +185,7 @@
 - 2026-08-10：T-36 经项目内线程闭环完成并合并（9f90a59）：输出格式 24kHz/96kbps、6 套人格语调参数重调（新参数表见任务卡）；worker 与协调者 check/smoke 全部通过。
 - 2026-08-10：用户决定语音克隆暂缓（ADR-030）：voice-pack-creator skill 保留复用，不实施 app 接入；M4 分发规划落盘（P0~P4），待用户确认启动项与仓库/商店决策。
 - 2026-08-10：M4 P0/P1 实施完成：LICENSE(MIT)/README/CONTRIBUTING/SECURITY 与 .github/workflows/ci.yml 落盘；git 密钥扫描无实际密钥；YAML 与 check 校验通过；待用户提供 GitHub 仓库后实测 Actions。
+- 2026-08-10：GitHub 仓库已创建并推送（fjtyyds/ai-desktop-pet，公开）；首轮 CI 修复 electron-builder 隐式发布问题（--publish never）并升级 action 版本后全绿（check/smoke/dist，安装包 artifact 100,357,474B）。
 
 ## Surprises & Discoveries
 
