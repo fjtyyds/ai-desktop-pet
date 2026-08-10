@@ -29,6 +29,9 @@
  *   由主进程轮询消费并弹系统通知（系统状态小部件已按 T-30 移除）
  * - T-25 工具栏：导出对话从设置页移入聊天工具栏（下拉菜单），新增最小化按钮
  *   （petAPI.window.minimize → IPC window:minimize，ADR-026 冻结契约）
+ * - T-33 TTS 专属语音包（按人格）：6 套预设人格各配 voice/pitch/rate，朗读时按当前
+ *   生效人格自动应用；设置页可关闭（回退系统默认 TTS）或固定选择语音包
+ *   （ttsVoicePackEnabled/ttsVoicePackId，协调者预确认的两个 settings 字段）
  */
 (function () {
   'use strict';
@@ -254,6 +257,44 @@
       }
     }
   };
+  /**
+   * T-33：6 套人格专属语音包（id 与 PERSONA_TEMPLATES/store.js PERSONA_TEMPLATE_IDS 对齐）。
+   * voice 为“首选系统语音偏好”（lang 语言前缀 + name 名称关键词，按序匹配），
+   * pitch/rate 为 Web Speech 参数（pitch 0.1~2、rate 0.1~10）。
+   * 机器没有匹配语音时回退按界面语言选系统默认语音，仅应用 pitch/rate 风格。
+   */
+  const TTS_VOICE_PACKS = {
+    warm: {
+      voice: { lang: 'zh', name: ['xiaoxiao', 'huihui', 'yaoyao'] },
+      pitch: 1.05,
+      rate: 0.95
+    },
+    sage: {
+      voice: { lang: 'zh', name: ['yunyang', 'kangkang', 'huihui'] },
+      pitch: 0.92,
+      rate: 0.82
+    },
+    playful: {
+      voice: { lang: 'zh', name: ['yaoyao', 'xiaoxiao', 'huihui'] },
+      pitch: 1.2,
+      rate: 1.15
+    },
+    gentle: {
+      voice: { lang: 'zh', name: ['xiaoxiao', 'huihui', 'yaoyao'] },
+      pitch: 1.02,
+      rate: 0.88
+    },
+    cool: {
+      voice: { lang: 'zh', name: ['kangkang', 'yunyang', 'huihui'] },
+      pitch: 0.82,
+      rate: 0.95
+    },
+    curious: {
+      voice: { lang: 'zh', name: ['yaoyao', 'xiaoxiao'] },
+      pitch: 1.22,
+      rate: 1.2
+    }
+  };
   /** 情绪带：valence 从高到低匹配；face 为角色表情，className 对应配色主题 */
   const MOOD_BANDS = [
     { min: 85, className: 'mood-excited', face: '🤩' },
@@ -353,6 +394,8 @@
       weatherToggle: document.getElementById('weather-toggle'),
       weatherEnabled: document.getElementById('weather-enabled'),
       weatherCity: document.getElementById('weather-city'),
+      ttsVoicePackEnabled: document.getElementById('tts-voice-pack-enabled'),
+      ttsVoicePackId: document.getElementById('tts-voice-pack-id'),
       headerTitle: document.getElementById('header-title'),
       apiKey: document.getElementById('api-key'),
       model: document.getElementById('model'),
@@ -555,6 +598,10 @@
     elements.pomodoroStart.addEventListener('click', () => startPomodoro());
     elements.pomodoroReset.addEventListener('click', resetPomodoro);
     elements.pomodoroStop.addEventListener('click', stopPomodoro);
+    elements.ttsVoicePackEnabled.addEventListener(
+      'change',
+      updateTtsVoicePackControls
+    );
 
     // T-25：点击工具栏外关闭导出菜单；Escape 关闭并归还焦点
     document.addEventListener('click', (event) => {
@@ -1258,14 +1305,85 @@
     setTimeout(refreshVoices, 2000);
   }
 
-  /** 按当前界面语言选系统语音（zh 优先 Huihui 类中文语音，en 优先英文语音） */
-  function pickTtsVoice() {
-    const preferred = currentLocale === 'en' ? /^en/i : /^zh/i;
+  /** T-33：当前生效的语音包：显式 ttsVoicePackId 优先，空值跟随 personaTemplate；未知 id 返回 null */
+  function resolveTtsVoicePack() {
+    const packId =
+      currentSettings && typeof currentSettings.ttsVoicePackId === 'string'
+        ? currentSettings.ttsVoicePackId.trim()
+        : '';
+    const id = packId || currentTemplateId(currentSettings) || '';
+    return TTS_VOICE_PACKS[id] || null;
+  }
+
+  /**
+   * 按偏好选系统语音：
+   * 1. 语音包 voice 偏好（语言前缀 + 名称关键词，任一命中即用）
+   * 2. 按当前界面语言（zh 优先 Huihui 类中文语音，en 优先英文语音）
+   * 3. 语音列表第一个
+   */
+  function pickTtsVoice(preferred) {
+    const preferredVoice = preferred && preferred.voice;
+    if (preferredVoice && Array.isArray(preferredVoice.name)) {
+      const langPrefix = typeof preferredVoice.lang === 'string'
+        ? preferredVoice.lang.toLowerCase()
+        : '';
+      const matched = ttsVoices.find((voice) => {
+        const voiceLang = String(voice.lang || '').toLowerCase();
+        if (langPrefix && !voiceLang.startsWith(langPrefix)) {
+          return false;
+        }
+        const voiceName = String(voice.name || '').toLowerCase();
+        return preferredVoice.name.some((keyword) =>
+          voiceName.includes(String(keyword).toLowerCase())
+        );
+      });
+      if (matched) {
+        return matched;
+      }
+    }
+    const localePreferred = currentLocale === 'en' ? /^en/i : /^zh/i;
     return (
-      ttsVoices.find((voice) => preferred.test(voice.lang || '')) ||
+      ttsVoices.find((voice) => localePreferred.test(voice.lang || '')) ||
       ttsVoices[0] ||
       null
     );
+  }
+
+  /** T-33：语音包下拉选项（空=自动跟随人格；其余为 6 套预设语音包），并同步禁用态 */
+  function renderTtsVoicePackOptions() {
+    const select = elements.ttsVoicePackId;
+    if (!select) {
+      return;
+    }
+    const t = window.PetLocales.createTranslator(currentLocale);
+    const selectedId =
+      currentSettings && typeof currentSettings.ttsVoicePackId === 'string'
+        ? currentSettings.ttsVoicePackId
+        : '';
+    select.textContent = '';
+    const auto = document.createElement('option');
+    auto.value = '';
+    auto.textContent = t('settings.ttsVoicePackAuto');
+    select.appendChild(auto);
+    for (const item of templateList()) {
+      if (!TTS_VOICE_PACKS[item.id]) {
+        continue;
+      }
+      const option = document.createElement('option');
+      option.value = item.id;
+      option.textContent = item.name || item.id;
+      select.appendChild(option);
+    }
+    select.value = TTS_VOICE_PACKS[selectedId] ? selectedId : '';
+    updateTtsVoicePackControls();
+  }
+
+  /** T-33：专属语音包关闭时禁用语音包选择 */
+  function updateTtsVoicePackControls() {
+    const select = elements.ttsVoicePackId;
+    if (select) {
+      select.disabled = !elements.ttsVoicePackEnabled.checked;
+    }
   }
 
   function updateSpeakButtonState(button, speaking) {
@@ -1352,14 +1470,24 @@
     }
     const synth = window.speechSynthesis;
     const utter = new SpeechSynthesisUtterance(text);
-    const voice = pickTtsVoice();
+    // T-33：专属语音包开启时按当前生效人格应用 voice/pitch/rate；关闭时回退系统默认
+    const packEnabled = currentSettings.ttsVoicePackEnabled !== false;
+    const pack = packEnabled ? resolveTtsVoicePack() : null;
+    const voice = pickTtsVoice(pack || null);
     if (voice) {
       utter.voice = voice;
       utter.lang = voice.lang;
     } else {
       utter.lang = currentLocale === 'en' ? 'en-US' : 'zh-CN';
     }
-    utter.rate = 1;
+    utter.pitch =
+      pack && Number.isFinite(pack.pitch)
+        ? Math.min(2, Math.max(0.1, pack.pitch))
+        : 1;
+    utter.rate =
+      pack && Number.isFinite(pack.rate)
+        ? Math.min(10, Math.max(0.1, pack.rate))
+        : 1;
     utter.onend = () => clearSpeakingState(button);
     utter.onerror = () => clearSpeakingState(button);
     currentUtterance = utter;
@@ -1960,6 +2088,9 @@
         persona: saved.persona,
         language: saved.language,
         idleEnabled: saved.idleEnabled !== false,
+        ttsVoicePackEnabled: saved.ttsVoicePackEnabled !== false,
+        ttsVoicePackId:
+          typeof saved.ttsVoicePackId === 'string' ? saved.ttsVoicePackId : '',
         weatherEnabled: saved.weatherEnabled === true,
         weatherCity: saved.weatherCity,
         pomodoroEnabled: saved.pomodoroEnabled !== false,
@@ -2032,6 +2163,9 @@
         : t('app.defaultPetName');
     elements.petName.value = currentPetName;
     elements.idleEnabled.checked = currentSettings.idleEnabled !== false;
+    elements.ttsVoicePackEnabled.checked =
+      currentSettings.ttsVoicePackEnabled !== false;
+    renderTtsVoicePackOptions(); // T-33：语音包选项与禁用态随设置/语言刷新
     applyWeatherSettings(currentSettings); // T-22：天气开关/城市输入 + 可见性 + 刷新
     elements.pomodoroEnabled.checked = currentSettings.pomodoroEnabled !== false;
     elements.pomodoroMinutes.value = String(
@@ -2098,6 +2232,8 @@
         language,
         idleEnabled: elements.idleEnabled.checked,
         personaTemplate,
+        ttsVoicePackEnabled: elements.ttsVoicePackEnabled.checked,
+        ttsVoicePackId: elements.ttsVoicePackId.value.trim(),
         weatherEnabled: elements.weatherEnabled.checked,
         weatherCity: elements.weatherCity.value.trim(),
         pomodoroEnabled: elements.pomodoroEnabled.checked,
@@ -2119,6 +2255,8 @@
         language,
         idleEnabled: elements.idleEnabled.checked,
         personaTemplate,
+        ttsVoicePackEnabled: elements.ttsVoicePackEnabled.checked,
+        ttsVoicePackId: elements.ttsVoicePackId.value.trim(),
         weatherEnabled: elements.weatherEnabled.checked,
         weatherCity: elements.weatherCity.value.trim(),
         pomodoroEnabled: elements.pomodoroEnabled.checked,

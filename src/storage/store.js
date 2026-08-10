@@ -29,6 +29,9 @@ const MODEL_MAX_LENGTH = 100;
 /** personaTemplate id 清洗上限（T-20） */
 const PERSONA_TEMPLATE_ID_MAX_LENGTH = 40;
 
+/** TTS 语音包设置（T-33）：语音包 id ≤ 40 字符，空值表示自动跟随当前 personaTemplate */
+const TTS_VOICE_PACK_ID_MAX_LENGTH = 40;
+
 /** 天气城市名清洗上限（T-22） */
 const WEATHER_CITY_MAX_LENGTH = 64;
 /** 番茄钟设置（T-21）：默认 25 分钟，允许 1~120 分钟 */
@@ -59,6 +62,8 @@ const DEFAULT_SETTINGS = {
   windowBounds: null, // T-19：上次窗口位置 { x, y }；null 表示未保存
   onboardingDone: false, // T-20：首次启动三步引导是否已完成
   personaTemplate: '', // T-20：最近应用的预设人格模板 id；'' 表示自定义/未应用
+  ttsVoicePackEnabled: true, // T-33：专属语音包开关（关闭回退系统默认 TTS）
+  ttsVoicePackId: '', // T-33：语音包 id（≤40；''=自动跟随当前 personaTemplate）
   weatherEnabled: false, // T-22：角色面板天气小部件开关（可选，默认关闭）
   weatherCity: '', // T-22：天气城市名（Open-Meteo geocoding，中英文均可）
   pomodoroEnabled: true, // T-21：番茄钟提醒开关（关闭后仅界面计时，不弹通知）
@@ -288,6 +293,15 @@ function createStore(baseDir) {
       DEFAULT_SETTINGS.personaTemplate,
       PERSONA_TEMPLATE_ID_MAX_LENGTH
     );
+    merged.ttsVoicePackEnabled = sanitizeBoolean(
+      merged.ttsVoicePackEnabled,
+      DEFAULT_SETTINGS.ttsVoicePackEnabled
+    );
+    merged.ttsVoicePackId = sanitizeText(
+      merged.ttsVoicePackId,
+      DEFAULT_SETTINGS.ttsVoicePackId,
+      TTS_VOICE_PACK_ID_MAX_LENGTH
+    );
     merged.windowBounds = sanitizeWindowBounds(
       merged.windowBounds,
       DEFAULT_SETTINGS.windowBounds
@@ -318,6 +332,8 @@ function createStore(baseDir) {
       'windowBounds',
       'onboardingDone',
       'personaTemplate',
+      'ttsVoicePackEnabled',
+      'ttsVoicePackId',
       'weatherEnabled',
       'weatherCity',
       'pomodoroEnabled',
@@ -376,6 +392,21 @@ function createStore(baseDir) {
             patch.personaTemplate,
             current.personaTemplate,
             PERSONA_TEMPLATE_ID_MAX_LENGTH
+          );
+          continue;
+        }
+        if (key === 'ttsVoicePackEnabled') {
+          next.ttsVoicePackEnabled = sanitizeBoolean(
+            patch.ttsVoicePackEnabled,
+            current.ttsVoicePackEnabled
+          );
+          continue;
+        }
+        if (key === 'ttsVoicePackId') {
+          next.ttsVoicePackId = sanitizeText(
+            patch.ttsVoicePackId,
+            current.ttsVoicePackId,
+            TTS_VOICE_PACK_ID_MAX_LENGTH
           );
           continue;
         }
@@ -449,6 +480,7 @@ module.exports = {
   DEFAULT_SETTINGS,
   PERSONA_TEMPLATE_IDS,
   DEFAULT_PERSONA_TEMPLATE_ID,
+  TTS_VOICE_PACK_ID_MAX_LENGTH,
   DEFAULT_POMODORO_MINUTES,
   POMODORO_MINUTES_MIN,
   POMODORO_MINUTES_MAX

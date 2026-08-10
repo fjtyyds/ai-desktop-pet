@@ -445,6 +445,63 @@ for (const localeFile of ['zh-CN', 'en']) {
 }
 pass('语言包 widgets.* 文案已移除，idle 话术保留');
 
+// T-33：TTS 专属语音包（按人格）——渲染层语音包表/设置页 UI/语言包同步断言
+const ttsPacksMarker = 'const TTS_VOICE_PACKS';
+if (!rendererChatSource.includes(ttsPacksMarker)) {
+  fail('chat.js 缺少 TTS_VOICE_PACKS 语音包表');
+}
+const ttsPacksStart = rendererChatSource.indexOf(ttsPacksMarker);
+const ttsPacksEnd = rendererChatSource.indexOf('};', ttsPacksStart);
+const ttsPacksBlock = rendererChatSource.slice(ttsPacksStart, ttsPacksEnd);
+const ttsPackIds = ['warm', 'sage', 'playful', 'gentle', 'cool', 'curious'];
+for (const id of ttsPackIds) {
+  if (!new RegExp(`\\b${id}\\s*:\\s*\\{`).test(ttsPacksBlock)) {
+    fail(`TTS_VOICE_PACKS 缺少 ${id} 语音包`);
+  }
+}
+if ((ttsPacksBlock.match(/pitch:/g) || []).length < ttsPackIds.length) {
+  fail('TTS_VOICE_PACKS 语音包 pitch 参数缺失');
+}
+if ((ttsPacksBlock.match(/rate:/g) || []).length < ttsPackIds.length) {
+  fail('TTS_VOICE_PACKS 语音包 rate 参数缺失');
+}
+for (const token of [
+  'resolveTtsVoicePack',
+  'utter.pitch',
+  'utter.rate',
+  'ttsVoicePackEnabled',
+  'ttsVoicePackId'
+]) {
+  if (!rendererChatSource.includes(token)) {
+    fail(`chat.js 缺少 T-33 语音包逻辑：${token}`);
+  }
+}
+for (const id of ['tts-voice-pack-enabled', 'tts-voice-pack-id']) {
+  if (!rendererIndexSource.includes(`id="${id}"`)) {
+    fail(`index.html 缺少语音包设置控件：${id}`);
+  }
+}
+for (const localeFile of ['zh-CN', 'en']) {
+  const locale = JSON.parse(
+    fs.readFileSync(
+      path.join(root, 'src', 'shared', 'locales', `${localeFile}.json`),
+      'utf8'
+    )
+  );
+  for (const key of [
+    'ttsVoicePackEnabled',
+    'ttsVoicePackEnabledHint',
+    'ttsVoicePack',
+    'ttsVoicePackAuto',
+    'ttsVoicePackHint'
+  ]) {
+    if (typeof locale.settings[key] !== 'string' || !locale.settings[key].trim()) {
+      fail(`${localeFile}.json 缺少 settings.${key} 文案`);
+    }
+  }
+}
+pass('T-33 语音包渲染层/设置页/语言包同步断言通过');
+
 if (
   !mainSource.includes('function dockWindow') ||
   !mainSource.includes('function findDockEdge')
@@ -654,6 +711,57 @@ try {
     fail('store dockEnabled 重新开启失败');
   }
   pass('store dockEnabled（靠边吸附）读写与清洗通过');
+
+  // T-33：TTS 语音包设置默认值、读写与清洗（仅允许协调者预确认的两个新字段）
+  const ttsSettingKeys = Object.keys(DEFAULT_SETTINGS).filter((key) =>
+    key.startsWith('tts')
+  );
+  if (
+    ttsSettingKeys.length !== 2 ||
+    !ttsSettingKeys.includes('ttsVoicePackEnabled') ||
+    !ttsSettingKeys.includes('ttsVoicePackId')
+  ) {
+    fail(
+      `DEFAULT_SETTINGS 新增 TTS 字段超出预确认范围：${ttsSettingKeys.join(',')}`
+    );
+  }
+  if (DEFAULT_SETTINGS.ttsVoicePackEnabled !== true) {
+    fail('DEFAULT_SETTINGS.ttsVoicePackEnabled 应为 true（默认开启专属语音包）');
+  }
+  if (DEFAULT_SETTINGS.ttsVoicePackId !== '') {
+    fail('DEFAULT_SETTINGS.ttsVoicePackId 应为空串（自动跟随人格模板）');
+  }
+  const packExplicit = store.writeSettings({
+    ttsVoicePackEnabled: false,
+    ttsVoicePackId: 'sage'
+  });
+  if (
+    packExplicit.ttsVoicePackEnabled !== false ||
+    packExplicit.ttsVoicePackId !== 'sage'
+  ) {
+    fail('store ttsVoicePackEnabled/ttsVoicePackId 显式写入失败');
+  }
+  const packInvalid = store.writeSettings({
+    ttsVoicePackEnabled: 'yes',
+    ttsVoicePackId: 'x'.repeat(50)
+  });
+  if (packInvalid.ttsVoicePackEnabled !== false) {
+    fail('ttsVoicePackEnabled 非布尔值应丢弃（保留当前值）');
+  }
+  if (packInvalid.ttsVoicePackId.length !== 40) {
+    fail(`ttsVoicePackId 未按 40 截断（实际 ${packInvalid.ttsVoicePackId.length}）`);
+  }
+  const packAuto = store.writeSettings({
+    ttsVoicePackEnabled: true,
+    ttsVoicePackId: ''
+  });
+  if (packAuto.ttsVoicePackEnabled !== true || packAuto.ttsVoicePackId !== '') {
+    fail('ttsVoicePackId 空值（自动跟随人格）写入失败');
+  }
+  if (store.readSettings().ttsVoicePackId !== '') {
+    fail('ttsVoicePackId 持久化后读取不一致');
+  }
+  pass('store TTS 语音包设置读写与清洗通过');
 } finally {
   fs.rmSync(checkDir, { recursive: true, force: true });
 }

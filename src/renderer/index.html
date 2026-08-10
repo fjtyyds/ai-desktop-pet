@@ -331,6 +331,26 @@
               aria-label="人格模板"
             ></div>
           </div>
+          <label class="field field-switch">
+            <span class="field-label" data-i18n="settings.ttsVoicePackEnabled"
+              >专属语音包</span
+            >
+            <input id="tts-voice-pack-enabled" class="field-checkbox" type="checkbox" />
+            <span class="field-hint" data-i18n="settings.ttsVoicePackEnabledHint"
+              >按人格自动使用专属语音与语调（音高/语速）；关闭后回退系统默认 TTS。</span
+            >
+          </label>
+          <label class="field">
+            <span class="field-label" data-i18n="settings.ttsVoicePack">语音包</span>
+            <select id="tts-voice-pack-id" class="field-select">
+              <option value="" data-i18n="settings.ttsVoicePackAuto"
+                >自动跟随人格</option
+              >
+            </select>
+            <span class="field-hint" data-i18n="settings.ttsVoicePackHint"
+              >留空时随当前人格模板自动切换；也可固定选择一套语音包。</span
+            >
+          </label>
           <label class="field">
             <span class="field-label" data-i18n="settings.traits"
               >性格标签（逗号分隔，最多 10 个）</span
