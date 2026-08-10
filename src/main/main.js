@@ -5,7 +5,6 @@ const { execFile } = require('child_process');
 const {
   app,
   BrowserWindow,
-  globalShortcut,
   ipcMain,
   Notification,
   powerMonitor,
@@ -31,16 +30,8 @@ let idleMonitor = null;
 
 /** T-19：窗口体验 IPC 通道（ADR-022 冻结契约；preload.js 同名常量保持一致） */
 const WINDOW_CHANNELS = {
-  toggleDock: 'window:toggle-dock',
-  setShortcut: 'window:set-shortcut'
+  toggleDock: 'window:toggle-dock'
 };
-
-/** T-19：全局快捷键候选（优先 Ctrl+Alt+P，冲突时依次尝试备用键） */
-const SHORTCUT_CANDIDATES = [
-  'CommandOrControl+Alt+P',
-  'CommandOrControl+Alt+Shift+P',
-  'Alt+P'
-];
 
 /** T-19：贴边/滑出参数（Windows 桌面语义） */
 const DOCK_STRIP = 10; // 贴边隐藏后露出的像素宽度/高度
@@ -61,7 +52,6 @@ const DEFAULT_POMODORO_MINUTES = 25;
 
 /** T-19：贴边状态 */
 let dockEnabled = true;
-let shortcutEnabled = true;
 let dockedEdge = null; // 'left' | 'right' | 'top' | 'bottom' | null
 let dockFullBounds = null; // 贴边展开时的完整窗口 bounds
 let dockDisplay = null; // 贴边所在显示器（workArea 快照）
@@ -74,7 +64,6 @@ let dockSliding = false;
 let dockLastAnimationAt = 0;
 let dockGraceUntil = 0;
 let positionSaveTimer = null;
-let activeShortcut = null;
 let windowSettingsWriter = null;
 // T-21：系统状态小部件状态
 let statusTimer = null;
@@ -380,15 +369,13 @@ function writeWindowSettings(patch) {
   }
 }
 
-/** 启动时读取贴边/快捷键开关（缺省开启） */
+/** 启动时读取贴边开关（缺省开启） */
 function loadWindowSettings() {
   try {
     const settings = ipc.getSettings();
     dockEnabled = settings.dockEnabled !== false;
-    shortcutEnabled = settings.shortcutEnabled !== false;
   } catch (_error) {
     dockEnabled = true;
-    shortcutEnabled = true;
   }
 }
 
@@ -807,40 +794,6 @@ function schedulePositionSave() {
   }, 500);
 }
 
-/* ---------------- T-19：全局快捷键 ---------------- */
-
-/** 注册全局快捷键；全部候选被占用时返回 false（ADR-022 冲突处理） */
-function tryRegisterShortcut() {
-  unregisterShortcut();
-  for (const accelerator of SHORTCUT_CANDIDATES) {
-    try {
-      if (globalShortcut.register(accelerator, () => showMainWindow())) {
-        activeShortcut = accelerator;
-        console.log(`[window] 全局快捷键已注册：${accelerator}`);
-        return true;
-      }
-    } catch (error) {
-      console.warn(`[window] 注册全局快捷键失败 ${accelerator}：`, error);
-    }
-  }
-  console.warn(
-    '[window] 全局快捷键注册失败，所有候选按键均被占用：' +
-      SHORTCUT_CANDIDATES.join(', ')
-  );
-  return false;
-}
-
-function unregisterShortcut() {
-  if (activeShortcut) {
-    try {
-      globalShortcut.unregister(activeShortcut);
-    } catch (_error) {
-      // 注销失败不影响运行
-    }
-    activeShortcut = null;
-  }
-}
-
 /* ---------------- T-19：IPC（ADR-022 冻结契约） ---------------- */
 
 function handleToggleDock() {
@@ -855,22 +808,8 @@ function handleToggleDock() {
   return { docked: dockEnabled };
 }
 
-function handleSetShortcutEnabled(_event, enabled) {
-  const requested = enabled === true;
-  let registered = false;
-  if (requested) {
-    registered = tryRegisterShortcut();
-  } else {
-    unregisterShortcut();
-  }
-  shortcutEnabled = registered;
-  writeWindowSettings({ shortcutEnabled });
-  return { enabled: shortcutEnabled };
-}
-
 function registerWindowIpc() {
   ipcMain.handle(WINDOW_CHANNELS.toggleDock, handleToggleDock);
-  ipcMain.handle(WINDOW_CHANNELS.setShortcut, handleSetShortcutEnabled);
 }
 
 /* ---------------- 窗口生命周期 ---------------- */
@@ -989,15 +928,10 @@ if (SKIP_BOOTSTRAP || !app || typeof app.requestSingleInstanceLock !== 'function
   });
 
   app.whenReady().then(() => {
-    loadWindowSettings(); // T-19: 读取贴边/快捷键开关
+    loadWindowSettings(); // T-19: 读取贴边开关
     createMainWindow();
-    registerWindowIpc(); // T-19: window:toggle-dock / window:set-shortcut
+    registerWindowIpc(); // T-19: window:toggle-dock
     startSystemStatusWidgets(); // T-21: CPU/内存/电池状态推送
-    if (shortcutEnabled && !tryRegisterShortcut()) {
-      // 快捷键被其他应用占用：自动关闭并持久化，避免每次启动重试
-      shortcutEnabled = false;
-      writeWindowSettings({ shortcutEnabled: false });
-    }
     trayApi = createTray({
       getMainWindow: () => mainWindow,
       showMainWindow,
@@ -1038,10 +972,6 @@ if (SKIP_BOOTSTRAP || !app || typeof app.requestSingleInstanceLock !== 'function
     if (mainWindow && !mainWindow.isDestroyed() && !dockedEdge) {
       persistWindowBounds(mainWindow.getBounds()); // T-19: 退出前记忆位置
     }
-  });
-
-  app.on('will-quit', () => {
-    globalShortcut.unregisterAll(); // T-19: 释放全局快捷键
   });
 
   // 应用常驻托盘：窗口全部关闭时不退出，由托盘菜单“退出”结束进程。

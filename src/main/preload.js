@@ -19,8 +19,7 @@ const CHANNELS = {
   historyExport: 'history:export',
   historyClear: 'history:clear',
   weatherGet: 'weather:get',
-  windowToggleDock: 'window:toggle-dock',
-  windowSetShortcut: 'window:set-shortcut'
+  windowToggleDock: 'window:toggle-dock'
 };
 
 contextBridge.exposeInMainWorld('petAPI', {
@@ -50,9 +49,7 @@ contextBridge.exposeInMainWorld('petAPI', {
   },
   window: {
     hide: () => ipcRenderer.invoke(CHANNELS.windowHide),
-    toggleDock: () => ipcRenderer.invoke(CHANNELS.windowToggleDock),
-    setShortcutEnabled: (enabled) =>
-      ipcRenderer.invoke(CHANNELS.windowSetShortcut, enabled)
+    toggleDock: () => ipcRenderer.invoke(CHANNELS.windowToggleDock)
   },
   history: {
     get: () => ipcRenderer.invoke(CHANNELS.historyGet),
