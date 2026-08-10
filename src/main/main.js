@@ -34,6 +34,7 @@ const WINDOW_CHANNELS = {
 /** T-31：贴边吸附参数（方案 B：靠边吸附、不自动隐藏；ADR-026） */
 const DOCK_MARGIN = 24; // 距离屏幕边缘多近视为“靠边”
 const DOCK_REGRAB_GRACE_MS = 800; // 取消吸附后的短暂窗口，防止程序化 setBounds 触发再次吸附
+const DOCK_MOVE_DEBOUNCE_MS = 200; // T-35：Windows 下 moved 不触发，以 200ms 无 move 判定拖放结束
 
 /** T-21：番茄钟完成信号轮询间隔（系统状态小部件移除后，仅保留通知消费） */
 const POMODORO_POLL_MS = 2000;
@@ -49,6 +50,7 @@ let dockedEdge = null; // 'left' | 'right' | 'top' | 'bottom' | null
 let dockFullBounds = null; // 吸附对齐后的窗口 bounds（兼作位置记忆基准）
 let dockGraceUntil = 0; // 取消吸附后的防重复触发窗口
 let positionSaveTimer = null;
+let dockMoveDebounceTimer = null; // T-35：move 防抖定时器（Windows 拖放结束判定）
 let windowSettingsWriter = null;
 // T-21：番茄钟完成信号轮询
 let pomodoroTimer = null;
@@ -361,12 +363,16 @@ function handleWindowMove() {
       // 仍在边缘附近：仅同步吸附基准，不打断用户拖动
       syncDockFullBounds(bounds);
     }
-    return;
+  } else {
+    schedulePositionSave();
   }
-  schedulePositionSave();
+  // T-35：Windows 上 moved 事件不触发，以 200ms 无 move 视为拖放结束；
+  // 已吸附沿边拖动同样走防抖对齐；防抖在程序化 setBounds 之后自然收敛，不会重复吸附
+  scheduleDockMoveEnd();
 }
 
-function handleWindowMoved() {
+/** T-35：共享的“拖放结束”处理：已吸附→对齐，未吸附且靠边→吸附，否则仅持久化 */
+function handleDragEnd() {
   if (!mainWindow || mainWindow.isDestroyed()) {
     return;
   }
@@ -398,6 +404,20 @@ function handleWindowMoved() {
     return;
   }
   persistWindowBounds(bounds);
+}
+
+/** T-35：macOS 兼容入口：moved 是拖放结束信号，直接复用共享处理 */
+function handleWindowMoved() {
+  handleDragEnd();
+}
+
+/** T-35：move 事件防抖调度：约 200ms 无 move 即视为拖放结束（Windows） */
+function scheduleDockMoveEnd() {
+  clearTimeout(dockMoveDebounceTimer);
+  dockMoveDebounceTimer = setTimeout(() => {
+    dockMoveDebounceTimer = null;
+    handleDragEnd();
+  }, DOCK_MOVE_DEBOUNCE_MS);
 }
 
 /** 缩放时保持吸附边贴齐；缩放导致吸附边离开边缘则取消吸附 */
@@ -544,6 +564,8 @@ function createMainWindow() {
     dockedEdge = null;
     dockFullBounds = null;
     clearTimeout(positionSaveTimer);
+    clearTimeout(dockMoveDebounceTimer);
+    dockMoveDebounceTimer = null;
   });
 
   mainWindow = win;
