@@ -47,9 +47,17 @@ function createTrayIcon() {
  * @param {() => void} handlers.showMainWindow
  * @param {() => void} handlers.toggleMainWindow
  * @param {() => void} handlers.quitApp
+ * @param {() => void} [handlers.checkForUpdates] 可选：托盘“检查更新”回调（T-37）
  * @param {() => string} [handlers.getLocale] 可选：主进程注入语言读取器；缺省时从 settings.json 读取
  */
-function createTray({ getMainWindow, showMainWindow, toggleMainWindow, quitApp, getLocale }) {
+function createTray({
+  getMainWindow,
+  showMainWindow,
+  toggleMainWindow,
+  quitApp,
+  checkForUpdates,
+  getLocale
+}) {
   const tray = new Tray(createTrayIcon());
   let settingsWatcher = null;
 
@@ -81,6 +89,8 @@ function createTray({ getMainWindow, showMainWindow, toggleMainWindow, quitApp, 
           label: visible ? t('tray.hideWindow') : t('tray.showWindow'),
           click: toggleMainWindow
         },
+        { type: 'separator' },
+        { label: t('updater.checkForUpdates'), click: () => checkForUpdates?.() },
         { type: 'separator' },
         { label: t('tray.quit'), click: quitApp }
       ])

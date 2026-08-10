@@ -9,7 +9,8 @@ const {
 } = require('electron');
 const path = require('path');
 const { createTray, loadAppIcon } = require('./tray');
-const { initCrash } = require('./crash'); // T-11: 崩溃上报与本地日志
+const { initCrash, writeLog } = require('./crash'); // T-11: 崩溃上报与本地日志
+const { initUpdater, AUTO_UPDATE_CHECK_DELAY_MS } = require('./updater'); // T-37: 自动更新
 const ipc = require('./ipc'); // T-03: 注册 chat/settings IPC；T-15: 空闲互动接线
 const { createSecureSettings } = require('./secure-settings'); // T-19: 窗口设置持久化
 const { createDefaultStore } = require('../storage'); // T-19: 窗口设置写入
@@ -24,6 +25,7 @@ let mainWindow = null;
 let trayApi = null;
 let isQuitting = false;
 let idleMonitor = null;
+let updaterApi = null; // T-37: 自动更新（仅打包版初始化）
 
 /** T-19：窗口体验 IPC 通道（ADR-022 冻结契约；preload.js 同名常量保持一致） */
 const WINDOW_CHANNELS = {
@@ -90,6 +92,25 @@ function getMainTranslator() {
         : 'zh-CN'
       : stored;
   return createTranslator(locale);
+}
+
+/** T-37：更新器日志：console + 现有本地日志文件双写 */
+function createUpdaterLogger() {
+  function write(level, message) {
+    // message 已带 [updater] 前缀（updater.js 统一包装）
+    console[level === 'debug' ? 'log' : level](message);
+    try {
+      writeLog(level, message);
+    } catch (_error) {
+      // 日志落盘失败不影响更新链路
+    }
+  }
+  return {
+    info: (message) => write('info', message),
+    warn: (message) => write('warn', message),
+    error: (message) => write('error', message),
+    debug: (message) => write('debug', message)
+  };
 }
 
 /** 番茄钟结束：主进程系统通知（本地化标题/正文） */
@@ -615,11 +636,25 @@ if (SKIP_BOOTSTRAP || !app || typeof app.requestSingleInstanceLock !== 'function
     createMainWindow();
     registerWindowIpc(); // T-19/T-25: window:toggle-dock / window:minimize
     startPomodoroNotificationPolling(); // T-21/T-30: 消费番茄钟完成信号（系统状态轮询已移除）
+
+    // T-37: 仅打包版初始化自动更新（开发模式绝不检查；updater 内部还有二次守卫）
+    if (app.isPackaged) {
+      updaterApi = initUpdater({
+        getMainWindow: () => mainWindow,
+        getTranslator: getMainTranslator,
+        logger: createUpdaterLogger()
+      });
+      setTimeout(() => {
+        updaterApi?.checkForUpdates({ manual: false });
+      }, AUTO_UPDATE_CHECK_DELAY_MS);
+    }
+
     trayApi = createTray({
       getMainWindow: () => mainWindow,
       showMainWindow,
       toggleMainWindow,
-      quitApp
+      quitApp,
+      checkForUpdates: () => updaterApi?.checkForUpdates({ manual: true }) // T-37: 托盘手动检查
     });
 
     // T-15: 空闲主动互动（节流、防打扰、可关闭）
@@ -652,6 +687,7 @@ if (SKIP_BOOTSTRAP || !app || typeof app.requestSingleInstanceLock !== 'function
   app.on('before-quit', () => {
     isQuitting = true;
     stopPomodoroNotificationPolling(); // T-21: 退出前停止番茄钟信号轮询
+    updaterApi?.handleBeforeQuit(); // T-37: 用户确认后执行 quitAndInstall
     if (mainWindow && !mainWindow.isDestroyed() && !dockedEdge) {
       persistWindowBounds(mainWindow.getBounds()); // T-19: 退出前记忆位置
     }

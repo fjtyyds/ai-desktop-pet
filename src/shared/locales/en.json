@@ -162,6 +162,24 @@
     "clearError": "Clear failed: {error}",
     "apiUnavailable": "API unavailable"
   },
+  "updater": {
+    "checkForUpdates": "Check for Updates",
+    "checking": "Checking for updates…",
+    "upToDateTitle": "Up to date",
+    "upToDate": "You are already running the latest version.",
+    "updateAvailableTitle": "Update available",
+    "updateAvailableBody": "Version {version} is available. Download it now?",
+    "download": "Download",
+    "cancel": "Cancel",
+    "downloading": "Downloading update… ({percent}%)",
+    "updateReadyTitle": "Update ready",
+    "updateReadyBody": "The new version has been downloaded. Restart the app to install it.",
+    "restartNow": "Restart & Install",
+    "restartLater": "Later",
+    "errorTitle": "Update check failed",
+    "error": "Failed to check for updates: {error}",
+    "ok": "OK"
+  },
   "tray": {
     "hideWindow": "Hide window",
     "showWindow": "Show window",

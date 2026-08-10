@@ -707,6 +707,110 @@ if (
 }
 pass('T-35 贴边吸附拖放结束防抖与 moved 兼容保留');
 
+// T-37：自动更新（ADR-031）——updater 模块、isPackaged 守卫、托盘接入、双语文案
+const updaterSource = fs.readFileSync(
+  path.join(root, 'src', 'main', 'updater.js'),
+  'utf8'
+);
+if (
+  !updaterSource.includes("require('electron-updater')") ||
+  !updaterSource.includes('autoUpdater')
+) {
+  fail('updater.js 未封装 electron-updater autoUpdater');
+}
+for (const eventName of [
+  "'update-available'",
+  "'update-not-available'",
+  "'download-progress'",
+  "'update-downloaded'",
+  "'error'"
+]) {
+  if (!updaterSource.includes(eventName)) {
+    fail(`updater.js 缺少更新事件监听：${eventName}`);
+  }
+}
+if (
+  !updaterSource.includes('function checkForUpdates') ||
+  !updaterSource.includes('function handleBeforeQuit') ||
+  !updaterSource.includes('quitAndInstall')
+) {
+  fail('updater.js 缺少 checkForUpdates/handleBeforeQuit/quitAndInstall');
+}
+if (!updaterSource.includes('if (!app.isPackaged)')) {
+  fail('updater.js 缺少 isPackaged 守卫（开发模式不得检查）');
+}
+pass('updater.js 模块与事件链路齐全');
+
+if (
+  !mainSource.includes("require('./updater')") ||
+  !mainSource.includes('initUpdater')
+) {
+  fail('main.js 未初始化 updater 模块');
+}
+if (
+  !mainSource.includes('if (app.isPackaged)') ||
+  !mainSource.includes('AUTO_UPDATE_CHECK_DELAY_MS') ||
+  !mainSource.includes('setTimeout')
+) {
+  fail('main.js 缺少 isPackaged 初始化守卫或延迟自动检查');
+}
+if (!mainSource.includes('checkForUpdates({ manual: true })')) {
+  fail('main.js 未将手动检查接入托盘回调');
+}
+if (
+  !mainSource.includes("app.on('before-quit'") ||
+  !mainSource.includes('handleBeforeQuit()')
+) {
+  fail('main.js 退出前未处理 quitAndInstall');
+}
+pass('main.js isPackaged 守卫与退出处理通过');
+
+const traySource = fs.readFileSync(path.join(root, 'src', 'main', 'tray.js'), 'utf8');
+if (
+  !traySource.includes('checkForUpdates') ||
+  !traySource.includes("t('updater.checkForUpdates')")
+) {
+  fail('tray.js 未接入“检查更新”菜单项');
+}
+pass('tray.js 检查更新菜单接入通过');
+
+const updaterLocaleKeys = [
+  'checkForUpdates',
+  'checking',
+  'upToDate',
+  'upToDateTitle',
+  'updateAvailableTitle',
+  'updateAvailableBody',
+  'download',
+  'cancel',
+  'downloading',
+  'updateReadyTitle',
+  'updateReadyBody',
+  'restartNow',
+  'restartLater',
+  'errorTitle',
+  'error',
+  'ok'
+];
+for (const localeFile of ['zh-CN', 'en']) {
+  const locale = JSON.parse(
+    fs.readFileSync(
+      path.join(root, 'src', 'shared', 'locales', `${localeFile}.json`),
+      'utf8'
+    )
+  );
+  for (const key of updaterLocaleKeys) {
+    if (
+      !locale.updater ||
+      typeof locale.updater[key] !== 'string' ||
+      !locale.updater[key].trim()
+    ) {
+      fail(`${localeFile}.json 缺少 updater.${key} 文案`);
+    }
+  }
+}
+pass('T-37 自动更新双语文案齐全（zh-CN/en）');
+
 // T-08：store persona 默认值、读写与清洗（非法值丢弃/超长截断，不破坏 settings.json）
 const { createStore, DEFAULT_SETTINGS } = require(path.join(
   root,
