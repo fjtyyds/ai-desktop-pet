@@ -127,7 +127,7 @@
 - [x] T-29 全局快捷键移除
 - [x] T-30 系统状态小部件移除
 - [x] T-31 贴边体验优化（方案 B：靠边吸附不自动隐藏）
-- [ ] T-32 orchestrator 缺陷修复（最后执行；是否入库待用户决定）
+- [x] T-32 已关闭：用户决定 scripts/orchestrator/ 不入库（ADR-028）
 - [x] T-33 TTS 专属语音包（按人格，e73fd89 已合并；朗读听感待人工目检）
 - Backlog：UI 大改（M3.6 独立里程碑，M3.5 收尾后评估）
 
@@ -162,6 +162,7 @@
 - 2026-08-10：用户选择 T-24~T-31 全部并行开始；约定：线程完成后先回报协调者，由协调者按回报顺序验收、串行合并并解决共享文件冲突；T-32 最后执行。
 - 2026-08-10：T-24~T-31 全部验收合并（34a2679、39aa346、01e35a8、827abb6、0415d20、875150e、4bbf6cb、b8cd946）；合并后 check 与 smoke 通过；worktree 已清理；新增 TTS 专属语音包需求（ADR-027/T-33）。
 - 2026-08-10：T-33 经项目内线程闭环派发完成并合并（e73fd89）：6 套人格语音包（voice/pitch/rate）+ 设置页开关/选择，store 仅新增协调者预确认的两个 tts* 字段；worker check/smoke 通过，协调者 main check 复核通过；朗读听感待人工目检。
+- 2026-08-10：用户决定 `scripts/orchestrator/` 不入库（ADR-028），T-32 关闭不派发；整体 UI 目检与 T-33 朗读试听启动（main check/smoke 通过，dev 窗口已打开供人工目检）。
 
 ## Surprises & Discoveries
 
@@ -209,6 +210,7 @@
 - ADR-021：流式回复（SSE）与打字机体验。
 - ADR-022：M3.5 契约扩展冻结（mood/memory/export/window）。
 - ADR-023：扩展能力范围与技术验证门禁（语音/图片/天气/番茄钟）。
+- ADR-028：scripts/orchestrator/ 不入库（2026-08-10，T-32 关闭）。
 
 详见 `docs/DECISIONS.md`。
 

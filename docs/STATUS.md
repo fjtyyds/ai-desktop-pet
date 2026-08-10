@@ -1,10 +1,10 @@
 # 项目状态
 
 - 更新时间：2026-08-10
-- 当前阶段：M3.5 收尾优化 T-24~T-31 已全部合并验收；整体回归目检与后续任务待排期
-- 当前任务：T-33（TTS 专属语音包）已合并（e73fd89），待人工听力目检；T-32（orchestrator 修复，是否入库待用户决定）待办
-- 最近完成：T-24~T-31 全部合并（check/smoke 通过）；worktree 清理；ADR-027/T-33 需求落盘
-- 下一步：T-33 人工听力目检；用户决定 T-32 是否入库；随后整体 UI 目检与 M4 分发规划
+- 当前阶段：M3.5 收尾优化全部完成（T-24~T-31 + T-33）；整体 UI 人工目检与 T-33 试听进行中；T-32 已关闭（orchestrator 不入库）
+- 当前任务：整体 UI 人工目检 + T-33 朗读试听（用户侧主观验收，进行中）
+- 最近完成：T-24~T-31 全部合并（check/smoke 通过）；T-33 合并（e73fd89）；ADR-028（orchestrator 不入库）落盘
+- 下一步：用户目检/试听结论；随后 M4 分发规划与 UI 大改（M3.6）评估
 - 阻塞：无
 - 交接提示：新会话先读 `AGENTS.md` → `PLAN.md` → `docs/STATUS.md` → `docs/reports/2026-08-10-工作对接方案.md` → 自己的任务卡（docs/tasks/T-xx.md）
 
@@ -166,3 +166,9 @@
 - 契约：不改 petAPI；store 仅新增协调者预确认的 `ttsVoicePackEnabled`（bool，默认 true）与 `ttsVoicePackId`（≤40 字符，空=跟随人格）。
 - 验证：worker `npm run check`、`npm run smoke` 通过；临时无头 UI 校验 10 项通过；协调者复核 main `npm run check` 全部通过；朗读听感待人工目检。
 - 清理：worktree E:\codex\AI桌宠-m3x-tts-voice 已移除，分支保留。
+
+## T-32 关闭记录（2026-08-10）
+
+- 用户决定：`scripts/orchestrator/` 不入库（ADR-028）。
+- 处置：保留为本地未跟踪目录；T-32（orchestrator 缺陷修复）不派发、不实施，任务卡标记已关闭。
+- 影响：项目路线图不再包含 orchestrator 修复；后续若需自动化闭环能力，另行评估。
