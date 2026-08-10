@@ -285,6 +285,58 @@ for (const key of ['updatedAt', 'refreshFailed', 'retryNotice']) {
 }
 pass('T-26 天气文案键齐全（zh-CN/en）');
 
+// T-28：人格模板卡片精简（名称 + 一句话，完整描述选中后展开）
+if (
+  !rendererChatSource.includes("className = 'template-desc'") ||
+  !rendererChatSource.includes('desc.title =')
+) {
+  fail('renderer/chat.js 模板卡片缺少一句话简介（template-desc）');
+}
+if (!rendererChatSource.includes("className = 'template-details'")) {
+  fail('renderer/chat.js 模板卡片缺少可展开的完整描述区（template-details）');
+}
+if (!rendererChatSource.includes("setAttribute('aria-expanded'")) {
+  fail('renderer/chat.js 模板卡片缺少 aria-expanded 展开状态');
+}
+if (rendererChatSource.includes("className = 'template-traits'")) {
+  fail('renderer/chat.js 模板卡片仍整段铺开 traits（应精简为名称+一句话）');
+}
+pass('renderer 人格模板卡片精简实现存在');
+
+const rendererChatCssSource = fs.readFileSync(
+  path.join(root, 'src', 'renderer', 'chat.css'),
+  'utf8'
+);
+if (!rendererChatCssSource.includes('.template-card .template-details')) {
+  fail('chat.css 缺少模板详情折叠态样式');
+}
+if (
+  !rendererChatCssSource.includes('.template-card.selected .template-details')
+) {
+  fail('chat.css 缺少模板详情选中展开样式');
+}
+pass('人格模板折叠/展开样式存在');
+
+if (
+  !rendererIndexSource.includes('id="persona-template-list"') ||
+  !rendererIndexSource.includes('id="onboarding-template-list"')
+) {
+  fail('renderer/index.html 缺少设置页/引导模板卡片容器');
+}
+if (rendererIndexSource.includes('onboarding-template-preview')) {
+  fail('renderer/index.html 仍保留引导旧预览面板（应统一使用卡片内展开）');
+}
+pass('设置页与引导共用同一套精简模板卡片');
+
+if (
+  !rendererChatSource.includes('template.persona.traits.slice()') ||
+  !rendererChatSource.includes('typeof template.persona.tone') ||
+  !rendererChatSource.includes('typeof template.persona.backstory')
+) {
+  fail('renderer/chat.js 应用模板时未保留完整 persona 内容');
+}
+pass('应用模板后 persona 内容保持不变');
+
 // T-08：store persona 默认值、读写与清洗（非法值丢弃/超长截断，不破坏 settings.json）
 const { createStore, DEFAULT_SETTINGS } = require(path.join(
   root,
