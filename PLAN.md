@@ -129,7 +129,7 @@
 - [x] T-31 贴边体验优化（方案 B：靠边吸附不自动隐藏）
 - [x] T-32 已关闭：用户决定 scripts/orchestrator/ 不入库（ADR-028）
 - [x] T-33 TTS 专属语音包（按人格，e73fd89 已合并；朗读听感待人工目检）
-- [ ] T-34 TTS 神经语音（ADR-029，进行中：2026-08-10 派发）
+- [x] T-34 TTS 神经语音（ADR-029，6b343db 已合并验收；听感待用户复核）
 - [ ] T-35 贴边吸附修复（Windows moved 事件不触发，T-34 合并后派发）
 - Backlog：UI 大改（M3.6 独立里程碑，M3.5 收尾后评估）
 
@@ -166,6 +166,7 @@
 - 2026-08-10：T-33 经项目内线程闭环派发完成并合并（e73fd89）：6 套人格语音包（voice/pitch/rate）+ 设置页开关/选择，store 仅新增协调者预确认的两个 tts* 字段；worker check/smoke 通过，协调者 main check 复核通过；朗读听感待人工目检。
 - 2026-08-10：用户决定 `scripts/orchestrator/` 不入库（ADR-028），T-32 关闭不派发；整体 UI 目检与 T-33 朗读试听启动（main check/smoke 通过，dev 窗口已打开供人工目检）。
 - 2026-08-10：用户目检反馈 T-33 语音包无差异且生硬（根因：本机仅系统 SAPI 音）→ ADR-029 采用 Edge 在线神经语音，T-34 已派发；贴边无效（根因：Windows 上 moved 事件不触发）→ T-35 建卡排队。
+- 2026-08-10：T-34 经项目内线程闭环完成并合并（6b343db）：自研 Edge 在线神经语音客户端（ws）替换系统音，6 套人格映射不同神经音色，失败回退 speechSynthesis；worker check/smoke 与协调者复核（check、smoke、双音色合成差异）全部通过；听感待用户 `npm run dev` 人工复核。
 
 ## Surprises & Discoveries
 
