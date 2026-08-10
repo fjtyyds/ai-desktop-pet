@@ -1,10 +1,10 @@
 # 项目状态
 
 - 更新时间：2026-08-10
-- 当前阶段：M4 P0/P1 完成；P3 自动更新已实施（T-37 已合并）；P2 待用户决策；P4 待发布准备
-- 当前任务：T-38 发布产物命名 ASCII 化（P3 遗留风险，发布前必须修复）
-- 最近完成：T-37 自动更新（electron-updater + GitHub Releases）验收合并（4ec503a）；check/smoke 通过
-- 下一步：T-38 → P4 最终 `npm run dist` 与安装冒烟；真实更新链路需首次 v 标签发布（push/tag 属远程操作，发布前与用户确认）
+- 当前阶段：M4 P0/P1 完成；P3 自动更新实施完成（T-37/T-38 已合并）；P2 待用户决策；P4 待执行
+- 当前任务：P4 最终 `npm run dist` 与安装冒烟（可自主推进）
+- 最近完成：T-38 发布产物命名 ASCII 化验收合并（3315146）；latest.yml 与实际产物一致
+- 下一步：P4 最终打包/安装冒烟 → 首次发布（v 标签 + Release，push/tag 属远程操作，发布前与用户确认）→ P2（签名/商店预算）
 - 阻塞：无（P2 签名/商店预算、大目录/worktree 清理、UI 大改排期、TTS 听感复核仍待用户决策）
 - 交接提示：新会话先读 `AGENTS.md` → `PLAN.md` → `docs/STATUS.md` → `docs/reports/2026-08-10-工作对接方案.md` → 自己的任务卡（docs/tasks/T-xx.md）
 
@@ -180,3 +180,11 @@
 - 验证：worker 与协调者 `npm run check` 全部通过；`npm run smoke` 通过（渲染页加载/历史恢复/番茄钟幂等/chat 端到端）；事件链路模拟与打包 app-update.yml 生成确认由 worker 完成。
 - 合并：4ec503a fast-forward 合并入 main；worktree E:\codex\AI桌宠-m3x-autoupdate 已清理，分支保留。
 - 遗留风险：artifactName 含非 ASCII（AI桌宠）时 latest.yml 引用安全化文件名与真实产物不一致，更新源将 404；已建 T-38 修复，发布前必须完成。
+
+## T-38 合并记录（2026-08-10，项目内线程闭环）
+
+- 派发：总工按闭环 SOP 派发 T-38（发布产物命名 ASCII 化）；worker 完成并回报（分支 codex/m4-artifact-name @ 3315146，基线 main a34593f）。
+- 实现：electron-builder.yml 的 nsis.artifactName 改为 `ai-desktop-pet-${version}-Setup.${ext}`（productName 保持 AI桌宠）；check.js 增加 T-38 断言（artifactName 纯 ASCII、productName 不变、dist 产物与 latest.yml 引用静态比对）。
+- 验证：worker 与协调者 `npm run check` 全部通过（含静态比对）；`npm run smoke` 通过；本地 `npm run dist -- --publish never` 产出 ai-desktop-pet-0.1.0-Setup.exe（100,568,284 B）与 blockmap，latest.yml 的 url/path 与实际产物完全一致。
+- 合并：3315146 fast-forward 合并入 main；worktree E:\codex\AI桌宠-m4-artifact-name 已清理，分支保留。
+- 遗留风险：真实更新链路（electron-updater 从 GitHub Releases 拉取）需首次 v 标签发布后才能端到端验证；push/tag 属远程操作，待用户确认。

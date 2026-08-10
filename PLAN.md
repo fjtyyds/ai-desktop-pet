@@ -141,7 +141,7 @@
 - [x] P0 开源前仓库整理（.gitignore/LICENSE(MIT)/README/CONTRIBUTING/SECURITY/密钥扫描；大目录已排除，物理清理待用户决定）
 - [x] P1 GitHub Actions 实测通过（仓库 https://github.com/fjtyyds/ai-desktop-pet ；check/smoke/dist 全绿，安装包 artifact 100MB）
 - [ ] P2 代码签名与商店（Store/Steam）
-- [x] P3 自动更新评估（ADR-031/T-37 已合并 4ec503a；真实更新链路待首次 v 标签发布验证；发布前需修 artifactName，见 T-38）
+- [x] P3 自动更新评估（ADR-031/T-37 已合并 4ec503a；T-38 已修复发布产物命名；真实更新链路待首次 v 标签发布验证）
 - [ ] P4 最终 `npm run dist` 与安装冒烟
 
 详见 `docs/reports/2026-08-10-M4-分发规划.md`。
@@ -187,6 +187,7 @@
 - 2026-08-10：M4 P0/P1 实施完成：LICENSE(MIT)/README/CONTRIBUTING/SECURITY 与 .github/workflows/ci.yml 落盘；git 密钥扫描无实际密钥；YAML 与 check 校验通过；待用户提供 GitHub 仓库后实测 Actions。
 - 2026-08-10：GitHub 仓库已创建并推送（fjtyyds/ai-desktop-pet，公开）；首轮 CI 修复 electron-builder 隐式发布问题（--publish never）并升级 action 版本后全绿（check/smoke/dist，安装包 artifact 100,357,474B）。
 - 2026-08-10：T-37 自动更新（electron-updater + GitHub Releases）经项目内线程闭环完成并合并（4ec503a fast-forward）：updater.js 封装（isPackaged 双重守卫、事件链路、dialog 确认、before-quit quitAndInstall）、托盘“检查更新”、双语文案与 check 断言；worker 与协调者 check/smoke 全部通过；遗留风险：artifactName 中文导致 latest.yml 引用与实际产物不一致（T-38 修复）。
+- 2026-08-10：T-38 发布产物命名 ASCII 化经项目内线程闭环完成并合并（3315146 fast-forward）：artifactName 改为 `ai-desktop-pet-${version}-Setup.${ext}`，productName 保持 AI桌宠；check 增加 ASCII 断言与 dist/latest.yml 引用静态比对；本地 dist 实测产物与清单完全一致；check/smoke 全部通过；真实更新链路待首次 v 标签发布验证。
 
 ## Surprises & Discoveries
 
