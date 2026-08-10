@@ -87,8 +87,10 @@
       languageHint: '界面语言会即时切换，也可以在设置中随时修改。',
       modelHint: '不填写 API Key 时将以演示模式运行，随时可在设置中补充。',
       templateHint: '选择一位你喜欢的桌宠人格，之后可在设置中随时切换或微调。',
-      templatePreview: '人格预览',
       templateEmpty: '暂无可用的人格模板。',
+      detailTraits: '性格',
+      detailTone: '语气',
+      detailBackstory: '背景',
       back: '上一步',
       next: '下一步',
       finish: '开始使用',
@@ -113,8 +115,10 @@
         'Without an API key the app runs in demo mode; you can add one later in settings.',
       templateHint:
         'Pick a personality for your pet. You can switch or fine-tune it in settings later.',
-      templatePreview: 'Personality preview',
       templateEmpty: 'No personality templates are available.',
+      detailTraits: 'Traits',
+      detailTone: 'Tone',
+      detailBackstory: 'Backstory',
       back: 'Back',
       next: 'Next',
       finish: 'Get started',
@@ -378,15 +382,6 @@
       onboardingModelHint: document.getElementById('onboarding-model-hint'),
       onboardingStep3Hint: document.getElementById('onboarding-step3-hint'),
       onboardingTemplateList: document.getElementById('onboarding-template-list'),
-      onboardingTemplatePreview: document.getElementById(
-        'onboarding-template-preview'
-      ),
-      onboardingPreviewTitle: document.getElementById('onboarding-preview-title'),
-      onboardingPreviewTraits: document.getElementById('onboarding-preview-traits'),
-      onboardingPreviewTone: document.getElementById('onboarding-preview-tone'),
-      onboardingPreviewBackstory: document.getElementById(
-        'onboarding-preview-backstory'
-      ),
       onboardingBack: document.getElementById('onboarding-back'),
       onboardingNext: document.getElementById('onboarding-next'),
       onboardingFinish: document.getElementById('onboarding-finish'),
@@ -2218,7 +2213,6 @@
     elements.onboardingLanguageHint.textContent = text('languageHint');
     elements.onboardingModelHint.textContent = text('modelHint');
     elements.onboardingStep3Hint.textContent = text('templateHint');
-    elements.onboardingPreviewTitle.textContent = text('templatePreview');
     elements.onboardingBack.textContent = text('back');
     elements.onboardingNext.textContent = text('next');
     elements.onboardingFinish.textContent = text('finish');
@@ -2308,6 +2302,7 @@
       button.dataset.templateId = item.id;
       button.setAttribute('role', 'option');
       button.setAttribute('aria-selected', item.id === selectedId ? 'true' : 'false');
+      button.setAttribute('aria-expanded', item.id === selectedId ? 'true' : 'false');
       if (item.id === selectedId) {
         button.classList.add('selected');
       }
@@ -2319,15 +2314,39 @@
       const desc = document.createElement('span');
       desc.className = 'template-desc';
       desc.textContent = item.description || '';
+      desc.title = item.description || '';
 
-      const traits = document.createElement('span');
-      traits.className = 'template-traits';
+      const details = document.createElement('div');
+      details.className = 'template-details';
       const persona = item.persona || {};
-      traits.textContent = Array.isArray(persona.traits)
-        ? persona.traits.join(' · ')
-        : '';
+      const detailLines = [
+        {
+          label: onboardingText('detailTraits'),
+          value: Array.isArray(persona.traits)
+            ? persona.traits.join(' · ')
+            : ''
+        },
+        {
+          label: onboardingText('detailTone'),
+          value: typeof persona.tone === 'string' ? persona.tone : ''
+        },
+        {
+          label: onboardingText('detailBackstory'),
+          value:
+            typeof persona.backstory === 'string' ? persona.backstory : ''
+        }
+      ];
+      for (const line of detailLines) {
+        if (!line.value) {
+          continue;
+        }
+        const detail = document.createElement('span');
+        detail.className = 'template-detail-line';
+        detail.textContent = `${line.label}：${line.value}`;
+        details.appendChild(detail);
+      }
 
-      button.append(name, desc, traits);
+      button.append(name, desc, details);
       button.addEventListener('click', () => onSelect(item.id));
       container.appendChild(button);
     }
@@ -2494,33 +2513,11 @@
       selectedId: selectedOnboardingTemplateId,
       onSelect: selectOnboardingTemplate
     });
-    updateOnboardingTemplatePreview();
   }
 
   function selectOnboardingTemplate(id) {
     selectedOnboardingTemplateId = id;
     renderOnboardingTemplates();
-  }
-
-  function updateOnboardingTemplatePreview() {
-    const template = getTemplateById(selectedOnboardingTemplateId);
-    if (!template || !template.persona) {
-      elements.onboardingTemplatePreview.hidden = true;
-      return;
-    }
-    const t = window.PetLocales.createTranslator(currentLocale);
-    elements.onboardingTemplatePreview.hidden = false;
-    elements.onboardingPreviewTraits.textContent = `${t('settings.traits')}：${
-      Array.isArray(template.persona.traits)
-        ? template.persona.traits.join(t('settings.traitsDelimiter'))
-        : ''
-    }`;
-    elements.onboardingPreviewTone.textContent = `${t('settings.tone')}：${
-      typeof template.persona.tone === 'string' ? template.persona.tone : ''
-    }`;
-    elements.onboardingPreviewBackstory.textContent = `${t(
-      'settings.backstory'
-    )}：${typeof template.persona.backstory === 'string' ? template.persona.backstory : ''}`;
   }
 
   /** 完成引导：语言/密钥/模型/模板 + onboardingDone 一次性持久化 */
