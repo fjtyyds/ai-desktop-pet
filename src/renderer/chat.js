@@ -32,6 +32,9 @@
  * - T-33 TTS 专属语音包（按人格）：6 套预设人格各配 voice/pitch/rate，朗读时按当前
  *   生效人格自动应用；设置页可关闭（回退系统默认 TTS）或固定选择语音包
  *   （ttsVoicePackEnabled/ttsVoicePackId，协调者预确认的两个 settings 字段）
+ * - T-34（ADR-029）：开启语音包时朗读优先走 petAPI.tts.speak（Edge 在线神经语音，
+ *   HTMLAudioElement 播放/停止），断网/合成/播放失败自动回退 speechSynthesis，
+ *   按钮不失效、不卡死；TTS_VOICE_PACKS 增加 edgeVoice/edgeRate/edgePitch 映射
  */
 (function () {
   'use strict';
@@ -267,32 +270,50 @@
     warm: {
       voice: { lang: 'zh', name: ['xiaoxiao', 'huihui', 'yaoyao'] },
       pitch: 1.05,
-      rate: 0.95
+      rate: 0.95,
+      edgeVoice: 'zh-CN-XiaoxiaoNeural',
+      edgeRate: '-5%',
+      edgePitch: '+0Hz'
     },
     sage: {
       voice: { lang: 'zh', name: ['yunyang', 'kangkang', 'huihui'] },
       pitch: 0.92,
-      rate: 0.82
+      rate: 0.82,
+      edgeVoice: 'zh-CN-YunyangNeural',
+      edgeRate: '-10%',
+      edgePitch: '-2Hz'
     },
     playful: {
       voice: { lang: 'zh', name: ['yaoyao', 'xiaoxiao', 'huihui'] },
       pitch: 1.2,
-      rate: 1.15
+      rate: 1.15,
+      edgeVoice: 'zh-CN-YunxiNeural',
+      edgeRate: '+10%',
+      edgePitch: '+8Hz'
     },
     gentle: {
       voice: { lang: 'zh', name: ['xiaoxiao', 'huihui', 'yaoyao'] },
       pitch: 1.02,
-      rate: 0.88
+      rate: 0.88,
+      edgeVoice: 'zh-CN-XiaoyiNeural',
+      edgeRate: '-10%',
+      edgePitch: '+0Hz'
     },
     cool: {
       voice: { lang: 'zh', name: ['kangkang', 'yunyang', 'huihui'] },
       pitch: 0.82,
-      rate: 0.95
+      rate: 0.95,
+      edgeVoice: 'zh-CN-YunjianNeural',
+      edgeRate: '-5%',
+      edgePitch: '-4Hz'
     },
     curious: {
       voice: { lang: 'zh', name: ['yaoyao', 'xiaoxiao'] },
       pitch: 1.22,
-      rate: 1.2
+      rate: 1.2,
+      edgeVoice: 'zh-CN-YunxiaNeural',
+      edgeRate: '+5%',
+      edgePitch: '+4Hz'
     }
   };
   /** 情绪带：valence 从高到低匹配；face 为角色表情，className 对应配色主题 */
@@ -321,6 +342,7 @@
   let ttsVoices = [];
   let ttsReady = false;
   let currentUtterance = null;
+  let currentAudio = null; // T-34：在线神经语音 HTMLAudioElement
   let currentSpeakButton = null;
   // T-22：天气小部件状态（最近一次成功数据 / 错误码 / 加载中）
   let weatherState = null;
@@ -1433,11 +1455,28 @@
     if (currentSpeakButton === button) {
       currentSpeakButton = null;
       currentUtterance = null;
+      if (currentAudio) {
+        try {
+          currentAudio.pause();
+        } catch (_error) {
+          // 播放对象清理失败不影响状态恢复
+        }
+        currentAudio = null;
+      }
     }
     updateSpeakButtonState(button, false);
   }
 
   function stopSpeaking() {
+    if (currentAudio) {
+      try {
+        currentAudio.pause();
+        currentAudio.src = '';
+      } catch (_error) {
+        // 播放对象清理失败不影响状态恢复
+      }
+      currentAudio = null;
+    }
     if (window.speechSynthesis) {
       try {
         window.speechSynthesis.cancel();
@@ -1453,11 +1492,20 @@
     }
   }
 
+  /** T-34：petAPI.tts.speak 是否可用（preload 已暴露即视为可用） */
+  function hasEdgeTtsApi() {
+    return Boolean(
+      window.petAPI &&
+        window.petAPI.tts &&
+        typeof window.petAPI.tts.speak === 'function'
+    );
+  }
+
   function toggleSpeak(button) {
     if (!ttsEnabled()) {
       return;
     }
-    if (currentUtterance && currentSpeakButton === button) {
+    if ((currentUtterance || currentAudio) && currentSpeakButton === button) {
       stopSpeaking();
       return;
     }
@@ -1468,11 +1516,68 @@
     if (!text) {
       return;
     }
-    const synth = window.speechSynthesis;
-    const utter = new SpeechSynthesisUtterance(text);
     // T-33：专属语音包开启时按当前生效人格应用 voice/pitch/rate；关闭时回退系统默认
     const packEnabled = currentSettings.ttsVoicePackEnabled !== false;
     const pack = packEnabled ? resolveTtsVoicePack() : null;
+    // T-34：开启语音包且 petAPI.tts.speak 可用时优先在线神经语音
+    if (pack && hasEdgeTtsApi()) {
+      speakWithEdge(button, text, pack);
+      return;
+    }
+    speakWithSystem(button, text, pack);
+  }
+
+  /** 在线神经语音：主进程合成 MP3 data URL，HTMLAudioElement 播放/停止 */
+  async function speakWithEdge(button, text, pack) {
+    currentSpeakButton = button;
+    updateSpeakButtonState(button, true);
+    let result = null;
+    try {
+      result = await window.petAPI.tts.speak({
+        text,
+        voice: pack.edgeVoice,
+        rate: pack.edgeRate,
+        pitch: pack.edgePitch
+      });
+    } catch (_error) {
+      result = null;
+    }
+    if (currentSpeakButton !== button) {
+      return; // 请求期间已被停止或切换
+    }
+    const audioDataUrl =
+      result && result.ok === true ? result.audioDataUrl : null;
+    if (typeof audioDataUrl !== 'string' || !audioDataUrl) {
+      speakWithSystem(button, text, pack); // 断网/合成失败：自动回退
+      return;
+    }
+    let fallbackDone = false;
+    const fallback = () => {
+      if (fallbackDone) {
+        return;
+      }
+      fallbackDone = true;
+      if (currentAudio === audio) {
+        currentAudio = null;
+      }
+      if (currentSpeakButton !== button) {
+        updateSpeakButtonState(button, false);
+        return;
+      }
+      currentUtterance = null;
+      speakWithSystem(button, text, pack); // 播放失败：回退系统 TTS
+    };
+    const audio = new Audio(audioDataUrl);
+    currentAudio = audio;
+    audio.onended = () => clearSpeakingState(button);
+    audio.onerror = fallback;
+    audio.play().catch(fallback);
+  }
+
+  /** 系统 TTS 回退路径（原 T-23 行为） */
+  function speakWithSystem(button, text, pack) {
+    const synth = window.speechSynthesis;
+    const utter = new SpeechSynthesisUtterance(text);
     const voice = pickTtsVoice(pack || null);
     if (voice) {
       utter.voice = voice;

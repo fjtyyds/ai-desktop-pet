@@ -502,6 +502,130 @@ for (const localeFile of ['zh-CN', 'en']) {
 }
 pass('T-33 语音包渲染层/设置页/语言包同步断言通过');
 
+// T-34（ADR-029）：Edge 在线神经语音——模块/IPC/preload/渲染层映射/CSP/回退断言
+const ttsEdgePath = path.join(root, 'src', 'main', 'tts-edge.js');
+if (!fs.existsSync(ttsEdgePath)) {
+  fail('缺少 src/main/tts-edge.js（T-34 在线神经语音客户端）');
+}
+const ttsEdgeSource = fs.readFileSync(ttsEdgePath, 'utf8');
+for (const token of [
+  'speech.platform.bing.com',
+  'TrustedClientToken',
+  'Sec-MS-GEC',
+  'speech.config',
+  'Path:ssml',
+  'Path:audio',
+  'Path:turn.end',
+  'audio-24khz-48kbitrate-mono-mp3',
+  'handshakeTimeout',
+  'CACHE_MAX'
+]) {
+  if (!ttsEdgeSource.includes(token)) {
+    fail(`tts-edge.js 缺少 ${token}`);
+  }
+}
+const ipcSource = fs.readFileSync(path.join(root, 'src', 'main', 'ipc.js'), 'utf8');
+if (!ipcSource.includes("ttsSpeak: 'tts:speak'")) {
+  fail('ipc.js 缺少 ttsSpeak 通道');
+}
+if (!ipcSource.includes('ipcMain.handle(CHANNELS.ttsSpeak')) {
+  fail('ipc.js 未注册 tts:speak 处理器');
+}
+if (!ipcSource.includes("require('./tts-edge')")) {
+  fail('ipc.js 未引入 tts-edge');
+}
+if (!preloadSource.includes("ttsSpeak: 'tts:speak'")) {
+  fail('preload.js 缺少 ttsSpeak 通道');
+}
+if (!preloadSource.includes('tts: {')) {
+  fail('preload.js 缺少 petAPI.tts 命名空间');
+}
+if (!preloadSource.includes('speak:')) {
+  fail('preload.js 缺少 tts.speak');
+}
+for (const token of [
+  'petAPI.tts.speak',
+  'HTMLAudioElement',
+  'new Audio(',
+  'currentAudio',
+  'speakWithSystem',
+  'speakWithEdge',
+  'speechSynthesis'
+]) {
+  if (!rendererChatSource.includes(token)) {
+    fail(`chat.js 缺少 T-34 逻辑：${token}`);
+  }
+}
+const edgeVoiceMap = {
+  warm: ['zh-CN-XiaoxiaoNeural', '-5%', '+0Hz'],
+  sage: ['zh-CN-YunyangNeural', '-10%', '-2Hz'],
+  playful: ['zh-CN-YunxiNeural', '+10%', '+8Hz'],
+  gentle: ['zh-CN-XiaoyiNeural', '-10%', '+0Hz'],
+  cool: ['zh-CN-YunjianNeural', '-5%', '-4Hz'],
+  curious: ['zh-CN-YunxiaNeural', '+5%', '+4Hz']
+};
+for (const [packId, expected] of Object.entries(edgeVoiceMap)) {
+  const packStart = ttsPacksBlock.indexOf(`${packId}: {`);
+  if (packStart < 0) {
+    fail(`TTS_VOICE_PACKS 缺少 ${packId} 语音包（T-34）`);
+  }
+  let depth = 0;
+  let packEnd = -1;
+  for (let i = packStart; i < ttsPacksBlock.length; i += 1) {
+    if (ttsPacksBlock[i] === '{') {
+      depth += 1;
+    } else if (ttsPacksBlock[i] === '}') {
+      depth -= 1;
+      if (depth === 0) {
+        packEnd = i + 1;
+        break;
+      }
+    }
+  }
+  if (packEnd < 0) {
+    fail(`TTS_VOICE_PACKS ${packId} 语音包对象未闭合`);
+  }
+  const packBlock = ttsPacksBlock.slice(packStart, packEnd);
+  const voiceMatch = packBlock.match(/edgeVoice:\s*'([^']+)'/);
+  const rateMatch = packBlock.match(/edgeRate:\s*'([^']+)'/);
+  const pitchMatch = packBlock.match(/edgePitch:\s*'([^']+)'/);
+  if (!voiceMatch || voiceMatch[1] !== expected[0]) {
+    fail(`${packId} edgeVoice 应为 ${expected[0]}`);
+  }
+  if (!rateMatch || rateMatch[1] !== expected[1]) {
+    fail(`${packId} edgeRate 应为 ${expected[1]}`);
+  }
+  if (!pitchMatch || pitchMatch[1] !== expected[2]) {
+    fail(`${packId} edgePitch 应为 ${expected[2]}`);
+  }
+}
+if (!rendererIndexSource.includes("media-src 'self' data:")) {
+  fail('index.html CSP 缺少 media-src data:（在线 MP3 data URL 播放）');
+}
+for (const localeFile of ['zh-CN', 'en']) {
+  const locale = JSON.parse(
+    fs.readFileSync(
+      path.join(root, 'src', 'shared', 'locales', `${localeFile}.json`),
+      'utf8'
+    )
+  );
+  const hint = locale.settings.ttsVoicePackEnabledHint || '';
+  if (
+    localeFile === 'zh-CN' &&
+    (!hint.includes('神经') || !hint.includes('回退'))
+  ) {
+    fail('zh-CN.json ttsVoicePackEnabledHint 未说明在线神经语音与回退');
+  }
+  if (
+    localeFile === 'en' &&
+    (!hint.toLowerCase().includes('neural') ||
+      !hint.toLowerCase().includes('fall'))
+  ) {
+    fail('en.json ttsVoicePackEnabledHint 未说明 online neural voice 与回退');
+  }
+}
+pass('T-34 Edge 神经语音模块/IPC/preload/映射/CSP/回退断言通过');
+
 if (
   !mainSource.includes('function dockWindow') ||
   !mainSource.includes('function findDockEdge')

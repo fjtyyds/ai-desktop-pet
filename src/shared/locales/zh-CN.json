@@ -80,7 +80,7 @@
     "idleEnabled": "空闲互动",
     "idleEnabledHint": "长时间无交互时，桌宠会主动冒泡和你打招呼；保存后生效，可随时关闭。",
     "ttsVoicePackEnabled": "专属语音包",
-    "ttsVoicePackEnabledHint": "按人格自动使用专属语音与语调（音高/语速）；关闭后回退系统默认 TTS。",
+    "ttsVoicePackEnabledHint": "按人格使用 Edge 在线神经语音（音高/语速），需联网；断网或失败时自动回退系统语音。关闭后使用系统默认 TTS。",
     "ttsVoicePack": "语音包",
     "ttsVoicePackAuto": "自动跟随人格",
     "ttsVoicePackHint": "留空时随当前人格模板自动切换；也可固定选择一套语音包。",
