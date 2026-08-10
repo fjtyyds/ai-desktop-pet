@@ -20,7 +20,6 @@ const CHANNELS = {
   historyClear: 'history:clear',
   weatherGet: 'weather:get',
   windowToggleDock: 'window:toggle-dock',
-  windowSetShortcut: 'window:set-shortcut',
   windowMinimize: 'window:minimize' // T-25：最小化到任务栏（ADR-026 冻结契约）
 };
 
@@ -52,8 +51,6 @@ contextBridge.exposeInMainWorld('petAPI', {
   window: {
     hide: () => ipcRenderer.invoke(CHANNELS.windowHide),
     toggleDock: () => ipcRenderer.invoke(CHANNELS.windowToggleDock),
-    setShortcutEnabled: (enabled) =>
-      ipcRenderer.invoke(CHANNELS.windowSetShortcut, enabled),
     minimize: () => ipcRenderer.invoke(CHANNELS.windowMinimize) // T-25
   },
   history: {

@@ -101,6 +101,7 @@ pass('renderer 设置页 API Key/模型输入存在');
 
 // T-24：窗口可缩放、小部件可折叠、移除底部平台/版本信息
 // T-25：工具栏导出 + 最小化（契约 window:minimize 已冻结，ADR-026）
+// T-29：全局快捷键移除（ADR-026）：源码不得再注册/暴露快捷键契约
 const preloadSource = fs.readFileSync(
   path.join(root, 'src', 'main', 'preload.js'),
   'utf8'
@@ -336,6 +337,20 @@ if (
   fail('renderer/chat.js 应用模板时未保留完整 persona 内容');
 }
 pass('应用模板后 persona 内容保持不变');
+if (/\bglobalShortcut\b/.test(mainSource)) {
+  fail('main.js 仍引用 globalShortcut（T-29 应移除）');
+}
+if (
+  /SHORTCUT_CANDIDATES|setShortcutEnabled|window:set-shortcut/.test(
+    mainSource + preloadSource
+  )
+) {
+  fail('main/preload 仍包含全局快捷键注册/契约（T-29 应移除）');
+}
+if (/setShortcutEnabled|shortcutEnabled/.test(rendererChatSource)) {
+  fail('renderer/chat.js 仍包含全局快捷键开关逻辑（T-29 应移除）');
+}
+pass('T-29 全局快捷键源码已移除');
 
 // T-08：store persona 默认值、读写与清洗（非法值丢弃/超长截断，不破坏 settings.json）
 const { createStore, DEFAULT_SETTINGS } = require(path.join(
@@ -490,6 +505,23 @@ try {
     fail('pomodoroNotifyAt 信号清理后读取不一致');
   }
   pass('store pomodoro 信号读写与清理语义通过');
+
+  // T-29：旧 shortcutEnabled 设置字段兼容忽略/清理（不报错、不再暴露）
+  const legacySettingsPath = path.join(checkDir, 'settings.json');
+  const legacyRaw = JSON.parse(
+    fs.readFileSync(legacySettingsPath, 'utf8')
+  );
+  legacyRaw.shortcutEnabled = true;
+  fs.writeFileSync(
+    legacySettingsPath,
+    JSON.stringify(legacyRaw, null, 2),
+    'utf8'
+  );
+  const legacyRead = store.readSettings();
+  if (Object.prototype.hasOwnProperty.call(legacyRead, 'shortcutEnabled')) {
+    fail('旧 shortcutEnabled 字段未被兼容清理/忽略（T-29）');
+  }
+  pass('store 旧 shortcutEnabled 兼容忽略通过');
 } finally {
   fs.rmSync(checkDir, { recursive: true, force: true });
 }

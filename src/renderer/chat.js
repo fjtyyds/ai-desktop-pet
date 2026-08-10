@@ -10,8 +10,8 @@
  * - T-14：流式回复优先（chat.sendStream + chat.onDelta），"正在思考…" 占位、
  *   打字机增量更新、流式中发送按钮变为"停止"（chat.cancelStream）
  * - T-15 空闲主动互动：窗口内交互心跳上报主进程；主进程触发后随机展示互动气泡
- * - T-19 窗口体验：设置页注入“贴边隐藏/全局快捷键”开关与提示（ADR-022 冻结契约
- *   petAPI.window.toggleDock / setShortcutEnabled；提示文案为本地双语映射，不依赖 locale 文件）
+ * - T-19 窗口体验：设置页注入“贴边隐藏”开关与提示（ADR-022 冻结契约
+ *   petAPI.window.toggleDock；提示文案为本地双语映射，不依赖 locale 文件）
  * - T-20 首次引导与人格模板：首次启动三步引导（语言 / API Key 与模型 / 人格模板），
  *   完成标志 onboardingDone 持久化；内置 6 套预设人格模板（双语内联，与 store.js
  *   PERSONA_TEMPLATE_IDS 对齐），设置页与引导中均可一键切换，切换即时保存到
@@ -50,22 +50,12 @@
       title: '窗口行为',
       dockLabel: '贴边隐藏',
       dockHint: '拖到屏幕边缘自动收起成细条，鼠标靠近自动滑出；可随时关闭。',
-      shortcutLabel: '全局快捷键',
-      shortcutHint: '按 Ctrl+Alt+P 可从任意位置呼出窗口；按键被占用时自动尝试备用键。',
-      shortcutUnavailable: '快捷键注册失败（可能与其他应用冲突），已自动关闭。',
-      shortcutChanged: '全局快捷键设置已保存。'
     },
     en: {
       title: 'Window behavior',
       dockLabel: 'Edge docking',
       dockHint:
-        'Drag to a screen edge to auto-collapse; hover near the edge to slide out.',
-      shortcutLabel: 'Global shortcut',
-      shortcutHint:
-        'Press Ctrl+Alt+P to summon the window from anywhere; fallbacks are tried if taken.',
-      shortcutUnavailable:
-        'Shortcut registration failed (possibly in use by another app) and was disabled.',
-      shortcutChanged: 'Global shortcut setting saved.'
+        'Drag to a screen edge to auto-collapse; hover near the edge to slide out.'
     }
   };
   /** T-23：语音输出按钮文案（双语内联，原因同 WINDOW_FEATURE_HINTS） */
@@ -431,8 +421,7 @@
     return Boolean(
       window.petAPI &&
         window.petAPI.window &&
-        typeof window.petAPI.window.toggleDock === 'function' &&
-        typeof window.petAPI.window.setShortcutEnabled === 'function'
+        typeof window.petAPI.window.toggleDock === 'function'
     );
   }
 
@@ -474,8 +463,7 @@
     block.appendChild(title);
 
     const dock = makeWindowFeatureSwitch('dock', 'dock-enabled');
-    const shortcut = makeWindowFeatureSwitch('shortcut', 'shortcut-enabled');
-    block.append(dock.label, shortcut.label);
+    block.append(dock.label);
     anchor.parentNode.insertBefore(block, anchor);
 
     windowFeatureEls = {
@@ -483,17 +471,11 @@
       title,
       dockText: dock.text,
       dockCheckbox: dock.input,
-      dockHint: dock.hint,
-      shortcutText: shortcut.text,
-      shortcutCheckbox: shortcut.input,
-      shortcutHint: shortcut.hint
+      dockHint: dock.hint
     };
 
     windowFeatureEls.dockCheckbox.addEventListener('change', () => {
       void toggleWindowDock();
-    });
-    windowFeatureEls.shortcutCheckbox.addEventListener('change', () => {
-      void toggleWindowShortcut();
     });
 
     applyWindowFeatureSettings(currentSettings);
@@ -514,8 +496,6 @@
     windowFeatureEls.title.textContent = hints.title;
     windowFeatureEls.dockText.textContent = hints.dockLabel;
     windowFeatureEls.dockHint.textContent = hints.dockHint;
-    windowFeatureEls.shortcutText.textContent = hints.shortcutLabel;
-    windowFeatureEls.shortcutHint.textContent = hints.shortcutHint;
   }
 
   /** 从主进程设置同步开关状态（缺省开启，与 store.js DEFAULT_SETTINGS 一致） */
@@ -525,8 +505,6 @@
     }
     windowFeatureEls.dockCheckbox.checked =
       !settings || settings.dockEnabled !== false;
-    windowFeatureEls.shortcutCheckbox.checked =
-      !settings || settings.shortcutEnabled !== false;
   }
 
   async function toggleWindowDock() {
@@ -550,42 +528,6 @@
       }
     } catch (error) {
       console.warn('切换贴边隐藏失败：', error);
-      applyWindowFeatureSettings(currentSettings);
-    }
-  }
-
-  async function toggleWindowShortcut() {
-    const api =
-      window.petAPI &&
-      window.petAPI.window &&
-      typeof window.petAPI.window.setShortcutEnabled === 'function'
-        ? window.petAPI.window
-        : null;
-    if (!api) {
-      applyWindowFeatureSettings(currentSettings);
-      return;
-    }
-    const requested = windowFeatureEls.shortcutCheckbox.checked;
-    try {
-      const result = await api.setShortcutEnabled(requested);
-      if (result && typeof result.enabled === 'boolean') {
-        windowFeatureEls.shortcutCheckbox.checked = result.enabled;
-        currentSettings = {
-          ...currentSettings,
-          shortcutEnabled: result.enabled
-        };
-        const hints = windowFeatureHints();
-        showSettingsStatus(
-          requested && !result.enabled
-            ? hints.shortcutUnavailable
-            : hints.shortcutChanged,
-          requested && !result.enabled ? 'error' : 'ok'
-        );
-      } else {
-        applyWindowFeatureSettings(currentSettings);
-      }
-    } catch (error) {
-      console.warn('切换全局快捷键失败：', error);
       applyWindowFeatureSettings(currentSettings);
     }
   }

@@ -56,7 +56,6 @@ const DEFAULT_SETTINGS = {
   language: 'system',
   idleEnabled: true, // T-15：空闲主动互动开关，默认开启
   dockEnabled: true, // T-19：贴边隐藏开关，默认开启
-  shortcutEnabled: true, // T-19：全局快捷键呼出开关，默认开启
   windowBounds: null, // T-19：上次窗口位置 { x, y }；null 表示未保存
   onboardingDone: false, // T-20：首次启动三步引导是否已完成
   personaTemplate: '', // T-20：最近应用的预设人格模板 id；'' 表示自定义/未应用
@@ -259,10 +258,8 @@ function createStore(baseDir) {
       merged.dockEnabled,
       DEFAULT_SETTINGS.dockEnabled
     );
-    merged.shortcutEnabled = sanitizeBoolean(
-      merged.shortcutEnabled,
-      DEFAULT_SETTINGS.shortcutEnabled
-    );
+    // T-29：旧 shortcutEnabled 字段按 ADR-026 移除，兼容忽略并清理
+    delete merged.shortcutEnabled;
     merged.onboardingDone = sanitizeBoolean(
       merged.onboardingDone,
       DEFAULT_SETTINGS.onboardingDone
@@ -323,7 +320,6 @@ function createStore(baseDir) {
       'language',
       'idleEnabled',
       'dockEnabled',
-      'shortcutEnabled',
       'windowBounds',
       'onboardingDone',
       'personaTemplate',
@@ -363,7 +359,7 @@ function createStore(baseDir) {
           next.idleEnabled = sanitizeBoolean(patch.idleEnabled, current.idleEnabled);
           continue;
         }
-        if (key === 'dockEnabled' || key === 'shortcutEnabled') {
+        if (key === 'dockEnabled') {
           next[key] = sanitizeBoolean(patch[key], current[key]);
           continue;
         }
