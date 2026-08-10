@@ -1,11 +1,11 @@
 # 项目状态
 
 - 更新时间：2026-08-10
-- 当前阶段：M3.5 收尾优化完成（T-34~T-36 已合并）；语音克隆暂缓（ADR-030）；M4 P0/P1 完成并实测通过
-- 当前任务：M4 P2（签名/商店）需要预算与注册类决策，暂缓；可先推进 P3 自动更新评估
-- 最近完成：GitHub 公开仓库 fjtyyds/ai-desktop-pet 创建，Actions check/smoke/dist 全绿（安装包 artifact 100MB）
-- 下一步：P3 自动更新评估（无需外部注册，可自行推进）→ P2 前与用户确认签名证书/商店预算 → 大目录/worktree 清理、UI 大改排期
-- 阻塞：无
+- 当前阶段：M4 P0/P1 完成；P3 自动更新已实施（T-37 已合并）；P2 待用户决策；P4 待发布准备
+- 当前任务：T-38 发布产物命名 ASCII 化（P3 遗留风险，发布前必须修复）
+- 最近完成：T-37 自动更新（electron-updater + GitHub Releases）验收合并（4ec503a）；check/smoke 通过
+- 下一步：T-38 → P4 最终 `npm run dist` 与安装冒烟；真实更新链路需首次 v 标签发布（push/tag 属远程操作，发布前与用户确认）
+- 阻塞：无（P2 签名/商店预算、大目录/worktree 清理、UI 大改排期、TTS 听感复核仍待用户决策）
 - 交接提示：新会话先读 `AGENTS.md` → `PLAN.md` → `docs/STATUS.md` → `docs/reports/2026-08-10-工作对接方案.md` → 自己的任务卡（docs/tasks/T-xx.md）
 
 ## M1 集成完成记录（2026-08-09）
@@ -172,3 +172,11 @@
 - 用户决定：`scripts/orchestrator/` 不入库（ADR-028）。
 - 处置：保留为本地未跟踪目录；T-32（orchestrator 缺陷修复）不派发、不实施，任务卡标记已关闭。
 - 影响：项目路线图不再包含 orchestrator 修复；后续若需自动化闭环能力，另行评估。
+
+## T-37 合并记录（2026-08-10，项目内线程闭环）
+
+- 派发：总工按闭环 SOP 用 `send-prompt --project E:\codex\AI桌宠` 派发 T-37；worker 完成并回报（分支 codex/m3x-autoupdate @ 4ec503a，基线 main fc8a036）。
+- 实现：新增 src/main/updater.js（electron-updater 封装：checkForUpdates、update-available/not-available/download-progress/update-downloaded/error、quitAndInstall、日志双写）；main.js 仅 app.isPackaged 时初始化并在启动 3s 后延迟检查，before-quit 执行 quitAndInstall；tray.js 增加“检查更新/Check for Updates”；zh-CN/en 增加 updater.* 文案；check.js 增加 T-37 断言。
+- 验证：worker 与协调者 `npm run check` 全部通过；`npm run smoke` 通过（渲染页加载/历史恢复/番茄钟幂等/chat 端到端）；事件链路模拟与打包 app-update.yml 生成确认由 worker 完成。
+- 合并：4ec503a fast-forward 合并入 main；worktree E:\codex\AI桌宠-m3x-autoupdate 已清理，分支保留。
+- 遗留风险：artifactName 含非 ASCII（AI桌宠）时 latest.yml 引用安全化文件名与真实产物不一致，更新源将 404；已建 T-38 修复，发布前必须完成。
