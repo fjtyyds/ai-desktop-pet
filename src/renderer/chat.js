@@ -24,9 +24,8 @@
  * - T-26 天气自动刷新增强：自动刷新间隔 30→15 分钟、窗口恢复显示即刷新
  *   （受最小间隔保护）、界面清楚展示“上次更新”时间、失败保留缓存并显示错误、
  *   指数退避自动重试
- * - T-21 系统状态与番茄钟：小部件面板展示 CPU/内存/电池（主进程复用 idle:event
- *   推送 { type: 'system-status' }）；本地番茄钟计时，完成时写入 settings 通知信号
- *   （pomodoroNotifyAt），由主进程轮询消费并弹系统通知；面板可收起、设置可关闭
+ * - T-21 本地番茄钟：界面计时，完成时写入 settings 通知信号（pomodoroNotifyAt），
+ *   由主进程轮询消费并弹系统通知（系统状态小部件已按 T-30 移除）
  * - T-25 工具栏：导出对话从设置页移入聊天工具栏（下拉菜单），新增最小化按钮
  *   （petAPI.window.minimize → IPC window:minimize，ADR-026 冻结契约）
  */
@@ -290,8 +289,7 @@
   let weatherCollapsed = true; // T-24：天气小部件默认收起（仅保留摘要行）
   let weatherRetryAttempt = 0; // T-26：失败重试次数（指数退避）
   let weatherRetryTimer = null; // T-26：失败自动重试定时器
-  // T-21：小部件与番茄钟状态
-  let lastSystemStatus = null;
+  // T-21：番茄钟状态
   let pomodoroStatusTimer = null;
   let pomodoroState = {
     mode: 'idle', // 'idle' | 'running' | 'paused' | 'finished'
@@ -395,19 +393,11 @@
       onboardingNext: document.getElementById('onboarding-next'),
       onboardingFinish: document.getElementById('onboarding-finish'),
       onboardingStatus: document.getElementById('onboarding-status'),
-      widgetsPanel: document.getElementById('widgets-panel'),
-      widgetsToggle: document.getElementById('widgets-toggle'),
-      widgetStats: document.getElementById('widget-stats'),
-      statCpu: document.getElementById('stat-cpu'),
-      statMem: document.getElementById('stat-mem'),
-      statBattery: document.getElementById('stat-battery'),
-      statBatteryState: document.getElementById('stat-battery-state'),
       pomodoroTime: document.getElementById('pomodoro-time'),
       pomodoroStart: document.getElementById('pomodoro-start'),
       pomodoroReset: document.getElementById('pomodoro-reset'),
       pomodoroStop: document.getElementById('pomodoro-stop'),
       pomodoroStatus: document.getElementById('pomodoro-status'),
-      widgetsEnabled: document.getElementById('widgets-enabled'),
       pomodoroEnabled: document.getElementById('pomodoro-enabled'),
       pomodoroMinutes: document.getElementById('pomodoro-minutes')
     };
@@ -561,7 +551,6 @@
       showOnboardingStep(onboardingStep + 1)
     );
     elements.onboardingFinish.addEventListener('click', () => void finishOnboarding());
-    elements.widgetsToggle.addEventListener('click', () => void toggleWidgets());
     elements.pomodoroStart.addEventListener('click', () => startPomodoro());
     elements.pomodoroReset.addEventListener('click', resetPomodoro);
     elements.pomodoroStop.addEventListener('click', stopPomodoro);
@@ -629,8 +618,7 @@
 
   /**
    * T-15：订阅主进程空闲触发事件；仅在聊天视图随机展示一条互动气泡
-   * （不写入历史，也不调用 LLM）。T-21：同一通道复用为系统状态推送，
-   * 以 payload.type='system-status' 区分。
+   * （不写入历史，也不调用 LLM）。
    */
   function subscribeIdle() {
     const idleApi = window.petAPI && window.petAPI.idle;
@@ -638,10 +626,6 @@
       return;
     }
     idleApi.onTrigger((payload) => {
-      if (payload && payload.type === 'system-status') {
-        void applySystemStatus(payload.status);
-        return;
-      }
       if (!payload || elements.chatView.hidden) {
         return; // 防打扰：设置页打开时忽略本次触发
       }
@@ -656,112 +640,6 @@
       const text = phrases[Math.floor(Math.random() * phrases.length)];
       appendMessage('assistant', text, 'message-idle');
     });
-  }
-
-  /* ---------------- T-21：系统状态小部件（CPU/内存/电池） ---------------- */
-
-  function hasWidgetsPanel() {
-    return Boolean(elements.widgetsPanel);
-  }
-
-  /** 渲染主进程推送的系统状态（数值刷新 + 电池状态文案 + 无障碍标签） */
-  async function applySystemStatus(status) {
-    if (!hasWidgetsPanel() || !status || typeof status !== 'object') {
-      return;
-    }
-    lastSystemStatus = status;
-    await window.PetLocales.ready;
-    const t = window.PetLocales.createTranslator(currentLocale);
-    const fmtPercent = (value) => {
-      const numeric = Number(value);
-      return Number.isFinite(numeric) ? `${Math.round(numeric)}%` : '--%';
-    };
-    const cpuText = fmtPercent(status.cpuPercent);
-    const memText = fmtPercent(status.memPercent);
-    const batteryText = fmtPercent(status.batteryPercent);
-    const batteryStateKey =
-      status.batteryState === 'charging'
-        ? 'batteryCharging'
-        : status.batteryState === 'battery'
-          ? 'batteryOnBattery'
-          : status.batteryState === 'unknown'
-            ? 'batteryUnknown'
-            : 'batteryAc';
-    const batteryStateText = t(`widgets.${batteryStateKey}`);
-
-    if (elements.statCpu) {
-      elements.statCpu.textContent = cpuText;
-    }
-    if (elements.statMem) {
-      elements.statMem.textContent = memText;
-      elements.statMem.title = t('widgets.memDetail', {
-        used: status.memUsedGb != null ? status.memUsedGb : '--',
-        total: status.memTotalGb != null ? status.memTotalGb : '--'
-      });
-    }
-    if (elements.statBattery) {
-      elements.statBattery.textContent = batteryText;
-      elements.statBattery.title = batteryStateText;
-      elements.statBattery.setAttribute(
-        'aria-label',
-        `${batteryText} ${batteryStateText}`
-      );
-      elements.statBattery.dataset.batteryState = status.batteryState || 'ac';
-    }
-    if (elements.statBatteryState) {
-      elements.statBatteryState.textContent = batteryStateText;
-      elements.statBatteryState.dataset.batteryState = status.batteryState || 'ac';
-    }
-    if (elements.widgetStats) {
-      elements.widgetStats.setAttribute(
-        'aria-label',
-        t('widgets.statusAria', {
-          cpu: cpuText,
-          mem: memText,
-          battery: `${batteryText} ${batteryStateText}`
-        })
-      );
-    }
-  }
-
-  /** 按设置显示/隐藏小部件面板（可关闭，关闭状态持久化） */
-  function syncWidgetsVisibility() {
-    if (!hasWidgetsPanel()) {
-      return;
-    }
-    elements.widgetsPanel.hidden = currentSettings.widgetsEnabled === false;
-  }
-
-  /** 面板右上角 ✕：切换小部件开关并持久化 */
-  async function toggleWidgets() {
-    pokeActivity();
-    const next = currentSettings.widgetsEnabled === false;
-    const settingsApi =
-      window.petAPI &&
-      window.petAPI.settings &&
-      typeof window.petAPI.settings.set === 'function';
-    const applyNext = (settings) => {
-      currentSettings =
-        settings && typeof settings === 'object'
-          ? settings
-          : { ...currentSettings, widgetsEnabled: next };
-      syncWidgetsVisibility();
-      if (elements.widgetsEnabled) {
-        elements.widgetsEnabled.checked = currentSettings.widgetsEnabled !== false;
-      }
-    };
-    if (!settingsApi) {
-      saveLocalFallback({ ...currentSettings, widgetsEnabled: next });
-      applyNext({ ...currentSettings, widgetsEnabled: next });
-      return;
-    }
-    try {
-      const saved = await window.petAPI.settings.set({ widgetsEnabled: next });
-      applyNext(saved || { ...currentSettings, widgetsEnabled: next });
-    } catch (error) {
-      console.warn('切换小部件失败：', error);
-      applyNext(currentSettings);
-    }
   }
 
   /* ---------------- T-21：本地番茄钟（计时 + 主进程 Notification） ---------------- */
@@ -2083,7 +1961,6 @@
         idleEnabled: saved.idleEnabled !== false,
         weatherEnabled: saved.weatherEnabled === true,
         weatherCity: saved.weatherCity,
-        widgetsEnabled: saved.widgetsEnabled !== false,
         pomodoroEnabled: saved.pomodoroEnabled !== false,
         pomodoroMinutes: Number(saved.pomodoroMinutes) || DEFAULT_POMODORO_MINUTES
       });
@@ -2155,13 +2032,11 @@
     elements.petName.value = currentPetName;
     elements.idleEnabled.checked = currentSettings.idleEnabled !== false;
     applyWeatherSettings(currentSettings); // T-22：天气开关/城市输入 + 可见性 + 刷新
-    elements.widgetsEnabled.checked = currentSettings.widgetsEnabled !== false;
     elements.pomodoroEnabled.checked = currentSettings.pomodoroEnabled !== false;
     elements.pomodoroMinutes.value = String(
       pomodoroMinutesFromSettings(currentSettings)
     );
     applyPomodoroSettings(currentSettings);
-    syncWidgetsVisibility();
 
     const persona =
       currentSettings.persona && typeof currentSettings.persona === 'object'
@@ -2176,9 +2051,6 @@
 
     applyStaticText();
     updatePomodoroControls(); // T-21：applyStaticText 会重置按钮静态文案，需按状态覆盖
-    if (lastSystemStatus) {
-      void applySystemStatus(lastSystemStatus); // T-21：语言切换后按新语言重渲染状态文案
-    }
     applyWindowFeatureSettings(currentSettings); // T-19
     updateWindowFeatureText(); // T-19: 语言切换后刷新提示文案
     syncOnboardingVisibility(); // T-20：首次启动引导（完成标志持久化）
@@ -2227,7 +2099,6 @@
         personaTemplate,
         weatherEnabled: elements.weatherEnabled.checked,
         weatherCity: elements.weatherCity.value.trim(),
-        widgetsEnabled: elements.widgetsEnabled.checked,
         pomodoroEnabled: elements.pomodoroEnabled.checked,
         pomodoroMinutes: Number(elements.pomodoroMinutes.value)
       });
@@ -2249,7 +2120,6 @@
         personaTemplate,
         weatherEnabled: elements.weatherEnabled.checked,
         weatherCity: elements.weatherCity.value.trim(),
-        widgetsEnabled: elements.widgetsEnabled.checked,
         pomodoroEnabled: elements.pomodoroEnabled.checked,
         pomodoroMinutes: Number(elements.pomodoroMinutes.value)
       });
@@ -2838,7 +2708,6 @@
   window.ChatUI = {
     init,
     applyMood,
-    applySystemStatus, // T-21：供主进程推送状态注入/冒烟验证
     startPomodoro, // T-21：可传分钟数覆盖（测试/快捷入口）
     resetPomodoro,
     stopPomodoro,
