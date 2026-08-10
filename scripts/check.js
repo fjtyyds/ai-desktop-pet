@@ -811,6 +811,85 @@ for (const localeFile of ['zh-CN', 'en']) {
 }
 pass('T-37 自动更新双语文案齐全（zh-CN/en）');
 
+// T-38：发布产物命名 ASCII 化——artifactName 纯 ASCII、productName 保持中文、
+// dist 产物与更新清单（latest.yml）引用静态比对（dist/ 不入库，存在才比对）
+const builderConfigSource = fs.readFileSync(
+  path.join(root, 'electron-builder.yml'),
+  'utf8'
+);
+const artifactNameMatch = builderConfigSource.match(
+  /^\s*artifactName:\s*([^\r\n#]+)/m
+);
+if (!artifactNameMatch) {
+  fail('electron-builder.yml 缺少 artifactName 配置');
+}
+const artifactName = artifactNameMatch[1].trim();
+const EXPECTED_ARTIFACT_NAME = 'ai-desktop-pet-${version}-Setup.${ext}';
+if (artifactName !== EXPECTED_ARTIFACT_NAME) {
+  fail(
+    `artifactName 必须为约定的 ASCII 命名 ${EXPECTED_ARTIFACT_NAME}（当前: ${artifactName}）`
+  );
+}
+if (!/^[\x21-\x7E]+$/.test(artifactName)) {
+  fail(`artifactName 必须为纯 ASCII（当前: ${artifactName}）`);
+}
+if (!artifactName.includes('${version}') || !artifactName.includes('${ext}')) {
+  fail('artifactName 必须包含 ${version} 与 ${ext} 占位符');
+}
+const productNameMatch = builderConfigSource.match(
+  /^\s*productName:\s*([^\r\n#]+)/m
+);
+if (!productNameMatch || productNameMatch[1].trim() !== 'AI桌宠') {
+  fail('productName 必须保持 AI桌宠（安装/快捷方式显示名不变）');
+}
+pass('T-38 artifactName 纯 ASCII 且 productName 保持 AI桌宠');
+
+const distDir = path.join(root, 'dist');
+if (fs.existsSync(distDir)) {
+  const distTopFiles = fs.readdirSync(distDir);
+  const topLevelExes = distTopFiles.filter((file) =>
+    file.toLowerCase().endsWith('.exe')
+  );
+  for (const file of topLevelExes) {
+    if (!/^[\x21-\x7E]+$/.test(file)) {
+      fail(`dist 产物文件名必须为纯 ASCII（当前: ${file}）`);
+    }
+  }
+  const latestYmlPath = path.join(distDir, 'latest.yml');
+  if (fs.existsSync(latestYmlPath)) {
+    const latestYmlSource = fs.readFileSync(latestYmlPath, 'utf8');
+    const refs = [];
+    for (const line of latestYmlSource.split(/\r?\n/)) {
+      const refMatch = line.match(/^\s*(?:url|path):\s*(.+?)\s*$/);
+      if (refMatch) {
+        const value = refMatch[1].replace(/^["']|["']$/g, '');
+        if (value) {
+          refs.push(value);
+        }
+      }
+    }
+    if (refs.length === 0) {
+      fail('dist/latest.yml 未包含 url/path 引用，无法与产物比对');
+    }
+    for (const ref of refs) {
+      const baseName = path.basename(ref);
+      if (!fs.existsSync(path.join(distDir, baseName))) {
+        fail(`dist/latest.yml 引用文件不存在于 dist: ${ref}`);
+      }
+    }
+    for (const file of topLevelExes) {
+      if (!refs.some((ref) => path.basename(ref) === file)) {
+        fail(`dist 产物未出现在 latest.yml 引用中: ${file}`);
+      }
+    }
+    pass(`T-38 dist/latest.yml 引用与实际产物一致（共 ${refs.length} 个引用）`);
+  } else if (topLevelExes.length > 0) {
+    pass('T-38 dist 产物名已确认 ASCII（无 latest.yml，清单比对跳过）');
+  }
+} else {
+  pass('T-38 dist 不存在，产物静态比对跳过（打包后运行 check 将比对）');
+}
+
 // T-08：store persona 默认值、读写与清洗（非法值丢弃/超长截断，不破坏 settings.json）
 const { createStore, DEFAULT_SETTINGS } = require(path.join(
   root,
