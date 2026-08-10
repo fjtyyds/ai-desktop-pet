@@ -2,9 +2,9 @@
 
 - 更新时间：2026-08-10
 - 当前阶段：M3.5 收尾优化 T-24~T-31 已全部合并验收；整体回归目检与后续任务待排期
-- 当前任务：T-32（orchestrator 修复）与 T-33（TTS 专属语音包）待办；可选整体 UI 目检
+- 当前任务：T-33（TTS 专属语音包）已合并（e73fd89），待人工听力目检；T-32（orchestrator 修复，是否入库待用户决定）待办
 - 最近完成：T-24~T-31 全部合并（check/smoke 通过）；worktree 清理；ADR-027/T-33 需求落盘
-- 下一步：用户确认 T-32/T-33 优先级；随后整体 UI 目检与 M4 分发规划
+- 下一步：T-33 人工听力目检；用户决定 T-32 是否入库；随后整体 UI 目检与 M4 分发规划
 - 阻塞：无
 - 交接提示：新会话先读 `AGENTS.md` → `PLAN.md` → `docs/STATUS.md` → `docs/reports/2026-08-10-工作对接方案.md` → 自己的任务卡（docs/tasks/T-xx.md）
 
@@ -157,3 +157,12 @@
 - 说明：用户反馈 T-27 曾多开一个线程，但 reflog 显示该分支仅一次提交，未产生重复分支/重复实现，保留现有实现。
 - 清理：8 个任务 worktree 已移除，分支保留；旧 M3.5 worktree（m3x-export/idle/memory-ui/mood-ui/stream/widgets）仍存在，是否清理待用户决定。
 - 新增需求：TTS 专属语音包（ADR-027，T-33），待排期。
+
+## T-33 合并记录（2026-08-10，项目内线程闭环）
+
+- 派发：新总工按闭环 SOP 用 `send-prompt --project E:\codex\AI桌宠` 派发 T-33；worker 线程 16:15 开工、16:20 完成；watcher 16:21 打开并收录反馈（摘要置顶）。
+- 分支：codex/m3x-tts-voice（e73fd89，基线 main 0eae4d0），fast-forward 合并入 main。
+- 实现：6 套人格（warm/sage/playful/gentle/cool/curious）各配 voice 偏好 + pitch/rate；朗读按 personaTemplate 自动应用，显式选择优先；设置页开关（默认开）与下拉（自动跟随人格 + 6 套固定选择）；关闭回退系统默认 TTS。
+- 契约：不改 petAPI；store 仅新增协调者预确认的 `ttsVoicePackEnabled`（bool，默认 true）与 `ttsVoicePackId`（≤40 字符，空=跟随人格）。
+- 验证：worker `npm run check`、`npm run smoke` 通过；临时无头 UI 校验 10 项通过；协调者复核 main `npm run check` 全部通过；朗读听感待人工目检。
+- 清理：worktree E:\codex\AI桌宠-m3x-tts-voice 已移除，分支保留。
