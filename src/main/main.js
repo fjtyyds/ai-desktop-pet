@@ -329,36 +329,25 @@ function showPomodoroNotification(minutes) {
 /**
  * 消费渲染层的番茄钟完成信号（settings.pomodoroNotifyAt > 0）。
  * 渲染层计时结束写入 settings（store.js 白名单字段），本函数随状态轮询
- * 读取并弹通知后清零，避免重复弹出。
+ * 调用 ipc.consumePomodoroNotificationSignal 幂等消费：读取最新设置 →
+ * 清零并同步模块缓存 → 弹通知。同一信号只弹一次；清零失败或提醒已关闭
+ * 时不弹通知，避免重复弹窗。
  */
 function consumePomodoroNotificationRequest() {
-  let minutes = DEFAULT_POMODORO_MINUTES;
-  let hasRequest = false;
+  let consumed = null;
   try {
-    const settings = ipc.getSettings();
-    const at = Number(settings && settings.pomodoroNotifyAt);
-    hasRequest = Number.isFinite(at) && at > 0;
-    if (hasRequest) {
-      const requested = Number(settings && settings.pomodoroNotifyMinutes);
-      if (Number.isFinite(requested) && requested > 0) {
-        minutes = Math.min(120, Math.max(1, Math.round(requested)));
-      }
-    }
-  } catch (_error) {
-    return;
-  }
-  if (!hasRequest) {
-    return;
-  }
-  try {
-    getWindowSettingsWriter().writeSettings({
-      pomodoroNotifyAt: 0,
-      pomodoroNotifyMinutes: 0
-    });
+    consumed = ipc.consumePomodoroNotificationSignal();
   } catch (error) {
-    console.warn('[pomodoro] 清除通知信号失败：', error);
+    console.warn('[pomodoro] 消费通知信号失败：', error);
+    return;
   }
-  showPomodoroNotification(minutes);
+  if (!consumed) {
+    return;
+  }
+  if (consumed.enabled === false) {
+    return; // 提醒已关闭：仅清除待处理信号，不弹系统通知
+  }
+  showPomodoroNotification(consumed.minutes);
 }
 
 /* ---------------- T-19：窗口设置读写 ---------------- */
