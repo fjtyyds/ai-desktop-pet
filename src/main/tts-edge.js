@@ -2,6 +2,7 @@
 
 /**
  * T-34（ADR-029）：Edge 在线神经语音最小客户端。
+ * T-36：输出格式改为 audio-24khz-96kbitrate-mono-mp3（96kbps，改善压缩感）。
  * 仅依赖 package.json 已显式声明的 ws；协议参照 rany2/edge-tts（MIT）。
  * 不引入第三方 TTS 依赖；合成失败返回 { ok:false, error }，由渲染层回退 speechSynthesis。
  */
@@ -15,6 +16,8 @@ const WSS_BASE_URL =
   'wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1' +
   '?TrustedClientToken=' +
   TRUSTED_CLIENT_TOKEN;
+/** T-36：96kbps 输出格式（48kbps 压缩感明显；48kHz 格式被服务端拒绝） */
+const OUTPUT_FORMAT = 'audio-24khz-96kbitrate-mono-mp3';
 const DEFAULT_VOICE = 'zh-CN-XiaoxiaoNeural';
 const DEFAULT_RATE = '+0%';
 const DEFAULT_PITCH = '+0Hz';
@@ -180,7 +183,7 @@ function synthesizeSegment(text, options) {
           'Path:speech.config\r\n\r\n' +
           '{"context":{"synthesis":{"audio":{"metadataoptions":{' +
           '"sentenceBoundaryEnabled":"true","wordBoundaryEnabled":"false"},' +
-          '"outputFormat":"audio-24khz-48kbitrate-mono-mp3"}}}}\r\n'
+          `"outputFormat":"${OUTPUT_FORMAT}"}}}}\r\n`
       );
       ws.send(
         `X-RequestId:${makeConnectionId()}\r\n` +

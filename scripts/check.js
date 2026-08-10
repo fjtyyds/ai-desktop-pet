@@ -516,13 +516,25 @@ for (const token of [
   'Path:ssml',
   'Path:audio',
   'Path:turn.end',
-  'audio-24khz-48kbitrate-mono-mp3',
+  'OUTPUT_FORMAT',
   'handshakeTimeout',
   'CACHE_MAX'
 ]) {
   if (!ttsEdgeSource.includes(token)) {
     fail(`tts-edge.js 缺少 ${token}`);
   }
+}
+const EXPECTED_TTS_FORMAT = 'audio-24khz-96kbitrate-mono-mp3';
+if (
+  !ttsEdgeSource.includes(`const OUTPUT_FORMAT = '${EXPECTED_TTS_FORMAT}'`)
+) {
+  fail(`tts-edge.js 缺少 96kbps 输出格式常量（${EXPECTED_TTS_FORMAT}）`);
+}
+if (!ttsEdgeSource.includes('"outputFormat":"${OUTPUT_FORMAT}"')) {
+  fail('tts-edge.js 的 speech.config 未使用 OUTPUT_FORMAT 常量');
+}
+if (ttsEdgeSource.includes('audio-24khz-48kbitrate-mono-mp3')) {
+  fail('tts-edge.js 仍包含旧 48kbps 输出格式');
 }
 const ipcSource = fs.readFileSync(path.join(root, 'src', 'main', 'ipc.js'), 'utf8');
 if (!ipcSource.includes("ttsSpeak: 'tts:speak'")) {
@@ -557,12 +569,12 @@ for (const token of [
   }
 }
 const edgeVoiceMap = {
-  warm: ['zh-CN-XiaoxiaoNeural', '-5%', '+0Hz'],
-  sage: ['zh-CN-YunyangNeural', '-10%', '-2Hz'],
-  playful: ['zh-CN-YunxiNeural', '+10%', '+8Hz'],
-  gentle: ['zh-CN-XiaoyiNeural', '-10%', '+0Hz'],
-  cool: ['zh-CN-YunjianNeural', '-5%', '-4Hz'],
-  curious: ['zh-CN-YunxiaNeural', '+5%', '+4Hz']
+  warm: ['zh-CN-XiaoxiaoNeural', '-3%', '+1Hz'],
+  sage: ['zh-CN-YunyangNeural', '-5%', '-1Hz'],
+  playful: ['zh-CN-YunxiNeural', '+6%', '+3Hz'],
+  gentle: ['zh-CN-XiaoyiNeural', '-6%', '+0Hz'],
+  cool: ['zh-CN-YunjianNeural', '-2%', '-2Hz'],
+  curious: ['zh-CN-YunxiaNeural', '+2%', '+2Hz']
 };
 for (const [packId, expected] of Object.entries(edgeVoiceMap)) {
   const packStart = ttsPacksBlock.indexOf(`${packId}: {`);

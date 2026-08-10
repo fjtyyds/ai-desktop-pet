@@ -264,6 +264,7 @@
    * T-33：6 套人格专属语音包（id 与 PERSONA_TEMPLATES/store.js PERSONA_TEMPLATE_IDS 对齐）。
    * voice 为“首选系统语音偏好”（lang 语言前缀 + name 名称关键词，按序匹配），
    * pitch/rate 为 Web Speech 参数（pitch 0.1~2、rate 0.1~10）。
+   * edgeVoice/edgeRate/edgePitch 为 Edge 在线合成参数（T-36 v2 参数表，voice 不变）。
    * 机器没有匹配语音时回退按界面语言选系统默认语音，仅应用 pitch/rate 风格。
    */
   const TTS_VOICE_PACKS = {
@@ -272,31 +273,31 @@
       pitch: 1.05,
       rate: 0.95,
       edgeVoice: 'zh-CN-XiaoxiaoNeural',
-      edgeRate: '-5%',
-      edgePitch: '+0Hz'
+      edgeRate: '-3%',
+      edgePitch: '+1Hz'
     },
     sage: {
       voice: { lang: 'zh', name: ['yunyang', 'kangkang', 'huihui'] },
       pitch: 0.92,
       rate: 0.82,
       edgeVoice: 'zh-CN-YunyangNeural',
-      edgeRate: '-10%',
-      edgePitch: '-2Hz'
+      edgeRate: '-5%',
+      edgePitch: '-1Hz'
     },
     playful: {
       voice: { lang: 'zh', name: ['yaoyao', 'xiaoxiao', 'huihui'] },
       pitch: 1.2,
       rate: 1.15,
       edgeVoice: 'zh-CN-YunxiNeural',
-      edgeRate: '+10%',
-      edgePitch: '+8Hz'
+      edgeRate: '+6%',
+      edgePitch: '+3Hz'
     },
     gentle: {
       voice: { lang: 'zh', name: ['xiaoxiao', 'huihui', 'yaoyao'] },
       pitch: 1.02,
       rate: 0.88,
       edgeVoice: 'zh-CN-XiaoyiNeural',
-      edgeRate: '-10%',
+      edgeRate: '-6%',
       edgePitch: '+0Hz'
     },
     cool: {
@@ -304,16 +305,16 @@
       pitch: 0.82,
       rate: 0.95,
       edgeVoice: 'zh-CN-YunjianNeural',
-      edgeRate: '-5%',
-      edgePitch: '-4Hz'
+      edgeRate: '-2%',
+      edgePitch: '-2Hz'
     },
     curious: {
       voice: { lang: 'zh', name: ['yaoyao', 'xiaoxiao'] },
       pitch: 1.22,
       rate: 1.2,
       edgeVoice: 'zh-CN-YunxiaNeural',
-      edgeRate: '+5%',
-      edgePitch: '+4Hz'
+      edgeRate: '+2%',
+      edgePitch: '+2Hz'
     }
   };
   /** 情绪带：valence 从高到低匹配；face 为角色表情，className 对应配色主题 */
