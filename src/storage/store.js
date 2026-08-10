@@ -62,7 +62,6 @@ const DEFAULT_SETTINGS = {
   personaTemplate: '', // T-20：最近应用的预设人格模板 id；'' 表示自定义/未应用
   weatherEnabled: false, // T-22：角色面板天气小部件开关（可选，默认关闭）
   weatherCity: '', // T-22：天气城市名（Open-Meteo geocoding，中英文均可）
-  widgetsEnabled: true, // T-21：系统状态小部件开关，默认开启，可收起
   pomodoroEnabled: true, // T-21：番茄钟提醒开关（关闭后仅界面计时，不弹通知）
   pomodoroMinutes: DEFAULT_POMODORO_MINUTES, // T-21：番茄钟时长（分钟）
   pomodoroNotifyAt: 0, // T-21：渲染层完成的番茄钟信号（时间戳；主进程消费后清零）
@@ -267,10 +266,6 @@ function createStore(baseDir) {
       merged.onboardingDone,
       DEFAULT_SETTINGS.onboardingDone
     );
-    merged.widgetsEnabled = sanitizeBoolean(
-      merged.widgetsEnabled,
-      DEFAULT_SETTINGS.widgetsEnabled
-    );
     merged.pomodoroEnabled = sanitizeBoolean(
       merged.pomodoroEnabled,
       DEFAULT_SETTINGS.pomodoroEnabled
@@ -326,7 +321,6 @@ function createStore(baseDir) {
       'personaTemplate',
       'weatherEnabled',
       'weatherCity',
-      'widgetsEnabled',
       'pomodoroEnabled',
       'pomodoroMinutes',
       'pomodoroNotifyAt',
@@ -400,7 +394,7 @@ function createStore(baseDir) {
           );
           continue;
         }
-        if (key === 'widgetsEnabled' || key === 'pomodoroEnabled') {
+        if (key === 'pomodoroEnabled') {
           next[key] = sanitizeBoolean(patch[key], current[key]);
           continue;
         }

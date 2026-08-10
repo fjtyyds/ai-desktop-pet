@@ -1,14 +1,11 @@
 'use strict';
 
-const os = require('os');
-const { execFile } = require('child_process');
 const {
   app,
   BrowserWindow,
   globalShortcut,
   ipcMain,
   Notification,
-  powerMonitor,
   screen
 } = require('electron');
 const path = require('path');
@@ -53,10 +50,8 @@ const DOCK_SLIDE_MS = 160; // 滑出/滑回动画时长
 const DOCK_ANIMATION_IGNORE_MS = 250; // 动画产生的 move 事件忽略窗口，避免误判为拖动
 const DOCK_REGRAB_GRACE_MS = 800; // 取消贴边后的短暂窗口，防止 setBounds 触发再贴边
 
-/** T-21：系统状态小部件（CPU/内存每 2s 推送；电池每 15s 查询一次） */
-const STATUS_POLL_MS = 2000;
-const BATTERY_POLL_MS = 15000;
-const BATTERY_QUERY_TIMEOUT_MS = 3000;
+/** T-21：番茄钟完成信号轮询间隔（系统状态小部件移除后，仅保留通知消费） */
+const POMODORO_POLL_MS = 2000;
 const DEFAULT_POMODORO_MINUTES = 25;
 
 /** T-19：贴边状态 */
@@ -76,11 +71,8 @@ let dockGraceUntil = 0;
 let positionSaveTimer = null;
 let activeShortcut = null;
 let windowSettingsWriter = null;
-// T-21：系统状态小部件状态
-let statusTimer = null;
-let batteryTimer = null;
-let lastCpuSample = null;
-let batteryPercentCache = null;
+// T-21：番茄钟完成信号轮询
+let pomodoroTimer = null;
 
 /** T-15：空闲参数。默认 3 分钟无交互触发、两次至少间隔 90 秒；环境变量可临时调小便于目检 */
 const IDLE_TRIGGER_MS = readPositiveEnvMs(
@@ -95,195 +87,6 @@ const IDLE_MIN_INTERVAL_MS = readPositiveEnvMs(
 function readPositiveEnvMs(name, fallback) {
   const value = Number(process.env[name]);
   return Number.isFinite(value) && value > 0 ? value : fallback;
-}
-
-/* ---------------- T-21：系统状态小部件（CPU/内存/电池） ----------------
- *
- * 边界说明：本任务不允许修改 preload.js/ipc.js，渲染层唯一可用的
- * 主进程→渲染层通道是 idle:event（petAPI.idle.onTrigger）。因此这里
- * 复用该通道，以 payload.type='system-status' 与 T-15 空闲互动区分；
- * 渲染层 chat.js 按 type 分发，不干扰空闲冒泡。
- */
-
-/** 采样 CPU 累计时间（Windows 上无 iowait，按 0 处理） */
-function sampleCpuTimes() {
-  const cpus = os.cpus();
-  let idle = 0;
-  let total = 0;
-  for (const cpu of cpus) {
-    const times = cpu.times;
-    const iowait = Number.isFinite(times.iowait) ? times.iowait : 0;
-    idle += times.idle + iowait;
-    total +=
-      times.user + times.nice + times.sys + times.idle + times.irq + iowait;
-  }
-  return { idle, total };
-}
-
-/** CPU 使用率（两次采样差值；首次采样返回 null） */
-function readCpuPercent() {
-  const current = sampleCpuTimes();
-  if (!lastCpuSample) {
-    lastCpuSample = current;
-    return null;
-  }
-  const totalDelta = current.total - lastCpuSample.total;
-  const idleDelta = current.idle - lastCpuSample.idle;
-  lastCpuSample = current;
-  if (totalDelta <= 0) {
-    return null;
-  }
-  const percent = ((totalDelta - idleDelta) / totalDelta) * 100;
-  return Math.min(100, Math.max(0, Math.round(percent * 10) / 10));
-}
-
-/** 内存：已用百分比 + GB 数值（供渲染层 tooltip） */
-function readMemoryStatus() {
-  const total = os.totalmem();
-  const free = os.freemem();
-  const used = Math.max(0, total - free);
-  const gb = (bytes) => Math.round((bytes / 1024 ** 3) * 10) / 10;
-  return {
-    memPercent: total > 0 ? Math.round((used / total) * 100) : null,
-    memUsedGb: gb(used),
-    memTotalGb: gb(total)
-  };
-}
-
-/** Windows 电池百分比（无电池/查询失败返回 null）；其他平台不查询 */
-function readBatteryInfo() {
-  return new Promise((resolve) => {
-    execFile(
-      'powershell.exe',
-      [
-        '-NoProfile',
-        '-NonInteractive',
-        '-Command',
-        'Get-CimInstance Win32_Battery | Select-Object -ExpandProperty EstimatedChargeRemaining'
-      ],
-      { timeout: BATTERY_QUERY_TIMEOUT_MS, windowsHide: true },
-      (error, stdout) => {
-        if (error) {
-          resolve(null);
-          return;
-        }
-        const values = String(stdout || '')
-          .split(/\r?\n/)
-          .map((line) => Number(line.trim()))
-          .filter((value) => Number.isFinite(value));
-        if (values.length === 0) {
-          resolve(null);
-          return;
-        }
-        const percent = Math.round(
-          values.reduce((sum, value) => sum + value, 0) / values.length
-        );
-        resolve({ percent: Math.min(100, Math.max(0, percent)) });
-      }
-    );
-  });
-}
-
-/** 周期刷新电池缓存（避免每 2s 拉起 PowerShell） */
-async function refreshBatteryCache() {
-  if (process.platform !== 'win32') {
-    batteryPercentCache = null;
-    return;
-  }
-  try {
-    const info = await readBatteryInfo();
-    batteryPercentCache = info && info.percent != null ? info.percent : null;
-  } catch (error) {
-    console.warn('[widgets] 电池状态读取失败：', error);
-    batteryPercentCache = null;
-  }
-}
-
-/** 组装当前系统状态（同步读取，可直接推送/测试） */
-function readSystemStatus() {
-  const cpuPercent = readCpuPercent();
-  const memory = readMemoryStatus();
-  const onBattery =
-    powerMonitor && typeof powerMonitor.isOnBatteryPower === 'function'
-      ? powerMonitor.isOnBatteryPower()
-      : false;
-  const batteryState =
-    batteryPercentCache == null
-      ? onBattery
-        ? 'battery'
-        : 'ac'
-      : onBattery
-        ? 'battery'
-        : 'charging';
-  return {
-    cpuPercent,
-    memPercent: memory.memPercent,
-    memUsedGb: memory.memUsedGb,
-    memTotalGb: memory.memTotalGb,
-    batteryPercent: batteryPercentCache,
-    batteryState
-  };
-}
-
-/** 推送系统状态到渲染层（复用 idle:event 通道，payload.type 区分） */
-async function broadcastSystemStatus() {
-  consumePomodoroNotificationRequest(); // T-21：番茄钟完成信号（先通知后随状态推送）
-  if (
-    !mainWindow ||
-    mainWindow.isDestroyed() ||
-    !mainWindow.webContents ||
-    mainWindow.webContents.isDestroyed()
-  ) {
-    return;
-  }
-  let status;
-  try {
-    status = readSystemStatus();
-  } catch (error) {
-    console.warn('[widgets] 读取系统状态失败：', error);
-    return;
-  }
-  mainWindow.webContents.send(ipc.CHANNELS.idleEvent, {
-    type: 'system-status',
-    status,
-    at: Date.now()
-  });
-}
-
-/** 电源插拔事件：立即刷新电池并推送 */
-function handlePowerChange() {
-  void refreshBatteryCache().then(() => broadcastSystemStatus());
-}
-
-function startSystemStatusWidgets() {
-  stopSystemStatusWidgets();
-  void refreshBatteryCache();
-  void broadcastSystemStatus();
-  statusTimer = setInterval(() => void broadcastSystemStatus(), STATUS_POLL_MS);
-  batteryTimer = setInterval(() => void refreshBatteryCache(), BATTERY_POLL_MS);
-  try {
-    powerMonitor.on('on-ac', handlePowerChange);
-    powerMonitor.on('on-battery', handlePowerChange);
-  } catch (error) {
-    console.warn('[widgets] 电源事件监听不可用：', error);
-  }
-}
-
-function stopSystemStatusWidgets() {
-  if (statusTimer) {
-    clearInterval(statusTimer);
-    statusTimer = null;
-  }
-  if (batteryTimer) {
-    clearInterval(batteryTimer);
-    batteryTimer = null;
-  }
-  try {
-    powerMonitor.removeListener('on-ac', handlePowerChange);
-    powerMonitor.removeListener('on-battery', handlePowerChange);
-  } catch (_error) {
-    // 监听移除失败不影响退出
-  }
 }
 
 /* ---------------- T-21：番茄钟 Notification ---------------- */
@@ -359,6 +162,23 @@ function consumePomodoroNotificationRequest() {
     console.warn('[pomodoro] 清除通知信号失败：', error);
   }
   showPomodoroNotification(minutes);
+}
+
+/** 启动番茄钟完成信号轮询（替代原系统状态轮询中的消费调用） */
+function startPomodoroNotificationPolling() {
+  stopPomodoroNotificationPolling();
+  consumePomodoroNotificationRequest();
+  pomodoroTimer = setInterval(
+    consumePomodoroNotificationRequest,
+    POMODORO_POLL_MS
+  );
+}
+
+function stopPomodoroNotificationPolling() {
+  if (pomodoroTimer) {
+    clearInterval(pomodoroTimer);
+    pomodoroTimer = null;
+  }
 }
 
 /* ---------------- T-19：窗口设置读写 ---------------- */
@@ -992,7 +812,7 @@ if (SKIP_BOOTSTRAP || !app || typeof app.requestSingleInstanceLock !== 'function
     loadWindowSettings(); // T-19: 读取贴边/快捷键开关
     createMainWindow();
     registerWindowIpc(); // T-19: window:toggle-dock / window:set-shortcut
-    startSystemStatusWidgets(); // T-21: CPU/内存/电池状态推送
+    startPomodoroNotificationPolling(); // T-21: 消费番茄钟完成信号（系统状态轮询已移除）
     if (shortcutEnabled && !tryRegisterShortcut()) {
       // 快捷键被其他应用占用：自动关闭并持久化，避免每次启动重试
       shortcutEnabled = false;
@@ -1034,7 +854,7 @@ if (SKIP_BOOTSTRAP || !app || typeof app.requestSingleInstanceLock !== 'function
 
   app.on('before-quit', () => {
     isQuitting = true;
-    stopSystemStatusWidgets(); // T-21: 退出前停止状态轮询
+    stopPomodoroNotificationPolling(); // T-21: 退出前停止番茄钟信号轮询
     if (mainWindow && !mainWindow.isDestroyed() && !dockedEdge) {
       persistWindowBounds(mainWindow.getBounds()); // T-19: 退出前记忆位置
     }
@@ -1052,13 +872,6 @@ if (SKIP_BOOTSTRAP || !app || typeof app.requestSingleInstanceLock !== 'function
 }
 
 module.exports = {
-  sampleCpuTimes,
-  readCpuPercent,
-  readMemoryStatus,
-  readBatteryInfo,
-  refreshBatteryCache,
-  readSystemStatus,
-  broadcastSystemStatus,
   getMainTranslator,
   showPomodoroNotification,
   consumePomodoroNotificationRequest

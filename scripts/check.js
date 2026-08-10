@@ -99,6 +99,99 @@ if (!rendererIndexSource.includes('密钥仅保存在本机')) {
 }
 pass('renderer 设置页 API Key/模型输入存在');
 
+// T-30：系统状态小部件已移除（主进程/UI/设置/文案/存储全触点回归断言）
+const mainSource = fs.readFileSync(path.join(root, 'src', 'main', 'main.js'), 'utf8');
+const forbiddenMain = [
+  'readSystemStatus',
+  'broadcastSystemStatus',
+  'startSystemStatusWidgets',
+  'stopSystemStatusWidgets',
+  'STATUS_POLL_MS',
+  'BATTERY_POLL_MS',
+  'powerMonitor'
+];
+for (const token of forbiddenMain) {
+  if (mainSource.includes(token)) {
+    fail(`main.js 仍包含已移除的系统状态代码：${token}`);
+  }
+}
+for (const token of [
+  'createIdleMonitor',
+  'consumePomodoroNotificationRequest',
+  'startPomodoroNotificationPolling'
+]) {
+  if (!mainSource.includes(token)) {
+    fail(`main.js 缺少保留能力：${token}`);
+  }
+}
+pass('main.js 系统状态轮询已移除，idle/番茄钟保留');
+
+const forbiddenIndex = [
+  'widgets-panel',
+  'system-status-widget',
+  'widget-stats',
+  'stat-cpu',
+  'stat-mem',
+  'stat-battery',
+  'widgets-toggle',
+  'widgets-enabled',
+  'widgets.'
+];
+for (const token of forbiddenIndex) {
+  if (rendererIndexSource.includes(token)) {
+    fail(`index.html 仍包含系统状态小部件标记：${token}`);
+  }
+}
+if (!rendererIndexSource.includes('pomodoro-widget')) {
+  fail('index.html 缺少番茄钟小部件（不应被误删）');
+}
+pass('index.html 系统状态小部件与设置入口已移除，番茄钟保留');
+
+const forbiddenRenderer = [
+  'applySystemStatus',
+  'toggleWidgets',
+  'syncWidgetsVisibility',
+  'lastSystemStatus',
+  'widgetsEnabled',
+  'widgetsToggle',
+  'widgetsPanel'
+];
+for (const token of forbiddenRenderer) {
+  if (rendererChatSource.includes(token)) {
+    fail(`chat.js 仍包含系统状态逻辑：${token}`);
+  }
+}
+if (!rendererChatSource.includes('subscribeIdle')) {
+  fail('chat.js 缺少 idle 空闲互动订阅（不应被误删）');
+}
+pass('chat.js 系统状态逻辑已移除，idle 订阅保留');
+
+const currentStore = require(path.join(root, 'src', 'storage', 'store.js'));
+if (currentStore.DEFAULT_SETTINGS.widgetsEnabled !== undefined) {
+  fail('DEFAULT_SETTINGS.widgetsEnabled 应已移除');
+}
+pass('store.js widgetsEnabled 字段已移除');
+
+for (const localeFile of ['zh-CN', 'en']) {
+  const locale = JSON.parse(
+    fs.readFileSync(
+      path.join(root, 'src', 'shared', 'locales', `${localeFile}.json`),
+      'utf8'
+    )
+  );
+  if (locale.widgets !== undefined) {
+    fail(`${localeFile}.json 仍包含 widgets.* 文案`);
+  }
+  if (
+    !locale.idle ||
+    !Array.isArray(locale.idle.phrases) ||
+    locale.idle.phrases.length === 0
+  ) {
+    fail(`${localeFile}.json 缺少 idle 主动话术（不应被误删）`);
+  }
+}
+pass('语言包 widgets.* 文案已移除，idle 话术保留');
+
 // T-08：store persona 默认值、读写与清洗（非法值丢弃/超长截断，不破坏 settings.json）
 const { createStore, DEFAULT_SETTINGS } = require(path.join(
   root,
