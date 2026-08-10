@@ -208,3 +208,14 @@
   2. 待确认：全局快捷键是否移除（倾向移除）；系统状态小部件是否移除（倾向移除）；贴边交互预期行为（自动隐藏 vs 靠边吸附）；人格模板文案精简幅度。
   3. “多线程开发/”（约 5GB，12 个 worktree 副本）确认为项目开发内容，暂时保留，不删除；`scripts/orchestrator/` 去留由用户决定，若入库须先修复已知缺陷。
 - 后果：收尾优化按“一个会话一个任务”拆卡实施；涉及契约（如新增 `window.minimize`、移除 `window.setShortcutEnabled`）的变更需协调者先行修订 contracts.js/API.md 后再实施；UI 大改不进本批次，作为独立里程碑评估。
+
+## ADR-026：收尾任务确认与契约变更（2026-08-10）
+
+- 状态：Accepted
+- 背景：用户确认三项收尾决策：① 移除全局快捷键（T-29）；② 移除系统状态小部件（T-30）；③ 贴边采用方案 B（靠边吸附、不自动隐藏，T-31）。同时 T-25 需要“最小化到任务栏”能力，现有契约只有 `window.hide`（隐藏到托盘）。
+- 决策：
+  1. 契约新增 `petAPI.window.minimize()` / IPC `window:minimize`（主进程 `BrowserWindow.minimize`）。
+  2. 契约移除 `petAPI.window.setShortcutEnabled()` / IPC `window:set-shortcut`；T-29 实施时同步清理 preload、main、store、renderer 与 locale。
+  3. T-30 整体移除系统状态小部件（CPU/内存/电池）及主进程轮询，保留 idle 主动话术。
+  4. T-31 贴边改为“靠边吸附不自动隐藏”（方案 B）：拖到屏幕边缘吸附对齐，不缩成细条自动隐藏；位置记忆保留。
+- 后果：contracts.js、docs/API.md 已同步冻结；T-25/T-29 线程按新契约实施，任务卡状态更新为“可分配”；T-30/T-31 按确认方案实施。

@@ -67,7 +67,9 @@ const DEFAULT_MODEL = 'deepseek-v4-flash';
  * - settings.get() -> Promise<AppSettings>
  * - settings.set(patch) -> Promise<AppSettings>
  * - window.hide() -> Promise<void>（隐藏主窗口到托盘，应用不退出）
+ * - window.minimize() -> Promise<void>（最小化到任务栏，T-25 冻结，ADR-026）
  * - history.get() -> Promise<ChatMessage[]>（M2：启动时恢复历史显示）
+ * 注：window.setShortcutEnabled 已按 ADR-026 从契约移除（T-29 实施清理）。
  */
 
 /** 短期记忆窗口大小（M2 默认最近 20 条消息） */

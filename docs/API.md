@@ -19,7 +19,10 @@ window.petAPI = {
     get() -> Promise<AppSettings>
     set(patch) -> Promise<AppSettings>
   },
-  window: { hide() -> Promise<void> },
+  window: {
+    hide() -> Promise<void>,          // 隐藏到托盘
+    minimize() -> Promise<void>       // M3.5 收尾 T-25：最小化到任务栏（ADR-026 冻结）
+  },
   history: { get() -> Promise<ChatMessage[]> }
 }
 ```
@@ -41,11 +44,12 @@ window.petAPI = {
 | `chat:stream-cancel` | renderer→main invoke | 取消当前流 |
 | `settings:get` / `settings:set` | invoke | 设置读写（apiKey 经 secure-settings 加解密） |
 | `window:hide` | invoke | 隐藏主窗口到托盘 |
+| `window:minimize` | invoke | M3.5 收尾 T-25：最小化主窗口到任务栏（ADR-026 冻结） |
 | `history:get` | invoke | 返回归一化消息历史 |
 | `mood:get` | invoke | M3.5：返回当前情绪状态 |
 | `memory:list` / `memory:delete` | invoke | M3.5：长期记忆列表/删除 |
 | `history:export` / `history:clear` | invoke | M3.5：导出对话 / 清除数据 |
-| `window:toggle-dock` / `window:set-shortcut` | invoke | M3.5：贴边隐藏开关 / 快捷键开关 |
+| `window:toggle-dock` | invoke | M3.5：贴边开关（T-31 起语义改为“靠边吸附”，ADR-026） |
 
 ## 3. 内部模块接口
 
@@ -77,8 +81,9 @@ petAPI.memory.update(id: string, patch: { content: string }) -> Promise<{ ok: bo
 petAPI.history.export({ format?: 'markdown' | 'json' }) -> Promise<{ ok: boolean, filePath?: string, error?: string }>
 petAPI.history.clear({ scope?: 'messages' | 'memories' | 'settings' | 'all' }) -> Promise<{ ok: boolean, error?: string }>
 petAPI.window.toggleDock() -> Promise<{ docked: boolean }>
-petAPI.window.setShortcutEnabled(enabled: boolean) -> Promise<{ enabled: boolean }>
+petAPI.window.minimize() -> Promise<void>
 ```
 
-- settings 扩展字段（由对应任务卡在 store.js 白名单登记）：`idleEnabled`（T-15）、`onboardingDone`（T-18/首次引导）、`shortcutEnabled` 与窗口位置（T-19）。
+- settings 扩展字段（由对应任务卡在 store.js 白名单登记）：`idleEnabled`（T-15）、`onboardingDone`（T-18/首次引导）、窗口位置（T-19）。`shortcutEnabled` 已按 ADR-026 决定移除（T-29 实施清理）。
+- 变更记录（ADR-026，2026-08-10）：新增 `window.minimize` / IPC `window:minimize`；移除 `window.setShortcutEnabled` / IPC `window:set-shortcut`。
 - 以上签名对 T-15~T-18 及后续任务卡生效；实施前如需调整，先回报协调者修订本文档。
