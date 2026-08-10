@@ -6,7 +6,7 @@
 - 最近完成：T-24~T-31 全部合并（check/smoke 通过）；worktree 清理；ADR-027/T-33 需求落盘
 - 下一步：用户确认 T-32/T-33 优先级；随后整体 UI 目检与 M4 分发规划
 - 阻塞：无
-- 交接提示：新会话先读 `AGENTS.md` → `PLAN.md` → 自己的任务卡（docs/tasks/T-xx.md）
+- 交接提示：新会话先读 `AGENTS.md` → `PLAN.md` → `docs/STATUS.md` → `docs/reports/2026-08-10-工作对接方案.md` → 自己的任务卡（docs/tasks/T-xx.md）
 
 ## M1 集成完成记录（2026-08-09）
 
