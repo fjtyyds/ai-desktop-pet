@@ -23,9 +23,18 @@ window.petAPI = {
     hide() -> Promise<void>,          // 隐藏到托盘
     minimize() -> Promise<void>       // M3.5 收尾 T-25：最小化到任务栏（ADR-026 冻结）
   },
-  history: { get() -> Promise<ChatMessage[]> }
+  history: { get() -> Promise<ChatMessage[]> },
+  tts: {
+    speak({ text, voice, rate, pitch }) -> Promise<TtsSpeakResult>  // T-34（ADR-029）：在线神经语音合成
+  }
 }
 ```
+
+### 在线神经语音约定（ADR-029，T-34 冻结）
+
+- 渲染层调用 `petAPI.tts.speak({ text, voice, rate, pitch })` 请求主进程合成 MP3；参数 `voice` 为 Edge 神经语音 ShortName（如 `zh-CN-XiaoxiaoNeural`），`rate`/`pitch` 为 SSML 风格字符串（如 `'-5%'`、`'+8Hz'`）。
+- 返回 `{ ok: true, audioDataUrl: 'data:audio/mpeg;base64,...', error: null }` 或 `{ ok: false, audioDataUrl: null, error: string }`；失败不抛异常。
+- 渲染层负责播放/停止（HTMLAudioElement）与失败回退 speechSynthesis；主进程负责合成、超时与 LRU 缓存。
 
 ### 流式约定（ADR-021，T-14 冻结）
 
@@ -50,6 +59,7 @@ window.petAPI = {
 | `memory:list` / `memory:delete` | invoke | M3.5：长期记忆列表/删除 |
 | `history:export` / `history:clear` | invoke | M3.5：导出对话 / 清除数据 |
 | `window:toggle-dock` | invoke | M3.5：贴边开关（T-31 起语义改为“靠边吸附”，ADR-026） |
+| `tts:speak` | invoke | T-34：在线神经语音合成（参数 text/voice/rate/pitch，返回 MP3 data URL） |
 
 ## 3. 内部模块接口
 

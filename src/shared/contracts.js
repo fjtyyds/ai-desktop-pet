@@ -69,7 +69,16 @@ const DEFAULT_MODEL = 'deepseek-v4-flash';
  * - window.hide() -> Promise<void>（隐藏主窗口到托盘，应用不退出）
  * - window.minimize() -> Promise<void>（最小化到任务栏，T-25 冻结，ADR-026）
  * - history.get() -> Promise<ChatMessage[]>（M2：启动时恢复历史显示）
+ * - tts.speak({ text, voice, rate, pitch }) -> Promise<TtsSpeakResult>（T-34 冻结，ADR-029）
  * 注：window.setShortcutEnabled 已按 ADR-026 从契约移除（T-29 实施清理）。
+ */
+
+/**
+ * T-34（ADR-029）：在线神经语音合成结果。
+ * @typedef {Object} TtsSpeakResult
+ * @property {boolean} ok 是否合成成功
+ * @property {string|null} audioDataUrl 成功时的 audio/mpeg data URL（base64）
+ * @property {string|null} error 失败原因（不抛异常）
  */
 
 /** 短期记忆窗口大小（M2 默认最近 20 条消息） */

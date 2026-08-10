@@ -233,3 +233,15 @@
 - 背景：`scripts/orchestrator/` 为自动化实验产物，从未入库；其去留待用户决定，T-32（orchestrator 缺陷修复）也以“是否入库”为前提。2026-08-10 用户明确决定不入库。
 - 决策：`scripts/orchestrator/` 保留为本地未跟踪目录，不加入版本库、不提交 main；T-32 任务关闭，不派发、不实施缺陷修复；后续如需自动化闭环能力，另行评估替代方案。
 - 后果：项目路线图不再包含 orchestrator 修复；该目录继续占用本地磁盘但不进入 git；未来若改变决策重新入库，需先补齐已知缺陷（多 `--task` 参数、token/时间预算、selftest）并重开任务卡。
+
+## ADR-029：TTS 改用 Edge 在线神经语音（自研最小客户端）（2026-08-10）
+
+- 状态：Accepted
+- 背景：T-33 语音包实测听感无差异且生硬（用户验收反馈）。根因：本机 Web Speech 只暴露 SAPI 系统音（Huihui/Kangkang/Yaoyao 等），6 套语音包的 voice 偏好最终都落到同一批系统音，且 Chromium 对 pitch/rate 支持有限；系统 TTS 无法提供“人味”。已实测 `speechSynthesis.getVoices()` 仅 6 个系统音；第三方 npm 包 edge-tts（ESM+TS，Node 拒绝剥离 node_modules 内类型）与 msedge-tts（返回固定 4KB/空流）均不可用。
+- 决策：
+  1. 新增自研最小 Edge 在线神经语音客户端 `src/main/tts-edge.js`（协议参照 rany2/edge-tts，MIT；已验证可稳定产出 MP3），不依赖第三方 TTS 包；主进程经 wss 连接 speech.platform.bing.com，生成 Sec-MS-GEC 令牌，发送 speech.config + SSML，解析二进制音频帧。
+  2. 6 套人格映射 6 个中文神经音色：warm→Xiaoxiao、sage→Yunyang、playful→Yunxi、gentle→Xiaoyi、cool→Yunjian、curious→Yunxia，各配 rate/pitch（已通过官方 voice list 确认全部存在）。
+  3. 契约新增 `petAPI.tts.speak({ text, voice, rate, pitch })`（IPC `tts:speak`），主进程返回 audio/mpeg data URL；渲染层用 HTMLAudioElement 播放；失败/离线自动回退 speechSynthesis（保留现有行为）。
+  4. CSP 增加 `media-src 'self' data:`；依赖显式新增 `ws`（WebSocket 需自定义头，Node 全局 WebSocket 不支持）。
+  5. 不新增 settings 字段：沿用 `ttsVoicePackEnabled`/`ttsVoicePackId`。
+- 后果：联网时获得自然、区分度高的神经语音；离线回退系统 TTS（音质降级但可用）；新增网络调用与 MP3 缓存开销（主进程 LRU 缓存）；微软在线服务为免费非正式接口，未来若失效由回退兜底。
