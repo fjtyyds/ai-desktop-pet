@@ -15,6 +15,49 @@
       <header class="drag-bar">
         <span id="header-title" class="drag-bar-title">AI 桌宠</span>
         <div class="drag-bar-actions">
+          <!-- T-25：导出对话移入聊天工具栏（设置页导出区块已移除） -->
+          <div id="toolbar-export" class="toolbar-export">
+            <button
+              id="export-btn"
+              class="icon-btn"
+              type="button"
+              title="导出对话"
+              aria-label="导出对话"
+              aria-haspopup="menu"
+              aria-expanded="false"
+              data-i18n-title="data.exportTitle"
+              data-i18n-aria-label="data.exportTitle"
+            >⇩</button>
+            <div
+              id="export-menu"
+              class="export-menu"
+              role="menu"
+              aria-label="导出对话"
+              data-i18n-aria-label="data.exportTitle"
+              hidden
+            >
+              <button
+                id="export-md"
+                class="export-menu-item"
+                type="button"
+                role="menuitem"
+                data-i18n="data.exportMarkdown"
+              >导出 Markdown</button>
+              <button
+                id="export-json"
+                class="export-menu-item"
+                type="button"
+                role="menuitem"
+                data-i18n="data.exportJson"
+              >导出 JSON</button>
+              <p
+                id="export-status"
+                class="settings-status export-status"
+                role="status"
+                hidden
+              ></p>
+            </div>
+          </div>
           <button
             id="settings-btn"
             class="icon-btn"
@@ -24,6 +67,15 @@
             data-i18n-title="settings.title"
             data-i18n-aria-label="settings.title"
           >⚙</button>
+          <button
+            id="minimize-btn"
+            class="icon-btn"
+            type="button"
+            title="最小化到任务栏"
+            aria-label="最小化"
+            data-i18n-title="window.minimizeTitle"
+            data-i18n-aria-label="window.minimize"
+          >—</button>
           <button
             id="close-btn"
             class="icon-btn"
@@ -381,26 +433,6 @@
             >保存设置</button
           >
           <p id="settings-status" class="settings-status" role="status" hidden></p>
-
-          <div class="field">
-            <span class="field-label" data-i18n="data.exportTitle">导出对话</span>
-            <span class="field-hint" data-i18n="data.exportHint"
-              >将聊天记录导出为 Markdown 或 JSON 文件，保存在你选择的位置。</span
-            >
-            <button
-              id="export-md"
-              class="primary-btn"
-              type="button"
-              data-i18n="data.exportMarkdown"
-            >导出 Markdown</button>
-            <button
-              id="export-json"
-              class="primary-btn"
-              type="button"
-              data-i18n="data.exportJson"
-            >导出 JSON</button>
-            <p id="export-status" class="settings-status" role="status" hidden></p>
-          </div>
 
           <div class="field">
             <span class="field-label" data-i18n="data.clearTitle">清除数据</span>

@@ -32,7 +32,8 @@ let idleMonitor = null;
 /** T-19：窗口体验 IPC 通道（ADR-022 冻结契约；preload.js 同名常量保持一致） */
 const WINDOW_CHANNELS = {
   toggleDock: 'window:toggle-dock',
-  setShortcut: 'window:set-shortcut'
+  setShortcut: 'window:set-shortcut',
+  minimize: 'window:minimize' // T-25：最小化到任务栏（ADR-026 冻结契约）
 };
 
 /** T-19：全局快捷键候选（优先 Ctrl+Alt+P，冲突时依次尝试备用键） */
@@ -883,9 +884,19 @@ function handleSetShortcutEnabled(_event, enabled) {
   return { enabled: shortcutEnabled };
 }
 
+/** T-25：最小化到任务栏（区别于 ✕ 隐藏到托盘；ADR-026 冻结契约） */
+function handleWindowMinimize(event) {
+  ipc.notifyActivity(); // T-15：点击最小化视为交互
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (win && !win.isDestroyed()) {
+    win.minimize();
+  }
+}
+
 function registerWindowIpc() {
   ipcMain.handle(WINDOW_CHANNELS.toggleDock, handleToggleDock);
   ipcMain.handle(WINDOW_CHANNELS.setShortcut, handleSetShortcutEnabled);
+  ipcMain.handle(WINDOW_CHANNELS.minimize, handleWindowMinimize);
 }
 
 /* ---------------- 窗口生命周期 ---------------- */
@@ -927,6 +938,9 @@ function createMainWindow() {
   win.on('hide', () => {
     trayApi?.refreshMenu();
     stopDockPolling(); // T-19: 隐藏到托盘时停止贴边轮询
+  });
+  win.on('minimize', () => {
+    stopDockPolling(); // T-25：最小化时停止贴边轮询，避免对最小化窗口做位置动画
   });
   win.on('focus', () => {
     idleMonitor?.markActivity(); // T-15: 聚焦视为交互

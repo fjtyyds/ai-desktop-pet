@@ -57,7 +57,9 @@
   },
   "window": {
     "close": "Close",
-    "closeTitle": "Close (hide to tray)"
+    "closeTitle": "Close (hide to tray)",
+    "minimize": "Minimize",
+    "minimizeTitle": "Minimize to taskbar"
   },
   "weather": {
     "widgetAriaLabel": "Weather widget",
