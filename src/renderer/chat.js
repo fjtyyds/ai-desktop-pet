@@ -19,6 +19,8 @@
  * - T-22 天气小部件：设置页开关 + 城市配置（weatherEnabled/weatherCity），
  *   角色面板顶部可选展示实时天气；刷新按钮与失败降级（缓存上次成功数据），
  *   数据源 Open-Meteo 无需 API Key，网络请求在主进程完成
+ * - T-24 窗口布局与可缩放：天气小部件默认收起/可折叠，展开后不遮挡
+ *   消息区与输入框；移除底部平台/版本信息（配合 renderer.js/index.html/locales）
  * - T-21 系统状态与番茄钟：小部件面板展示 CPU/内存/电池（主进程复用 idle:event
  *   推送 { type: 'system-status' }）；本地番茄钟计时，完成时写入 settings 通知信号
  *   （pomodoroNotifyAt），由主进程轮询消费并弹系统通知；面板可收起、设置可关闭
@@ -284,6 +286,7 @@
   let weatherLoading = false;
   let weatherLastFetchAt = 0;
   let weatherTimer = null;
+  let weatherCollapsed = true; // T-24：天气小部件默认收起（仅保留摘要行）
   // T-21：小部件与番茄钟状态
   let lastSystemStatus = null;
   let pomodoroStatusTimer = null;
@@ -339,6 +342,7 @@
       weatherTemp: document.getElementById('weather-temp'),
       weatherMeta: document.getElementById('weather-meta'),
       weatherRefresh: document.getElementById('weather-refresh'),
+      weatherToggle: document.getElementById('weather-toggle'),
       weatherEnabled: document.getElementById('weather-enabled'),
       weatherCity: document.getElementById('weather-city'),
       headerTitle: document.getElementById('header-title'),
@@ -591,6 +595,7 @@
       pokeActivity();
       void refreshWeather(true);
     });
+    elements.weatherToggle.addEventListener('click', toggleWeatherCollapsed);
     elements.onboardingLanguage.addEventListener(
       'change',
       handleOnboardingLanguageChange
@@ -1481,6 +1486,7 @@
     }
     const enabled = currentSettings.weatherEnabled === true && hasWeatherApi();
     elements.weatherWidget.hidden = !enabled;
+    applyWeatherCollapsed(); // T-24：显示/隐藏时同步折叠状态
     if (!enabled) {
       if (weatherTimer) {
         clearInterval(weatherTimer);
@@ -1494,6 +1500,30 @@
         WEATHER_AUTO_REFRESH_MS
       );
     }
+  }
+
+  /** T-24：按折叠状态切换天气摘要/详情（默认收起） */
+  function applyWeatherCollapsed() {
+    if (!elements.weatherWidget || !elements.weatherToggle) {
+      return;
+    }
+    elements.weatherWidget.classList.toggle('collapsed', weatherCollapsed);
+    elements.weatherToggle.setAttribute(
+      'aria-expanded',
+      String(!weatherCollapsed)
+    );
+    const t = weatherTranslator();
+    const key = weatherCollapsed ? 'weather.expand' : 'weather.collapse';
+    elements.weatherToggle.title = t(key);
+    elements.weatherToggle.setAttribute('aria-label', t(key));
+    elements.weatherToggle.textContent = weatherCollapsed ? '▸' : '▾';
+  }
+
+  /** T-24：点击切换天气小部件展开/收起 */
+  function toggleWeatherCollapsed() {
+    pokeActivity();
+    weatherCollapsed = !weatherCollapsed;
+    applyWeatherCollapsed();
   }
 
   /** 从设置同步天气开关与城市输入框（applySettings 时调用） */
@@ -1996,23 +2026,9 @@
 
     elements.headerTitle.textContent = currentPetName;
     renderServiceStatus();
-    applyMeta();
     applyOnboardingText(); // T-20：引导与人格模板静态文案（内联双语）
     applyWeatherText(); // T-22：语言切换后重绘天气动态文案
-  }
-
-  /** 底部 meta（平台/版本）；renderer.js 先行写入中文，这里按当前语言覆盖 */
-  function applyMeta() {
-    const meta = document.getElementById('meta');
-    if (meta && window.petAPI) {
-      meta.textContent = window.PetLocales.createTranslator(currentLocale)(
-        'meta.platformVersion',
-        {
-          platform: window.petAPI.platform,
-          version: window.petAPI.version
-        }
-      );
-    }
+    applyWeatherCollapsed(); // T-24：语言切换后刷新折叠按钮文案
   }
 
   /** 将设置应用到表单与标题（缺失字段回退默认值） */

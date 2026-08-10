@@ -3,9 +3,6 @@
     "name": "AI 桌宠",
     "defaultPetName": "AI 桌宠"
   },
-  "meta": {
-    "platformVersion": "平台：{platform} · 版本 {version}"
-  },
   "chat": {
     "viewAriaLabel": "聊天",
     "inputAriaLabel": "聊天输入框",
@@ -64,6 +61,8 @@
   },
   "weather": {
     "widgetAriaLabel": "天气小部件",
+    "collapse": "收起天气",
+    "expand": "展开天气",
     "settingsLabel": "天气小部件",
     "settingsHint": "在角色面板显示实时天气，城市可自由配置；数据来自 Open-Meteo，无需 API Key。",
     "city": "城市",

@@ -59,6 +59,10 @@ const BATTERY_POLL_MS = 15000;
 const BATTERY_QUERY_TIMEOUT_MS = 3000;
 const DEFAULT_POMODORO_MINUTES = 25;
 
+/** T-24：窗口可缩放的最小尺寸（建议 ≥280×360） */
+const MIN_WINDOW_WIDTH = 280;
+const MIN_WINDOW_HEIGHT = 360;
+
 /** T-19：贴边状态 */
 let dockEnabled = true;
 let shortcutEnabled = true;
@@ -381,13 +385,22 @@ function loadWindowSettings() {
   }
 }
 
-/** 持久化窗口位置（T-19：位置记忆） */
+/** 持久化窗口位置与尺寸（T-19 位置记忆；T-24 可缩放后一并保存尺寸） */
 function persistWindowBounds(bounds) {
   if (!bounds || !Number.isFinite(bounds.x) || !Number.isFinite(bounds.y)) {
     return;
   }
   writeWindowSettings({
-    windowBounds: { x: Math.round(bounds.x), y: Math.round(bounds.y) }
+    windowBounds: {
+      x: Math.round(bounds.x),
+      y: Math.round(bounds.y),
+      width: Number.isFinite(bounds.width)
+        ? Math.max(MIN_WINDOW_WIDTH, Math.round(bounds.width))
+        : 320,
+      height: Number.isFinite(bounds.height)
+        ? Math.max(MIN_WINDOW_HEIGHT, Math.round(bounds.height))
+        : 420
+    }
   });
 }
 
@@ -396,7 +409,16 @@ function getStoredWindowBounds() {
     const settings = ipc.getSettings();
     const bounds = settings && settings.windowBounds;
     if (bounds && Number.isFinite(bounds.x) && Number.isFinite(bounds.y)) {
-      return { x: Math.round(bounds.x), y: Math.round(bounds.y) };
+      return {
+        x: Math.round(bounds.x),
+        y: Math.round(bounds.y),
+        width: Number.isFinite(bounds.width)
+          ? Math.max(MIN_WINDOW_WIDTH, Math.round(bounds.width))
+          : 320,
+        height: Number.isFinite(bounds.height)
+          ? Math.max(MIN_WINDOW_HEIGHT, Math.round(bounds.height))
+          : 420
+      };
     }
   } catch (_error) {
     // 设置读取失败时回退默认位置
@@ -423,7 +445,11 @@ function resolveInitialWindowBounds() {
   if (!saved) {
     return {};
   }
-  const candidate = { ...saved, width: 320, height: 420 };
+  const candidate = {
+    ...saved,
+    width: Math.max(MIN_WINDOW_WIDTH, saved.width || 320),
+    height: Math.max(MIN_WINDOW_HEIGHT, saved.height || 420)
+  };
   return isBoundsVisibleOnAnyDisplay(candidate) ? saved : {};
 }
 
@@ -869,13 +895,15 @@ function createMainWindow() {
 
   const savedPosition = resolveInitialWindowBounds(); // T-19: 位置恢复
   const win = new BrowserWindow({
-    ...savedPosition,
     width: 320,
     height: 420,
+    minWidth: MIN_WINDOW_WIDTH, // T-24：可缩放并设置合理最小尺寸
+    minHeight: MIN_WINDOW_HEIGHT,
+    ...savedPosition, // T-19/T-24：恢复位置与已保存的窗口尺寸
     frame: false,
     transparent: true,
     alwaysOnTop: true,
-    resizable: false,
+    resizable: true, // T-24：窗口可缩放，聊天区随窗口自适应
     hasShadow: false,
     backgroundColor: '#00000000',
     icon: loadAppIcon(), // T-10: 正式图标（assets/icon.png，内嵌 base64 回退）

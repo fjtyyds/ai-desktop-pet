@@ -99,6 +99,68 @@ if (!rendererIndexSource.includes('密钥仅保存在本机')) {
 }
 pass('renderer 设置页 API Key/模型输入存在');
 
+// T-24：窗口可缩放、小部件可折叠、移除底部平台/版本信息
+const mainSource = fs.readFileSync(
+  path.join(root, 'src', 'main', 'main.js'),
+  'utf8'
+);
+if (!mainSource.includes('resizable: true')) {
+  fail('main.js 未启用窗口可缩放（resizable: true）');
+}
+const minWidthDef = mainSource.match(/const MIN_WINDOW_WIDTH\s*=\s*(\d+)/);
+const minHeightDef = mainSource.match(/const MIN_WINDOW_HEIGHT\s*=\s*(\d+)/);
+if (!minWidthDef || Number(minWidthDef[1]) < 280) {
+  fail('main.js 缺少合理最小窗口宽度（建议 ≥280）');
+}
+if (!minHeightDef || Number(minHeightDef[1]) < 360) {
+  fail('main.js 缺少合理最小窗口高度（建议 ≥360）');
+}
+if (
+  !mainSource.includes('minWidth: MIN_WINDOW_WIDTH') ||
+  !mainSource.includes('minHeight: MIN_WINDOW_HEIGHT')
+) {
+  fail('main.js 未将最小尺寸应用到 BrowserWindow');
+}
+pass('窗口可缩放且最小尺寸合理');
+
+const rendererSource = fs.readFileSync(
+  path.join(root, 'src', 'renderer', 'renderer.js'),
+  'utf8'
+);
+if (
+  rendererSource.includes('platformVersion') ||
+  rendererSource.includes('meta.textContent')
+) {
+  fail('renderer.js 仍写入底部平台/版本信息');
+}
+if (
+  rendererIndexSource.includes('id="meta"') ||
+  rendererIndexSource.includes('class="meta"')
+) {
+  fail('index.html 仍包含底部 meta footer');
+}
+for (const localeFile of ['zh-CN.json', 'en.json']) {
+  const localeSource = fs.readFileSync(
+    path.join(root, 'src', 'shared', 'locales', localeFile),
+    'utf8'
+  );
+  if (localeSource.includes('platformVersion')) {
+    fail(`locales/${localeFile} 仍包含 platformVersion 文案`);
+  }
+}
+pass('底部平台/版本信息已移除');
+
+if (!rendererIndexSource.includes('id="weather-toggle"')) {
+  fail('index.html 缺少天气小部件折叠按钮（weather-toggle）');
+}
+if (
+  !rendererChatSource.includes('weatherCollapsed') ||
+  !rendererChatSource.includes('toggleWeatherCollapsed')
+) {
+  fail('renderer/chat.js 缺少天气小部件折叠状态与交互');
+}
+pass('天气小部件默认收起/可折叠');
+
 // T-08：store persona 默认值、读写与清洗（非法值丢弃/超长截断，不破坏 settings.json）
 const { createStore, DEFAULT_SETTINGS } = require(path.join(
   root,
