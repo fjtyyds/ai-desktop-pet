@@ -6,7 +6,7 @@ const { ipcMain, app, BrowserWindow, dialog } = require('electron');
 const { createProvider } = require('../llm');
 const { createDefaultStore, resolveBaseDir } = require('../storage');
 const { createMemoryStore } = require('../storage/memory-store');
-const { DEFAULT_SETTINGS } = require('../storage/store');
+const { DEFAULT_SETTINGS, DEFAULT_POMODORO_MINUTES } = require('../storage/store');
 const { createChatService } = require('../llm/chat');
 const { createSecureSettings } = require('./secure-settings');
 const { createTranslator } = require('../shared/locales');
@@ -187,6 +187,36 @@ function handleSettingsSet(_event, patch) {
   provider = null;
   chatService = null;
   return { ...settings };
+}
+
+/**
+ * 消费番茄钟完成信号（T-27，幂等）：
+ * - 每次从磁盘读取最新设置，不依赖模块缓存，避免轮询读到已消费的陈旧信号；
+ * - 仅当 pomodoroNotifyAt > 0 时清零，与 handleSettingsSet 共用同一
+ *   secureSettings 实例，清零后同步更新模块缓存；
+ * - 清零失败返回 null（不弹通知），下一次轮询会重试；
+ * - 返回 { at, minutes, enabled }；无待消费信号返回 null。
+ */
+function consumePomodoroNotificationSignal() {
+  const current = getSecureSettings().readSettings();
+  const at = Number(current && current.pomodoroNotifyAt);
+  if (!(Number.isFinite(at) && at > 0)) {
+    return null;
+  }
+  const requested = Number(current && current.pomodoroNotifyMinutes);
+  const minutes =
+    Number.isFinite(requested) && requested > 0
+      ? Math.min(120, Math.max(1, Math.round(requested)))
+      : DEFAULT_POMODORO_MINUTES;
+  settings = getSecureSettings().writeSettings({
+    pomodoroNotifyAt: 0,
+    pomodoroNotifyMinutes: 0
+  });
+  return {
+    at,
+    minutes,
+    enabled: current.pomodoroEnabled !== false
+  };
 }
 
 function handleWindowHide(event) {
@@ -495,6 +525,7 @@ module.exports = {
   registerIpcHandlers,
   CHANNELS,
   getSettings,
+  consumePomodoroNotificationSignal,
   onActivity,
   notifyActivity,
   buildMarkdownExport,

@@ -23,8 +23,19 @@ fs.writeFileSync(
   'utf8'
 );
 
+// T-27：预置一个待消费的番茄钟完成信号，验证主进程消费与清零幂等
+const seedSettings = {
+  pomodoroNotifyAt: 1234567890123,
+  pomodoroNotifyMinutes: 25
+};
+fs.writeFileSync(
+  path.join(smokeUserData, 'settings.json'),
+  JSON.stringify(seedSettings),
+  'utf8'
+);
+
 // 注册 IPC 处理器（聊天/设置/历史），供端到端断言调用
-require(path.join(__dirname, '..', 'src', 'main', 'ipc'));
+const ipcModule = require(path.join(__dirname, '..', 'src', 'main', 'ipc'));
 
 process.on('exit', () => {
   try {
@@ -107,6 +118,79 @@ app.whenReady().then(() => {
       } else {
         console.log('[smoke] history.get 未提供（T-05 未合入时跳过历史断言）');
       }
+
+      // T-27：主进程消费与清零幂等（首次消费后再次消费必须返回 null；
+      // 缓存设置同步清零，普通设置保存不回写陈旧信号）
+      const firstConsume = ipcModule.consumePomodoroNotificationSignal();
+      if (
+        !firstConsume ||
+        firstConsume.minutes !== 25 ||
+        firstConsume.at !== 1234567890123
+      ) {
+        fail(`首次消费番茄钟信号结果异常: ${JSON.stringify(firstConsume)}`);
+      }
+      const secondConsume = ipcModule.consumePomodoroNotificationSignal();
+      if (secondConsume !== null) {
+        fail(`重复消费番茄钟信号未幂等: ${JSON.stringify(secondConsume)}`);
+      }
+      const afterConsume = ipcModule.getSettings();
+      if (
+        Number(afterConsume.pomodoroNotifyAt) !== 0 ||
+        Number(afterConsume.pomodoroNotifyMinutes) !== 0
+      ) {
+        fail('消费后设置缓存未清零（陈旧信号仍可被轮询读到）');
+      }
+      const normalSave = await win.webContents.executeJavaScript(
+        `window.petAPI.settings.set({ petName: 'smoke 保存' })`
+      );
+      if (Number(normalSave.pomodoroNotifyAt) !== 0) {
+        fail('普通设置保存回写了已消费的陈旧信号');
+      }
+      console.log('[smoke] pomodoro 通知信号消费幂等通过');
+
+      // T-27：渲染层倒计时结束只写一次信号，主进程消费一次后不再重复
+      const pomodoroRun = await win.webContents.executeJavaScript(`(async () => {
+        if (!window.ChatUI || typeof window.ChatUI.startPomodoro !== 'function') {
+          return { supported: false };
+        }
+        window.ChatUI.startPomodoro(1 / 60); // T-21 快捷入口：约 1 秒倒计时
+        const started = Date.now();
+        while (Date.now() - started < 5000) {
+          if (window.ChatUI.getPomodoroState().mode === 'finished') {
+            return { supported: true, state: window.ChatUI.getPomodoroState() };
+          }
+          await new Promise((resolve) => setTimeout(resolve, 50));
+        }
+        return { supported: true, state: window.ChatUI.getPomodoroState() };
+      })()`);
+      if (pomodoroRun.supported) {
+        if (pomodoroRun.state.mode !== 'finished') {
+          fail(`番茄钟未在预期时间内结束: ${JSON.stringify(pomodoroRun.state)}`);
+        }
+        let pendingAt = 0;
+        for (let i = 0; i < 50; i += 1) {
+          pendingAt = Number(ipcModule.getSettings().pomodoroNotifyAt);
+          if (pendingAt > 0) {
+            break;
+          }
+          await new Promise((resolve) => setTimeout(resolve, 50));
+        }
+        if (pendingAt <= 0) {
+          fail('渲染层倒计时结束未写入 pomodoroNotifyAt 信号');
+        }
+        const runConsume1 = ipcModule.consumePomodoroNotificationSignal();
+        const runConsume2 = ipcModule.consumePomodoroNotificationSignal();
+        if (!runConsume1 || runConsume2 !== null) {
+          fail(
+            `渲染层完成信号的消费/幂等断言失败: ${JSON.stringify({
+              runConsume1,
+              runConsume2
+            })}`
+          );
+        }
+        console.log('[smoke] pomodoro 渲染层→主进程一次性通知信号通过');
+      }
+
       console.log(`[smoke] chat 表单端到端通过（气泡 ${state.bubbleCount}）`);
       app.quit();
     } catch (error) {

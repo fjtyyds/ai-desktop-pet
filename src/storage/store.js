@@ -65,8 +65,8 @@ const DEFAULT_SETTINGS = {
   widgetsEnabled: true, // T-21：系统状态小部件开关，默认开启，可收起
   pomodoroEnabled: true, // T-21：番茄钟提醒开关（关闭后仅界面计时，不弹通知）
   pomodoroMinutes: DEFAULT_POMODORO_MINUTES, // T-21：番茄钟时长（分钟）
-  pomodoroNotifyAt: 0, // T-21：渲染层完成的番茄钟信号（时间戳；主进程消费后清零）
-  pomodoroNotifyMinutes: 0, // T-21：信号携带的时长（分钟；0=未设置）
+  pomodoroNotifyAt: 0, // T-21/T-27：渲染层→主进程一次性完成信号（时间戳；主进程消费后清零）
+  pomodoroNotifyMinutes: 0, // T-21/T-27：信号携带的时长（分钟；0=未设置；随信号一同清零）
   persona: { ...DEFAULT_PERSONA }
 };
 
@@ -313,6 +313,9 @@ function createStore(baseDir) {
 
   function writeSettings(patch) {
     const current = readSettings();
+    // T-27：pomodoroNotifyAt/pomodoroNotifyMinutes 是主进程消费的一次性信号，
+    // 仅当 patch 显式携带时才写入；普通设置保存不会清除待消费信号，
+    // 也不会把已消费（已清零）的信号回写为旧值。
     const allowed = [
       'apiKey',
       'model',

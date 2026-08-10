@@ -932,6 +932,9 @@
 
   /** 计时结束：界面提示 + 写入 settings 通知信号，由主进程弹系统通知 */
   function finishPomodoro() {
+    if (pomodoroState.mode === 'finished') {
+      return; // T-27：同一轮倒计时的完成信号只处理一次（幂等）
+    }
     clearPomodoroTimer();
     pomodoroState.mode = 'finished';
     pomodoroState.remainingMs = 0;
@@ -941,6 +944,9 @@
     const t = window.PetLocales.createTranslator(currentLocale);
     showPomodoroStatus(t('pomodoro.finished'), 'ok');
     if (currentSettings.pomodoroEnabled !== false) {
+      // T-27：一次性完成信号（pomodoroNotifyAt/pomodoroNotifyMinutes）由主进程
+      // 幂等消费并清零；普通 saveSettings 的 patch 不携带这两个字段，
+      // 避免把已消费的陈旧信号回写。
       const settingsApi =
         window.petAPI &&
         window.petAPI.settings &&
@@ -2117,6 +2123,8 @@
 
     elements.settingsSave.disabled = true;
     try {
+      // T-27：普通设置保存绝不携带 pomodoroNotifyAt/pomodoroNotifyMinutes，
+      // 完成信号只由 finishPomodoro 单独写入，防止回写已消费信号。
       const saved = await window.petAPI.settings.set({
         petName,
         apiKey,

@@ -216,6 +216,42 @@ try {
     fail('settings.json 中 apiKey/model 内容损坏');
   }
   pass('store apiKey/model 读写与清洗通过');
+
+  // T-27：pomodoroNotifyAt 信号读写/清零语义 + 普通设置保存不回写陈旧信号
+  const signalAt = 1234567890123;
+  const withSignal = store.writeSettings({
+    pomodoroNotifyAt: signalAt,
+    pomodoroNotifyMinutes: 25
+  });
+  if (
+    withSignal.pomodoroNotifyAt !== signalAt ||
+    withSignal.pomodoroNotifyMinutes !== 25
+  ) {
+    fail('pomodoroNotifyAt 信号写入失败');
+  }
+  const normalSaveWithSignal = store.writeSettings({ petName: '信号保留测试' });
+  if (normalSaveWithSignal.pomodoroNotifyAt !== signalAt) {
+    fail('普通设置保存不应清除待消费信号');
+  }
+  const cleared = store.writeSettings({
+    pomodoroNotifyAt: 0,
+    pomodoroNotifyMinutes: 0
+  });
+  if (cleared.pomodoroNotifyAt !== 0 || cleared.pomodoroNotifyMinutes !== 0) {
+    fail('pomodoroNotifyAt 信号清零失败');
+  }
+  const normalSaveAfterClear = store.writeSettings({ petName: '清零后保存测试' });
+  if (
+    normalSaveAfterClear.pomodoroNotifyAt !== 0 ||
+    normalSaveAfterClear.pomodoroNotifyMinutes !== 0
+  ) {
+    fail('普通设置保存回写了已消费的陈旧信号');
+  }
+  const rereadSignal = store.readSettings();
+  if (rereadSignal.pomodoroNotifyAt !== 0) {
+    fail('pomodoroNotifyAt 信号清理后读取不一致');
+  }
+  pass('store pomodoro 信号读写与清理语义通过');
 } finally {
   fs.rmSync(checkDir, { recursive: true, force: true });
 }
