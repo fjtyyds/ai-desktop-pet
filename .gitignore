@@ -13,3 +13,18 @@ crashes/
 Thumbs.db
 .env
 .env.local
+
+# 本地探针/演示文件（不入库）
+probe-*.js
+test-edge-tts.js
+cdp-test.js
+break-test.js
+format-test.js
+style-test.js
+demo-v2.js
+restart-dev.ps1
+edge-probe-*.mp3
+tts-probe*.mp3
+v2-*.mp3
+style-*.mp3
+fmt-*.mp3

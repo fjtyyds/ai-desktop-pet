@@ -134,6 +134,18 @@
 - [x] T-36 TTS 听感优化（9f90a59 已合并验收：96kbps + 语调参数重调；听感待用户复核）
 - Backlog：UI 大改（M3.6 独立里程碑，M3.5 收尾后评估）
 
+**M4：分发（规划完成，未启动）**
+
+目标：GitHub 开源 + Actions CI/CD + Microsoft Store/Steam + 代码签名与自动更新评估 + 最终打包。
+
+- [ ] P0 开源前仓库整理（.gitignore/LICENSE/README/大目录处置）
+- [ ] P1 GitHub Actions（check/smoke/dist）
+- [ ] P2 代码签名与商店（Store/Steam）
+- [ ] P3 自动更新评估
+- [ ] P4 最终 `npm run dist` 与安装冒烟
+
+详见 `docs/reports/2026-08-10-M4-分发规划.md`。
+
 ## Progress
 
 - 2026-08-09：M0 完成（Electron 43.3.0、文档体系、CI）。
@@ -171,6 +183,7 @@
 - 2026-08-10：用户反馈神经语音仍显僵硬 → 实测免费端点不支持 express-as/break；已验证 24kHz/96kbps 高质量格式可用，生成 v2 听感参数演示音频；T-36 建卡（输出格式 + 语调参数重调）。
 - 2026-08-10：T-35 经项目内线程闭环完成并合并（98d1de4）：Windows 拖放结束改为 move 防抖（200ms）判定，moved 保留兼容；worker Win32 SetWindowPos 模拟 5 步拖动/缩放/重启验证 + check/smoke 通过；待真人拖动目检。
 - 2026-08-10：T-36 经项目内线程闭环完成并合并（9f90a59）：输出格式 24kHz/96kbps、6 套人格语调参数重调（新参数表见任务卡）；worker 与协调者 check/smoke 全部通过。
+- 2026-08-10：用户决定语音克隆暂缓（ADR-030）：voice-pack-creator skill 保留复用，不实施 app 接入；M4 分发规划落盘（P0~P4），待用户确认启动项与仓库/商店决策。
 
 ## Surprises & Discoveries
 

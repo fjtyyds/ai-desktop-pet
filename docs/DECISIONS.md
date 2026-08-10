@@ -245,3 +245,10 @@
   4. CSP 增加 `media-src 'self' data:`；依赖显式新增 `ws`（WebSocket 需自定义头，Node 全局 WebSocket 不支持）。
   5. 不新增 settings 字段：沿用 `ttsVoicePackEnabled`/`ttsVoicePackId`。
 - 后果：联网时获得自然、区分度高的神经语音；离线回退系统 TTS（音质降级但可用）；新增网络调用与 MP3 缓存开销（主进程 LRU 缓存）；微软在线服务为免费非正式接口，未来若失效由回退兜底。
+
+## ADR-030：专属语音克隆接入暂缓，skill 保留复用（2026-08-10）
+
+- 状态：Accepted（暂缓）
+- 背景：用户提出“智能语音采集 skill，采集分析真人录音生成专属语音包替换默认语音包”；协调者已创建 `voice-pack-creator` skill（采集/分析脚本实测通过），并给出选型（云端 Fish Audio / 本地 GPT-SoVITS）。随后用户决定“先算了吧，继续项目的推进”。
+- 决策：暂不实施 app 内专属语音包接入；`voice-pack-creator` skill 保留在 `C:\Users\HP\.codex\skills\voice-pack-creator` 供未来复用；若未来重启该需求，克隆引擎选型届时再定。
+- 后果：项目路线图回到 M3.5 收尾 → M4 分发规划；skill 不占用项目仓库；需求与实现步骤已固化在 skill 与交接文档中，无需重复调研。
