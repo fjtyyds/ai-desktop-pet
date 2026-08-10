@@ -18,6 +18,7 @@
     "electron-builder": "^26.15.3"
   },
   "dependencies": {
+    "electron-updater": "^6.8.9",
     "ws": "^8.21.3"
   }
 }

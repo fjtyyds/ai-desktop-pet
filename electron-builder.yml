@@ -34,3 +34,9 @@ nsis:
   uninstallerIcon: assets/icon.ico
   installerHeaderIcon: assets/icon.ico
   artifactName: AI桌宠-${version}-Setup.${ext}
+
+# ADR-031：自动更新源（electron-updater + GitHub Releases；CI 用 --publish never，Release 由 Actions 上传）
+publish:
+  provider: github
+  owner: fjtyyds
+  repo: ai-desktop-pet

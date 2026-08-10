@@ -252,3 +252,14 @@
 - 背景：用户提出“智能语音采集 skill，采集分析真人录音生成专属语音包替换默认语音包”；协调者已创建 `voice-pack-creator` skill（采集/分析脚本实测通过），并给出选型（云端 Fish Audio / 本地 GPT-SoVITS）。随后用户决定“先算了吧，继续项目的推进”。
 - 决策：暂不实施 app 内专属语音包接入；`voice-pack-creator` skill 保留在 `C:\Users\HP\.codex\skills\voice-pack-creator` 供未来复用；若未来重启该需求，克隆引擎选型届时再定。
 - 后果：项目路线图回到 M3.5 收尾 → M4 分发规划；skill 不占用项目仓库；需求与实现步骤已固化在 skill 与交接文档中，无需重复调研。
+
+## ADR-031：自动更新采用 electron-updater + GitHub Releases（2026-08-10）
+
+- 状态：Accepted（评估完成，实施中）
+- 背景：M4 P3 需要自动更新方案。候选：electron-updater（GitHub Releases 通道）、商店渠道更新机制、手动下载。
+- 决策：
+  1. 采用 `electron-updater@6.8.9`（与 electron-builder 26/Electron 43 兼容，npm 安装无冲突）+ GitHub Releases 作为更新源。
+  2. `electron-builder.yml` 增加 publish（provider=github, owner=fjtyyds, repo=ai-desktop-pet）；CI 仍用 `--publish never`，Release 由 `softprops/action-gh-release` 上传 exe/blockmap/latest.yml。
+  3. 实现范围：打包后自动检查更新（静默失败）、发现更新弹窗确认、下载后重启安装；托盘菜单增加“检查更新”；开发模式（未打包）不检查。
+  4. 无渲染层契约变更；更新状态仅用原生 dialog/通知。
+- 后果：用户安装正式版后可自动升级；商店/Steam 渠道各自使用平台更新机制，本方案仅覆盖 GitHub 直装版；首次发布需打 v 标签触发 release。
