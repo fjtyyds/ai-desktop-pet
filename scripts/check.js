@@ -890,6 +890,36 @@ if (fs.existsSync(distDir)) {
   pass('T-38 dist 不存在，产物静态比对跳过（打包后运行 check 将比对）');
 }
 
+// T-39：最终打包产物——win-unpacked 更新清单存在且指向 GitHub Releases（ADR-031）
+if (fs.existsSync(distDir)) {
+  const appUpdateYmlPath = path.join(
+    distDir,
+    'win-unpacked',
+    'resources',
+    'app-update.yml'
+  );
+  if (!fs.existsSync(appUpdateYmlPath)) {
+    fail('dist/win-unpacked/resources/app-update.yml 不存在（T-39）');
+  }
+  const appUpdateYmlSource = fs.readFileSync(appUpdateYmlPath, 'utf8');
+  const appUpdateRefs = {};
+  for (const line of appUpdateYmlSource.split(/\r?\n/)) {
+    const refMatch = line.match(/^\s*(provider|owner|repo):\s*(.+?)\s*$/);
+    if (refMatch) {
+      appUpdateRefs[refMatch[1]] = refMatch[2].trim();
+    }
+  }
+  const expectedAppUpdate = { provider: 'github', owner: 'fjtyyds', repo: 'ai-desktop-pet' };
+  for (const [key, expected] of Object.entries(expectedAppUpdate)) {
+    if (appUpdateRefs[key] !== expected) {
+      fail(`app-update.yml ${key} 应为 ${expected}（当前: ${appUpdateRefs[key]}）`);
+    }
+  }
+  pass('T-39 win-unpacked app-update.yml 存在且指向 github/fjtyyds/ai-desktop-pet');
+} else {
+  pass('T-39 dist 不存在，app-update.yml 断言跳过（打包后运行 check 将断言）');
+}
+
 // T-08：store persona 默认值、读写与清洗（非法值丢弃/超长截断，不破坏 settings.json）
 const { createStore, DEFAULT_SETTINGS } = require(path.join(
   root,
