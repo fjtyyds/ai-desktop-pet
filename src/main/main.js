@@ -31,16 +31,9 @@ const WINDOW_CHANNELS = {
   minimize: 'window:minimize' // T-25：最小化到任务栏（ADR-026 冻结契约）
 };
 
-/** T-19：贴边/滑出参数（Windows 桌面语义） */
-const DOCK_STRIP = 10; // 贴边隐藏后露出的像素宽度/高度
+/** T-31：贴边吸附参数（方案 B：靠边吸附、不自动隐藏；ADR-026） */
 const DOCK_MARGIN = 24; // 距离屏幕边缘多近视为“靠边”
-const DOCK_HOLD_MS = 500; // 靠边停留该时长后自动贴边
-const DOCK_PEEK_MARGIN = 64; // 鼠标距边缘多远时滑出
-const DOCK_LINGER_MS = 1800; // 鼠标离开且窗口失焦后多久滑回
-const DOCK_POLL_MS = 120; // 贴边期间鼠标位置轮询间隔
-const DOCK_SLIDE_MS = 160; // 滑出/滑回动画时长
-const DOCK_ANIMATION_IGNORE_MS = 250; // 动画产生的 move 事件忽略窗口，避免误判为拖动
-const DOCK_REGRAB_GRACE_MS = 800; // 取消贴边后的短暂窗口，防止 setBounds 触发再贴边
+const DOCK_REGRAB_GRACE_MS = 800; // 取消吸附后的短暂窗口，防止程序化 setBounds 触发再次吸附
 
 /** T-21：番茄钟完成信号轮询间隔（系统状态小部件移除后，仅保留通知消费） */
 const POMODORO_POLL_MS = 2000;
@@ -50,19 +43,11 @@ const DEFAULT_POMODORO_MINUTES = 25;
 const MIN_WINDOW_WIDTH = 280;
 const MIN_WINDOW_HEIGHT = 360;
 
-/** T-19：贴边状态 */
+/** T-31：贴边吸附状态 */
 let dockEnabled = true;
 let dockedEdge = null; // 'left' | 'right' | 'top' | 'bottom' | null
-let dockFullBounds = null; // 贴边展开时的完整窗口 bounds
-let dockDisplay = null; // 贴边所在显示器（workArea 快照）
-let dockTarget = null; // 'full' | 'hidden' | null
-let dockHoldTimer = null;
-let dockPollTimer = null;
-let dockLingerTimer = null;
-let dockSlideTimer = null;
-let dockSliding = false;
-let dockLastAnimationAt = 0;
-let dockGraceUntil = 0;
+let dockFullBounds = null; // 吸附对齐后的窗口 bounds（兼作位置记忆基准）
+let dockGraceUntil = 0; // 取消吸附后的防重复触发窗口
 let positionSaveTimer = null;
 let windowSettingsWriter = null;
 // T-21：番茄钟完成信号轮询
@@ -183,7 +168,7 @@ function writeWindowSettings(patch) {
   }
 }
 
-/** 启动时读取贴边开关（缺省开启） */
+/** 启动时读取贴边吸附开关（缺省开启） */
 function loadWindowSettings() {
   try {
     const settings = ipc.getSettings();
@@ -261,172 +246,44 @@ function resolveInitialWindowBounds() {
   return isBoundsVisibleOnAnyDisplay(candidate) ? saved : {};
 }
 
-/* ---------------- T-19：贴边/滑出 ---------------- */
+/* ---------------- T-31：贴边吸附（方案 B：靠边吸附、不自动隐藏；ADR-026） ---------------- */
 
-function getDockArea() {
-  if (dockDisplay && dockDisplay.area) {
-    return dockDisplay.area;
-  }
-  const base = dockFullBounds || (mainWindow ? mainWindow.getBounds() : null);
-  if (!base) {
-    return screen.getPrimaryDisplay().workArea;
-  }
-  return screen.getDisplayMatching(base).workArea;
-}
-
-/** 窗口当前 bounds 是否靠近屏幕边缘；返回命中的边缘或 null */
+/** 窗口当前 bounds 是否靠近屏幕边缘；返回最近命中边缘或 null */
 function findDockEdge(bounds) {
   if (!dockEnabled) {
     return null;
   }
   const area = screen.getDisplayMatching(bounds).workArea;
-  if (Math.abs(bounds.x - area.x) <= DOCK_MARGIN) {
-    return 'left';
-  }
-  if (Math.abs(bounds.x + bounds.width - (area.x + area.width)) <= DOCK_MARGIN) {
-    return 'right';
-  }
-  if (Math.abs(bounds.y - area.y) <= DOCK_MARGIN) {
-    return 'top';
-  }
-  if (Math.abs(bounds.y + bounds.height - (area.y + area.height)) <= DOCK_MARGIN) {
-    return 'bottom';
-  }
-  return null;
-}
-
-function computeHiddenBounds() {
-  const full = dockFullBounds;
-  const area = getDockArea();
-  switch (dockedEdge) {
-    case 'left':
-      return { ...full, x: area.x - (full.width - DOCK_STRIP) };
-    case 'right':
-      return { ...full, x: area.x + area.width - DOCK_STRIP };
-    case 'top':
-      return { ...full, y: area.y - (full.height - DOCK_STRIP) };
-    case 'bottom':
-      return { ...full, y: area.y + area.height - DOCK_STRIP };
-    default:
-      return full;
-  }
-}
-
-/** 鼠标是否位于贴边边缘的“滑出触发区” */
-function isCursorNearDockEdge(cursor) {
-  const area = getDockArea();
-  const margin = DOCK_PEEK_MARGIN;
-  switch (dockedEdge) {
-    case 'left':
-      return (
-        cursor.x <= area.x + margin &&
-        cursor.y >= area.y - margin &&
-        cursor.y <= area.y + area.height + margin
-      );
-    case 'right':
-      return (
-        cursor.x >= area.x + area.width - margin &&
-        cursor.y >= area.y - margin &&
-        cursor.y <= area.y + area.height + margin
-      );
-    case 'top':
-      return (
-        cursor.y <= area.y + margin &&
-        cursor.x >= area.x - margin &&
-        cursor.x <= area.x + area.width + margin
-      );
-    case 'bottom':
-      return (
-        cursor.y >= area.y + area.height - margin &&
-        cursor.x >= area.x - margin &&
-        cursor.x <= area.x + area.width + margin
-      );
-    default:
-      return false;
-  }
-}
-
-function stopDockAnimation() {
-  if (dockSlideTimer) {
-    clearInterval(dockSlideTimer);
-    dockSlideTimer = null;
-  }
-  dockSliding = false;
-}
-
-function stopDockPolling() {
-  if (dockPollTimer) {
-    clearInterval(dockPollTimer);
-    dockPollTimer = null;
-  }
-  if (dockLingerTimer) {
-    clearTimeout(dockLingerTimer);
-    dockLingerTimer = null;
-  }
-}
-
-function startDockPolling() {
-  stopDockPolling();
-  dockPollTimer = setInterval(pollDock, DOCK_POLL_MS);
-}
-
-/** 在 full（完整展开）与 hidden（贴边细条）之间平滑移动窗口 */
-function slideWindowTo(state) {
-  if (
-    !mainWindow ||
-    mainWindow.isDestroyed() ||
-    !dockedEdge ||
-    !dockFullBounds ||
-    dockTarget === state
-  ) {
-    return;
-  }
-  const target = state === 'hidden' ? computeHiddenBounds() : dockFullBounds;
-  const current = mainWindow.getBounds();
-  if (
-    Math.abs(current.x - target.x) < 2 &&
-    Math.abs(current.y - target.y) < 2
-  ) {
-    dockTarget = state;
-    return;
-  }
-  stopDockAnimation();
-  dockTarget = state;
-  dockSliding = true;
-  const steps = Math.max(4, Math.round(DOCK_SLIDE_MS / 16));
-  const dx = (target.x - current.x) / steps;
-  const dy = (target.y - current.y) / steps;
-  let step = 0;
-  const applyBounds = (bounds) => {
-    dockLastAnimationAt = Date.now();
-    mainWindow.setBounds(bounds);
-  };
-  dockSlideTimer = setInterval(() => {
-    step += 1;
-    if (!mainWindow || mainWindow.isDestroyed()) {
-      stopDockAnimation();
-      return;
+  const candidates = [
+    { edge: 'left', distance: Math.abs(bounds.x - area.x) },
+    {
+      edge: 'right',
+      distance: Math.abs(bounds.x + bounds.width - (area.x + area.width))
+    },
+    { edge: 'top', distance: Math.abs(bounds.y - area.y) },
+    {
+      edge: 'bottom',
+      distance: Math.abs(bounds.y + bounds.height - (area.y + area.height))
     }
-    if (step >= steps) {
-      applyBounds(target);
-      stopDockAnimation();
-      return;
+  ];
+  let best = null;
+  for (const candidate of candidates) {
+    if (
+      candidate.distance <= DOCK_MARGIN &&
+      (!best || candidate.distance < best.distance)
+    ) {
+      best = candidate;
     }
-    applyBounds({
-      x: Math.round(current.x + dx * step),
-      y: Math.round(current.y + dy * step),
-      width: target.width,
-      height: target.height
-    });
-  }, 16);
+  }
+  return best ? best.edge : null;
 }
 
+/** 吸附窗口到指定屏幕边缘：完整窗口贴边对齐，不缩成细条、不自动隐藏 */
 function dockWindow(edge, bounds) {
   if (!dockEnabled || !mainWindow || mainWindow.isDestroyed()) {
     return;
   }
-  const display = screen.getDisplayMatching(bounds);
-  const area = display.workArea;
+  const area = screen.getDisplayMatching(bounds).workArea;
   const full = { ...bounds };
   switch (edge) {
     case 'left':
@@ -442,51 +299,36 @@ function dockWindow(edge, bounds) {
       full.y = area.y + area.height - bounds.height;
       break;
   }
-  // 先保存贴边展开位置（作为下次恢复的“正常位置”）
-  persistWindowBounds(full);
   dockedEdge = edge;
   dockFullBounds = full;
-  dockDisplay = { id: display.id, area: { ...area } };
-  dockTarget = null;
-  stopDockAnimation();
-  clearTimeout(dockHoldTimer);
-  startDockPolling();
-  slideWindowTo('hidden');
+  // 吸附后的位置即“正常位置”，作为位置记忆与下次启动恢复
+  persistWindowBounds(full);
+  mainWindow.setBounds(full);
 }
 
+/** 取消吸附：保留当前位置作为自由位置，并短暂阻止程序化移动触发再次吸附 */
 function undockWindow() {
-  if (!mainWindow || mainWindow.isDestroyed()) {
-    dockedEdge = null;
-    dockFullBounds = null;
-    dockDisplay = null;
-    dockTarget = null;
-    stopDockPolling();
-    stopDockAnimation();
-    return;
-  }
-  const bounds = mainWindow.getBounds();
+  const bounds =
+    mainWindow && !mainWindow.isDestroyed() ? mainWindow.getBounds() : null;
   dockedEdge = null;
   dockFullBounds = null;
-  dockDisplay = null;
-  dockTarget = null;
   dockGraceUntil = Date.now() + DOCK_REGRAB_GRACE_MS;
-  clearTimeout(dockHoldTimer);
-  stopDockPolling();
-  stopDockAnimation();
-  persistWindowBounds(bounds);
+  if (bounds) {
+    persistWindowBounds(bounds);
+  }
 }
 
-/** 沿贴边边缘拖动时同步“完整展开”位置，避免滑出时跳回旧坐标 */
+/** 沿贴边边缘拖动时同步吸附基准位置，松手后据此贴齐，避免跳回旧坐标 */
 function syncDockFullBounds(bounds) {
   if (!dockFullBounds || !dockedEdge) {
     return;
   }
-  const area = getDockArea();
+  const area = screen.getDisplayMatching(bounds).workArea;
   const next = {
     x: bounds.x,
     y: bounds.y,
-    width: dockFullBounds.width,
-    height: dockFullBounds.height
+    width: bounds.width,
+    height: bounds.height
   };
   switch (dockedEdge) {
     case 'left':
@@ -506,111 +348,89 @@ function syncDockFullBounds(bounds) {
   persistWindowBounds(next);
 }
 
-function pollDock() {
-  if (
-    !dockEnabled ||
-    !dockedEdge ||
-    !mainWindow ||
-    mainWindow.isDestroyed() ||
-    !mainWindow.isVisible()
-  ) {
-    stopDockPolling();
-    return;
-  }
-  const cursor = screen.getCursorScreenPoint();
-  if (isCursorNearDockEdge(cursor)) {
-    clearTimeout(dockLingerTimer);
-    dockLingerTimer = null;
-    if (dockTarget !== 'full') {
-      slideWindowTo('full');
-    }
-    return;
-  }
-
-  // 鼠标不在触发区：只要鼠标仍在窗口内或窗口聚焦，就保持展开
-  const bounds = mainWindow.getBounds();
-  const insideWindow =
-    cursor.x >= bounds.x - 4 &&
-    cursor.x <= bounds.x + bounds.width + 4 &&
-    cursor.y >= bounds.y - 4 &&
-    cursor.y <= bounds.y + bounds.height + 4;
-  if (insideWindow || mainWindow.isFocused()) {
-    clearTimeout(dockLingerTimer);
-    dockLingerTimer = null;
-    return;
-  }
-  if (!dockLingerTimer) {
-    dockLingerTimer = setTimeout(() => {
-      dockLingerTimer = null;
-      if (
-        dockedEdge &&
-        mainWindow &&
-        !mainWindow.isDestroyed() &&
-        !mainWindow.isFocused()
-      ) {
-        slideWindowTo('hidden');
-      }
-    }, DOCK_LINGER_MS);
-  }
-}
-
 function handleWindowMove() {
-  if (!mainWindow || mainWindow.isDestroyed() || dockSliding) {
-    return;
-  }
-  // 贴边动画产生的 move 事件在动画结束后仍可能异步到达，短窗口内忽略
-  if (Date.now() - dockLastAnimationAt < DOCK_ANIMATION_IGNORE_MS) {
+  if (!mainWindow || mainWindow.isDestroyed()) {
     return;
   }
   const bounds = mainWindow.getBounds();
   if (dockedEdge) {
-    if (dockTarget === 'hidden') {
-      // 从贴边细条直接拖动：先展开到完整位置再取消贴边，避免留下半截细条位置
-      stopDockAnimation();
-      if (dockFullBounds) {
-        dockLastAnimationAt = Date.now();
-        mainWindow.setBounds(dockFullBounds);
-      }
-      undockWindow();
-    } else if (!findDockEdge(bounds)) {
-      // 用户拖动已贴边（展开态）窗口离开边缘时取消贴边
+    // 拖动离开边缘（超出吸附阈值）立即取消吸附，恢复自由位置
+    if (!findDockEdge(bounds)) {
       undockWindow();
     } else if (dockFullBounds) {
+      // 仍在边缘附近：仅同步吸附基准，不打断用户拖动
       syncDockFullBounds(bounds);
     }
     return;
   }
   schedulePositionSave();
-  if (!dockEnabled || Date.now() < dockGraceUntil) {
-    return;
-  }
-  clearTimeout(dockHoldTimer);
-  dockHoldTimer = null;
-  const edge = findDockEdge(bounds);
-  if (edge) {
-    dockHoldTimer = setTimeout(() => {
-      dockHoldTimer = null;
-      if (
-        !mainWindow ||
-        mainWindow.isDestroyed() ||
-        dockedEdge ||
-        dockSliding
-      ) {
-        return;
-      }
-      const current = mainWindow.getBounds();
-      if (findDockEdge(current) === edge) {
-        dockWindow(edge, current);
-      }
-    }, DOCK_HOLD_MS);
-  }
 }
 
 function handleWindowMoved() {
-  if (!mainWindow || mainWindow.isDestroyed() || dockedEdge || dockSliding) {
+  if (!mainWindow || mainWindow.isDestroyed()) {
     return;
   }
-  persistWindowBounds(mainWindow.getBounds());
+  const bounds = mainWindow.getBounds();
+  if (dockedEdge) {
+    // 已吸附：拖动/程序化移动结束后贴齐到最新基准
+    if (dockFullBounds) {
+      const aligned = dockFullBounds;
+      if (
+        Math.abs(bounds.x - aligned.x) >= 1 ||
+        Math.abs(bounds.y - aligned.y) >= 1 ||
+        bounds.width !== aligned.width ||
+        bounds.height !== aligned.height
+      ) {
+        mainWindow.setBounds(aligned);
+      }
+      persistWindowBounds(aligned);
+    }
+    return;
+  }
+  if (Date.now() < dockGraceUntil) {
+    persistWindowBounds(bounds);
+    return;
+  }
+  const edge = findDockEdge(bounds);
+  if (edge) {
+    // 拖放结束且仍在边缘附近：吸附到边缘（dockWindow 内会持久化位置）
+    dockWindow(edge, bounds);
+    return;
+  }
+  persistWindowBounds(bounds);
+}
+
+/** 缩放时保持吸附边贴齐；缩放导致吸附边离开边缘则取消吸附 */
+function handleWindowResize() {
+  if (!mainWindow || mainWindow.isDestroyed() || !dockedEdge) {
+    return;
+  }
+  const bounds = mainWindow.getBounds();
+  if (!findDockEdge(bounds)) {
+    undockWindow();
+    return;
+  }
+  const area = screen.getDisplayMatching(bounds).workArea;
+  const next = { ...bounds };
+  switch (dockedEdge) {
+    case 'left':
+      next.x = area.x;
+      break;
+    case 'right':
+      next.x = area.x + area.width - bounds.width;
+      break;
+    case 'top':
+      next.y = area.y;
+      break;
+    case 'bottom':
+      next.y = area.y + area.height - bounds.height;
+      break;
+  }
+  dockFullBounds = next;
+  persistWindowBounds(next);
+  if (next.x !== bounds.x || next.y !== bounds.y) {
+    mainWindow.setBounds(next);
+  }
 }
 
 /** 移动结束后延迟落盘位置（Windows 上程序化移动可能不触发 moved 事件） */
@@ -618,12 +438,7 @@ function schedulePositionSave() {
   clearTimeout(positionSaveTimer);
   positionSaveTimer = setTimeout(() => {
     positionSaveTimer = null;
-    if (
-      !mainWindow ||
-      mainWindow.isDestroyed() ||
-      dockedEdge ||
-      dockSliding
-    ) {
+    if (!mainWindow || mainWindow.isDestroyed() || dockedEdge) {
       return;
     }
     persistWindowBounds(mainWindow.getBounds());
@@ -634,11 +449,20 @@ function schedulePositionSave() {
 
 function handleToggleDock() {
   dockEnabled = !dockEnabled;
-  if (!dockEnabled && dockedEdge && mainWindow && !mainWindow.isDestroyed()) {
-    stopDockAnimation();
-    const full = dockFullBounds || mainWindow.getBounds();
-    mainWindow.setBounds(full);
+  if (!dockEnabled && dockedEdge) {
     undockWindow();
+  } else if (
+    dockEnabled &&
+    !dockedEdge &&
+    mainWindow &&
+    !mainWindow.isDestroyed()
+  ) {
+    // 重新开启且当前已靠近边缘时，立即吸附
+    const bounds = mainWindow.getBounds();
+    const edge = findDockEdge(bounds);
+    if (edge) {
+      dockWindow(edge, bounds);
+    }
   }
   writeWindowSettings({ dockEnabled });
   return { docked: dockEnabled };
@@ -690,27 +514,21 @@ function createMainWindow() {
   win.on('show', () => {
     idleMonitor?.markActivity(); // T-15: 显示窗口视为交互
     trayApi?.refreshMenu();
-    if (dockedEdge) {
-      startDockPolling(); // T-19: 从托盘恢复显示时恢复贴边轮询
-    }
   });
   win.on('hide', () => {
     trayApi?.refreshMenu();
-    stopDockPolling(); // T-19: 隐藏到托盘时停止贴边轮询
   });
   win.on('minimize', () => {
     stopDockPolling(); // T-25：最小化时停止贴边轮询，避免对最小化窗口做位置动画
   });
   win.on('focus', () => {
     idleMonitor?.markActivity(); // T-15: 聚焦视为交互
-    if (dockedEdge) {
-      slideWindowTo('full'); // T-19: 点击/聚焦贴边窗口时展开
-    }
   });
 
-  // T-19: 拖动过程检测贴边；移动结束后记忆位置
+  // T-31: 拖动结束检测贴边吸附；移动/缩放过程保持位置记忆
   win.on('move', handleWindowMove);
   win.on('moved', handleWindowMoved);
+  win.on('resize', handleWindowResize); // T-31: 缩放时保持吸附边贴齐
 
   // 关闭窗口时隐藏到托盘，而不是退出应用
   win.on('close', (event) => {
@@ -725,11 +543,6 @@ function createMainWindow() {
     mainWindow = null;
     dockedEdge = null;
     dockFullBounds = null;
-    dockDisplay = null;
-    dockTarget = null;
-    stopDockPolling();
-    stopDockAnimation();
-    clearTimeout(dockHoldTimer);
     clearTimeout(positionSaveTimer);
   });
 
@@ -741,9 +554,6 @@ function showMainWindow() {
   if (!mainWindow) createMainWindow();
   if (mainWindow.isMinimized()) mainWindow.restore();
   mainWindow.show();
-  if (dockedEdge && mainWindow.isVisible()) {
-    slideWindowTo('full'); // T-19: 呼出时展开贴边窗口
-  }
   mainWindow.focus();
   trayApi?.refreshMenu();
 }

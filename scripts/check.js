@@ -102,6 +102,7 @@ pass('renderer 设置页 API Key/模型输入存在');
 // T-24：窗口可缩放、小部件可折叠、移除底部平台/版本信息
 // T-25：工具栏导出 + 最小化（契约 window:minimize 已冻结，ADR-026）
 // T-29：全局快捷键移除（ADR-026）：源码不得再注册/暴露快捷键契约
+// T-31：贴边吸附语义同步（方案 B：靠边吸附、不自动隐藏；ADR-026）
 const preloadSource = fs.readFileSync(
   path.join(root, 'src', 'main', 'preload.js'),
   'utf8'
@@ -444,6 +445,31 @@ for (const localeFile of ['zh-CN', 'en']) {
 }
 pass('语言包 widgets.* 文案已移除，idle 话术保留');
 
+if (
+  !mainSource.includes('function dockWindow') ||
+  !mainSource.includes('function findDockEdge')
+) {
+  fail('main.js 缺少贴边吸附实现（dockWindow/findDockEdge）');
+}
+if (
+  mainSource.includes('function pollDock') ||
+  mainSource.includes('DOCK_STRIP') ||
+  mainSource.includes('computeHiddenBounds') ||
+  mainSource.includes('slideWindowTo')
+) {
+  fail('main.js 仍包含贴边自动隐藏逻辑（方案 B 应移除）');
+}
+if (!rendererChatSource.includes('靠边吸附')) {
+  fail('renderer/chat.js 未同步“靠边吸附”文案');
+}
+if (
+  rendererChatSource.includes('贴边隐藏') ||
+  rendererChatSource.includes('自动收起成细条')
+) {
+  fail('renderer/chat.js 仍包含“贴边隐藏/自动收起”旧文案');
+}
+pass('T-31 贴边吸附语义同步');
+
 // T-08：store persona 默认值、读写与清洗（非法值丢弃/超长截断，不破坏 settings.json）
 const { createStore, DEFAULT_SETTINGS } = require(path.join(
   root,
@@ -614,6 +640,20 @@ try {
     fail('旧 shortcutEnabled 字段未被兼容清理/忽略（T-29）');
   }
   pass('store 旧 shortcutEnabled 兼容忽略通过');
+
+  // T-31：贴边吸附开关（方案 B）默认开启，且读写清洗正常
+  if (DEFAULT_SETTINGS.dockEnabled !== true) {
+    fail('DEFAULT_SETTINGS.dockEnabled 应为 true（靠边吸附默认开启）');
+  }
+  const dockOff = store.writeSettings({ dockEnabled: false });
+  if (dockOff.dockEnabled !== false || store.readSettings().dockEnabled !== false) {
+    fail('store dockEnabled 关闭后写入/读取不一致');
+  }
+  const dockOn = store.writeSettings({ dockEnabled: true });
+  if (dockOn.dockEnabled !== true) {
+    fail('store dockEnabled 重新开启失败');
+  }
+  pass('store dockEnabled（靠边吸附）读写与清洗通过');
 } finally {
   fs.rmSync(checkDir, { recursive: true, force: true });
 }
