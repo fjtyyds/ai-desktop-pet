@@ -3,9 +3,6 @@
     "name": "AI Pet",
     "defaultPetName": "AI Pet"
   },
-  "meta": {
-    "platformVersion": "Platform: {platform} · Version {version}"
-  },
   "chat": {
     "viewAriaLabel": "Chat",
     "inputAriaLabel": "Chat input",
@@ -64,6 +61,8 @@
   },
   "weather": {
     "widgetAriaLabel": "Weather widget",
+    "collapse": "Collapse weather",
+    "expand": "Expand weather",
     "settingsLabel": "Weather widget",
     "settingsHint": "Show live weather in the pet panel. The city is configurable; data comes from Open-Meteo and needs no API key.",
     "city": "City",

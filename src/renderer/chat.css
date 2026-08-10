@@ -774,6 +774,28 @@
   background: rgba(255, 255, 255, 0.04);
 }
 
+/* T-24：天气小部件默认收起（仅保留摘要行），展开后详情不遮挡聊天区 */
+.weather-widget.collapsed .weather-desc,
+.weather-widget.collapsed .weather-meta,
+.weather-widget.collapsed .weather-refresh-btn {
+  display: none;
+}
+
+.weather-widget.collapsed .weather-main {
+  gap: 6px;
+}
+
+.weather-toggle-btn {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  font-size: 12px;
+}
+
+.weather-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
 /* T-21：系统状态与番茄钟小部件 */
 .widgets-panel {
   flex: 0 0 auto;
@@ -995,4 +1017,42 @@
 
 .widget-status[data-type='error'] {
   color: #ef9a9a;
+}
+
+/* T-24：窗口可缩放后的小尺寸自适应（最小 280×360 时聊天区保持可用） */
+@media (max-height: 480px) {
+  .drag-bar {
+    height: 24px;
+    flex-basis: 24px;
+  }
+
+  .message-list {
+    padding: 8px 10px;
+    gap: 6px;
+  }
+
+  .chat-form {
+    padding: 6px 10px;
+  }
+
+  .weather-widget,
+  .widgets-panel {
+    margin: 0 10px 6px;
+    padding: 6px 8px;
+  }
+
+  /* T-24：小窗口优先保证聊天可用，小部件在高度不足时隐藏 */
+  .widgets-panel {
+    display: none;
+  }
+
+  .weather-widget.collapsed {
+    padding-top: 4px;
+    padding-bottom: 4px;
+  }
+
+  .service-status {
+    margin: 0 10px 6px;
+    padding: 4px 8px;
+  }
 }

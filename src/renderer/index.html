@@ -45,7 +45,7 @@
       >
         <div
           id="weather-widget"
-          class="weather-widget"
+          class="weather-widget collapsed"
           role="region"
           aria-label="天气小部件"
           data-i18n-aria-label="weather.widgetAriaLabel"
@@ -58,6 +58,16 @@
               <span id="weather-desc" class="weather-desc"></span>
             </div>
             <span id="weather-temp" class="weather-temp"></span>
+            <button
+              id="weather-toggle"
+              class="icon-btn weather-toggle-btn"
+              type="button"
+              title="展开天气"
+              aria-label="展开天气"
+              aria-expanded="false"
+              data-i18n-title="weather.expand"
+              data-i18n-aria-label="weather.expand"
+            >▸</button>
             <button
               id="weather-refresh"
               class="icon-btn weather-refresh-btn"
@@ -577,7 +587,6 @@
         </div>
       </section>
 
-      <footer class="meta" id="meta"></footer>
     </main>
     <script src="../shared/locales/index.js"></script>
     <script src="./chat.js"></script>
