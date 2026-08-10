@@ -21,6 +21,9 @@
  *   数据源 Open-Meteo 无需 API Key，网络请求在主进程完成
  * - T-24 窗口布局与可缩放：天气小部件默认收起/可折叠，展开后不遮挡
  *   消息区与输入框；移除底部平台/版本信息（配合 renderer.js/index.html/locales）
+ * - T-26 天气自动刷新增强：自动刷新间隔 30→15 分钟、窗口恢复显示即刷新
+ *   （受最小间隔保护）、界面清楚展示“上次更新”时间、失败保留缓存并显示错误、
+ *   指数退避自动重试
  * - T-21 系统状态与番茄钟：小部件面板展示 CPU/内存/电池（主进程复用 idle:event
  *   推送 { type: 'system-status' }）；本地番茄钟计时，完成时写入 settings 通知信号
  *   （pomodoroNotifyAt），由主进程轮询消费并弹系统通知；面板可收起、设置可关闭
@@ -35,8 +38,10 @@
   const DEFAULT_LANGUAGE = 'system';
   const ACTIVITY_POKE_MIN_INTERVAL_MS = 5000; // T-15: 交互心跳节流
   const MOOD_POLL_MS = 3000;
-  const WEATHER_AUTO_REFRESH_MS = 30 * 60 * 1000; // T-22：开启时每 30 分钟自动刷新
-  const WEATHER_MIN_REFRESH_GAP_MS = 30 * 1000; // T-22：自动刷新节流（手动刷新不受限）
+  const WEATHER_AUTO_REFRESH_MS = 15 * 60 * 1000; // T-26：开启时每 15 分钟自动刷新
+  const WEATHER_MIN_REFRESH_GAP_MS = 30 * 1000; // T-26：自动/恢复刷新节流（手动刷新不受限）
+  const WEATHER_RETRY_BASE_MS = 60 * 1000; // T-26：失败后首次自动重试间隔
+  const WEATHER_RETRY_MAX_MS = 15 * 60 * 1000; // T-26：重试退避上限（不超过自动刷新间隔）
   const DEFAULT_POMODORO_MINUTES = 25; // T-21：与 store.js 默认值一致
   const POMODORO_TICK_MS = 250; // T-21：番茄钟刷新间隔
   /** T-19：设置页窗口行为区块文案（双语内联，因 locale 文件不在任务边界内） */
@@ -289,6 +294,8 @@
   let weatherLastFetchAt = 0;
   let weatherTimer = null;
   let weatherCollapsed = true; // T-24：天气小部件默认收起（仅保留摘要行）
+  let weatherRetryAttempt = 0; // T-26：失败重试次数（指数退避）
+  let weatherRetryTimer = null; // T-26：失败自动重试定时器
   // T-21：小部件与番茄钟状态
   let lastSystemStatus = null;
   let pomodoroStatusTimer = null;
@@ -304,6 +311,7 @@
     cacheElements();
     bindEvents();
     bindActivityEvents();
+    bindWeatherRefreshTriggers();
     subscribeIdle();
     initTts(); // T-23：语音输出能力探测（异步加载系统语音列表）
     // 先加载两份语言包，确保任何文案渲染不会回退到键名
@@ -347,6 +355,7 @@
       weatherDesc: document.getElementById('weather-desc'),
       weatherTemp: document.getElementById('weather-temp'),
       weatherMeta: document.getElementById('weather-meta'),
+      weatherUpdated: document.getElementById('weather-updated'),
       weatherRefresh: document.getElementById('weather-refresh'),
       weatherToggle: document.getElementById('weather-toggle'),
       weatherEnabled: document.getElementById('weather-enabled'),
@@ -653,6 +662,18 @@
     for (const type of events) {
       window.addEventListener(type, pokeActivity, { capture: true, passive: true });
     }
+  }
+
+  /** T-26：窗口从隐藏/托盘恢复显示（含最小化恢复）时立即刷新天气，受最小间隔保护 */
+  function bindWeatherRefreshTriggers() {
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        void refreshWeather(false);
+      }
+    });
+    window.addEventListener('focus', () => {
+      void refreshWeather(false);
+    });
   }
 
   function pokeActivity() {
@@ -1559,6 +1580,7 @@
         clearInterval(weatherTimer);
         weatherTimer = null;
       }
+      clearWeatherRetry();
       return;
     }
     if (!weatherTimer) {
@@ -1628,6 +1650,7 @@
     elements.weatherRefresh.disabled = true;
     const t = weatherTranslator();
     setWeatherMeta(t('weather.loading'), 'loading');
+    setWeatherUpdated('', 'loading');
     try {
       const result = await window.petAPI.weather.get({ force: force === true });
       weatherLastFetchAt = Date.now();
@@ -1635,7 +1658,7 @@
     } catch (error) {
       console.warn('获取天气失败：', error);
       weatherLastFetchAt = Date.now();
-      renderWeatherError('weather-network-error', null);
+      showWeatherFailure('weather-network-error', weatherState);
     } finally {
       weatherLoading = false;
       elements.weatherRefresh.disabled = false;
@@ -1646,6 +1669,7 @@
     if (result && result.ok && result.data) {
       weatherState = result.data;
       weatherErrorCode = null;
+      clearWeatherRetry();
       renderWeatherData(result.data);
       return;
     }
@@ -1654,16 +1678,7 @@
         ? result.error
         : 'weather-network-error';
     const cachedData = result && result.data ? result.data : null;
-    renderWeatherError(code, cachedData);
-    if (cachedData) {
-      const t = weatherTranslator();
-      setWeatherMeta(
-        `${t('weather.updatedAt', {
-          time: formatWeatherTime(cachedData.updatedAt)
-        })} · ${t('weather.cachedNotice')}`,
-        'warning'
-      );
-    }
+    showWeatherFailure(code, cachedData);
   }
 
   /** 渲染成功数据（城市/图标/温度/描述 + 详情行）；语言切换时经 applyWeatherText 复用 */
@@ -1693,12 +1708,15 @@
     if (Number.isFinite(Number(data.windSpeed))) {
       details.push(t('weather.wind', { value: Math.round(data.windSpeed) }));
     }
-    if (Number.isFinite(Number(data.updatedAt))) {
-      details.push(
-        t('weather.updatedAt', { time: formatWeatherTime(data.updatedAt) })
-      );
-    }
     setWeatherMeta(details.join(' · '), 'ok');
+    if (Number.isFinite(Number(data.updatedAt))) {
+      setWeatherUpdated(
+        t('weather.updatedAt', { time: formatWeatherTime(data.updatedAt) }),
+        'ok'
+      );
+    } else {
+      setWeatherUpdated('', 'ok');
+    }
   }
 
   /** 失败降级：有缓存数据时保留展示；无缓存时显示本地化错误 */
@@ -1717,6 +1735,64 @@
     elements.weatherDesc.textContent = '';
     elements.weatherTemp.textContent = '';
     setWeatherMeta(weatherErrorMessage(code), 'error');
+    setWeatherUpdated('', 'error');
+  }
+
+  /** T-26：失败统一出口——保留缓存、显示错误与自动重试提示、按退避间隔重试 */
+  function showWeatherFailure(code, cachedData) {
+    renderWeatherError(code, cachedData);
+    const t = weatherTranslator();
+    const retryNotice = t('weather.retryNotice', {
+      seconds: nextWeatherRetrySeconds()
+    });
+    if (cachedData) {
+      setWeatherMeta(
+        `${t('weather.refreshFailed', {
+          error: weatherErrorMessage(code)
+        })} · ${t('weather.cachedNotice')} · ${retryNotice}`,
+        'warning'
+      );
+    } else {
+      setWeatherMeta(
+        `${weatherErrorMessage(code)} · ${retryNotice}`,
+        'error'
+      );
+    }
+    scheduleWeatherRetry();
+  }
+
+  /** T-26：下一次重试延迟（指数退避：60s → 120s → 240s → …，上限 15 分钟） */
+  function nextWeatherRetryDelayMs() {
+    return Math.min(
+      WEATHER_RETRY_BASE_MS * Math.pow(2, weatherRetryAttempt),
+      WEATHER_RETRY_MAX_MS
+    );
+  }
+
+  function nextWeatherRetrySeconds() {
+    return Math.max(1, Math.round(nextWeatherRetryDelayMs() / 1000));
+  }
+
+  /** T-26：安排失败自动重试（定时器到期后走最小间隔保护） */
+  function scheduleWeatherRetry() {
+    if (weatherRetryTimer) {
+      clearTimeout(weatherRetryTimer);
+    }
+    const delay = nextWeatherRetryDelayMs();
+    weatherRetryAttempt += 1;
+    weatherRetryTimer = setTimeout(() => {
+      weatherRetryTimer = null;
+      void refreshWeather(false);
+    }, delay);
+  }
+
+  /** T-26：成功后清零退避状态并取消待执行的重试 */
+  function clearWeatherRetry() {
+    if (weatherRetryTimer) {
+      clearTimeout(weatherRetryTimer);
+      weatherRetryTimer = null;
+    }
+    weatherRetryAttempt = 0;
   }
 
   function weatherErrorMessage(code) {
@@ -1745,6 +1821,15 @@
     elements.weatherMeta.dataset.type = type || 'ok';
   }
 
+  /** T-26：独立“上次更新”行，类型决定配色（ok/warning/error/loading） */
+  function setWeatherUpdated(text, type) {
+    if (!elements.weatherUpdated) {
+      return;
+    }
+    elements.weatherUpdated.textContent = text;
+    elements.weatherUpdated.dataset.type = type || 'ok';
+  }
+
   function formatWeatherTime(value) {
     const timestamp = Number(value);
     if (!Number.isFinite(timestamp) || timestamp <= 0) {
@@ -1763,10 +1848,19 @@
     if (!elements.weatherWidget || elements.weatherWidget.hidden) {
       return;
     }
-    if (weatherState) {
+    if (weatherErrorCode && weatherState) {
       renderWeatherData(weatherState);
+      const t = weatherTranslator();
+      setWeatherMeta(
+        `${t('weather.refreshFailed', {
+          error: weatherErrorMessage(weatherErrorCode)
+        })} · ${t('weather.cachedNotice')}`,
+        'warning'
+      );
     } else if (weatherErrorCode) {
       renderWeatherError(weatherErrorCode, null);
+    } else if (weatherState) {
+      renderWeatherData(weatherState);
     }
   }
 

@@ -71,7 +71,7 @@
     "cityPlaceholder": "e.g. Shanghai",
     "refresh": "Refresh",
     "loading": "Fetching weather…",
-    "updatedAt": "Updated {time}",
+    "updatedAt": "Last updated: {time}",
     "feelsLike": "Feels like {temp}°",
     "humidity": "Humidity {value}%",
     "wind": "Wind {value} km/h",
@@ -81,7 +81,9 @@
     "networkError": "Network request failed. Please try again later.",
     "invalidResponse": "The weather service returned an unexpected response.",
     "errorPrefix": "Failed to fetch weather: {error}",
-    "cachedNotice": "Showing the last successful data."
+    "cachedNotice": "Showing the last successful data.",
+    "refreshFailed": "Refresh failed: {error}",
+    "retryNotice": "Retrying automatically in {seconds}s"
   },
   "settings": {
     "title": "Settings",

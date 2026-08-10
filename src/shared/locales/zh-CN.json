@@ -71,7 +71,7 @@
     "cityPlaceholder": "如：上海 / Shanghai",
     "refresh": "刷新",
     "loading": "正在获取天气…",
-    "updatedAt": "更新于 {time}",
+    "updatedAt": "上次更新：{time}",
     "feelsLike": "体感 {temp}°",
     "humidity": "湿度 {value}%",
     "wind": "风速 {value} km/h",
@@ -81,7 +81,9 @@
     "networkError": "网络请求失败，请稍后重试。",
     "invalidResponse": "天气服务返回异常，请稍后重试。",
     "errorPrefix": "天气获取失败：{error}",
-    "cachedNotice": "当前显示上次成功获取的数据。"
+    "cachedNotice": "当前显示上次成功获取的数据。",
+    "refreshFailed": "刷新失败：{error}",
+    "retryNotice": "将在 {seconds} 秒后自动重试"
   },
   "settings": {
     "title": "设置",

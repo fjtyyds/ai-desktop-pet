@@ -235,6 +235,56 @@ if (
 }
 pass('T-25 工具栏导出 + 最小化集成存在');
 
+// T-26：天气自动刷新增强（15 分钟间隔、恢复显示即刷新、更新时间展示、失败重试）
+if (!rendererChatSource.includes('WEATHER_AUTO_REFRESH_MS = 15 * 60 * 1000')) {
+  fail('renderer/chat.js 未将天气自动刷新间隔改为 15 分钟');
+}
+if (
+  !rendererChatSource.includes("document.addEventListener('visibilitychange'") ||
+  !rendererChatSource.includes("window.addEventListener('focus'")
+) {
+  fail('renderer/chat.js 缺少窗口恢复显示时的天气刷新触发');
+}
+if (
+  !rendererChatSource.includes('weatherRetryTimer') ||
+  !rendererChatSource.includes('scheduleWeatherRetry')
+) {
+  fail('renderer/chat.js 缺少天气失败自动重试/退避逻辑');
+}
+if (!rendererChatSource.includes('weather-updated')) {
+  fail('renderer/chat.js 缺少“上次更新”时间展示');
+}
+pass('T-26 天气自动刷新增强集成存在');
+
+if (!rendererIndexSource.includes('id="weather-updated"')) {
+  fail('renderer/index.html 缺少“上次更新”时间元素');
+}
+pass('T-26 天气更新时间元素存在');
+
+const zhLocales = JSON.parse(
+  fs.readFileSync(path.join(root, 'src', 'shared', 'locales', 'zh-CN.json'), 'utf8')
+);
+const enLocales = JSON.parse(
+  fs.readFileSync(path.join(root, 'src', 'shared', 'locales', 'en.json'), 'utf8')
+);
+for (const key of ['updatedAt', 'refreshFailed', 'retryNotice']) {
+  if (
+    !zhLocales.weather ||
+    typeof zhLocales.weather[key] !== 'string' ||
+    !zhLocales.weather[key]
+  ) {
+    fail(`zh-CN.json 缺少 weather.${key} 文案`);
+  }
+  if (
+    !enLocales.weather ||
+    typeof enLocales.weather[key] !== 'string' ||
+    !enLocales.weather[key]
+  ) {
+    fail(`en.json 缺少 weather.${key} 文案`);
+  }
+}
+pass('T-26 天气文案键齐全（zh-CN/en）');
+
 // T-08：store persona 默认值、读写与清洗（非法值丢弃/超长截断，不破坏 settings.json）
 const { createStore, DEFAULT_SETTINGS } = require(path.join(
   root,
