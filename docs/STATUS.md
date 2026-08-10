@@ -1,10 +1,10 @@
 # 项目状态
 
 - 更新时间：2026-08-10
-- 当前阶段：M4 P0/P1 完成；P3 自动更新实施完成（T-37/T-38 已合并）；P2 待用户决策；P4 待执行
-- 当前任务：P4 最终 `npm run dist` 与安装冒烟（可自主推进）
-- 最近完成：T-38 发布产物命名 ASCII 化验收合并（3315146）；latest.yml 与实际产物一致
-- 下一步：P4 最终打包/安装冒烟 → 首次发布（v 标签 + Release，push/tag 属远程操作，发布前与用户确认）→ P2（签名/商店预算）
+- 当前阶段：M4 P0/P1/P3/P4 完成（T-37~T-39 已合并）；P2（签名/商店）待用户决策；真实更新验证待首次发布
+- 当前任务：等待用户决策/确认（首次发布、P2 预算、TTS 听感复核、清理、UI 大改排期）
+- 最近完成：T-39 M4 P4 最终打包与安装冒烟验收合并（0a8f8bc）；安装/卸载冒烟零污染
+- 下一步：用户确认后执行首次发布（v0.1.0 标签 + GitHub Release）并做真实更新端到端验证；P2 签名/商店需预算与注册类决策
 - 阻塞：无（P2 签名/商店预算、大目录/worktree 清理、UI 大改排期、TTS 听感复核仍待用户决策）
 - 交接提示：新会话先读 `AGENTS.md` → `PLAN.md` → `docs/STATUS.md` → `docs/reports/2026-08-10-工作对接方案.md` → 自己的任务卡（docs/tasks/T-xx.md）
 
@@ -188,3 +188,11 @@
 - 验证：worker 与协调者 `npm run check` 全部通过（含静态比对）；`npm run smoke` 通过；本地 `npm run dist -- --publish never` 产出 ai-desktop-pet-0.1.0-Setup.exe（100,568,284 B）与 blockmap，latest.yml 的 url/path 与实际产物完全一致。
 - 合并：3315146 fast-forward 合并入 main；worktree E:\codex\AI桌宠-m4-artifact-name 已清理，分支保留。
 - 遗留风险：真实更新链路（electron-updater 从 GitHub Releases 拉取）需首次 v 标签发布后才能端到端验证；push/tag 属远程操作，待用户确认。
+
+## T-39 合并记录（2026-08-10，项目内线程闭环）
+
+- 派发：总工按闭环 SOP 派发 T-39（M4 P4 最终打包与安装冒烟）；worker 完成并回报（分支 codex/m4-final-dist @ 0a8f8bc，基线 main 2ebb122）。
+- 实现：scripts/check.js 追加 T-39 断言（win-unpacked app-update.yml 存在且 provider/owner/repo 指向 github/fjtyyds/ai-desktop-pet）；任务卡完成记录。
+- 验证：worker 与协调者 `npm run check` 全部通过（含 T-38/T-39 断言）；`npm run smoke` 通过；`npm run dist -- --publish never` 成功，产物 ai-desktop-pet-0.1.0-Setup.exe（100,568,325 B）+ blockmap，latest.yml 引用与实际产物一致；app-update.yml 指向 GitHub；静默安装/卸载退出码 0，安装版以临时 userData 启动正常、真实 %APPDATA%\AI桌宠 零污染；安装版更新检查实测“No published versions”（证明更新源已生效）。
+- 合并：0a8f8bc fast-forward 合并入 main；worktree E:\codex\AI桌宠-m4-final-dist 已清理，分支保留。
+- 遗留风险：真实更新下载/安装链路需首次 v0.1.0 发布（v 标签 + Release，push/tag 属远程操作，待用户确认）；正式代码签名/商店渠道待 M4 P2（SmartScreen 可能提示未知发布者）。
