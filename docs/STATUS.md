@@ -6,6 +6,7 @@
 - 最近完成：T-51/52/53 验收合并推送；用户确认 TTS 维持现状、T-44 UI 目检通过；归档目录保留
 - 下一步：资金到位后恢复商店注册（Steam $100/MS Store）、签名采购与 v1.0 全渠道发布；GitHub Release 路径无需资金，可随时授权
 - 阻塞：商店与签名资金暂缺（Steam $100/MS Store/Azure Artifact Signing 或 OV/EV）；v1.0 商店发布待资金与授权
+- 最新版：`E:\codex\AI桌宠最新版`（scripts/sync-latest.ps1 自动同步，当前 0.1.0 @ f5ffa63，ADR-042）
 - 交接提示：新会话先读 `AGENTS.md` → `PLAN.md` → `docs/STATUS.md` → `docs/reports/2026-08-10-工作对接方案.md` → 自己的任务卡（docs/tasks/T-xx.md）
 
 ## M1 集成完成记录（2026-08-09）
@@ -340,3 +341,10 @@
 - 用户决策（15:07）：①商店/签名暂无资金支持，冻结；②归档目录 E:\codex\_archive_20260811\ 暂时保留；③TTS 听感维持现状；④T-44 UI 目检通过；⑤v1.0 发布是资金事项的延续，暂缓。
 - 影响：无自主可派发卡；闭环 watcher 保持运行；资金到位或用户提供新需求后恢复派活。
 - GitHub Release（免费路径）不受资金影响，仍待用户授权（push/tag/Release 边界）。
+
+## 最新版同步机制记录（2026-08-11，ADR-042）
+
+- 用户要求生成可复制的最新版本目录并随每次项目调整更新；新建 scripts/sync-latest.ps1（构建 + 同步 NSIS/MSIX 产物 + 生成 README/latest.json 清单）与 README 模板 docs/templates/latest-version-readme.md。
+- 首次执行：main f5ffa63 构建成功（NSIS 103.70MB、MSIX 143.50MB、msixupload 143.31MB），已同步到 E:\codex\AI桌宠最新版；latest.yml 引用与实际产物一致；安装包已含 T-53 修复。
+- 协议：每次 main 合并验收后由协调者运行同步脚本（已写入 AGENTS.md 常用命令与验收要求）。
+- 备注：首次运行因 PS 5.1 按 GBK 解析无 BOM 脚本误建乱码目录，已重命名为 E:\codex\_stale-sync-mojibake-20260811（约 390MB 产物副本，可恢复；物理删除被环境策略拦截，待手动）。

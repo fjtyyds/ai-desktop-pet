@@ -359,3 +359,14 @@
   4. T-44 UI 目检通过（用户确认，2026-08-11 15:07）。
   5. v1.0 全渠道发布（含商店提审）暂缓；GitHub Release 路径无需资金，待用户另行授权；正式发布仍受“push/tag/Release 需确认”边界约束。
 - 后果：项目进入“功能与文档冻结、等待资金/新需求”状态；无自主可派发卡；闭环 watcher 保持运行，用户提供资金或新需求后恢复派活。
+
+## ADR-042：最新版同步机制（scripts/sync-latest.ps1 + E:\codex\AI桌宠最新版）（2026-08-11）
+
+- 状态：Accepted
+- 背景：用户要求生成“可复制的最新版本”目录 `E:\codex\AI桌宠最新版`，并随每一次项目调整更新。
+- 决策：
+  1. 新建 `scripts/sync-latest.ps1`：默认执行 `npm run dist -- --publish never`，将 NSIS 安装包（Setup.exe/blockmap/latest.yml）与 MSIX 产物（msix/msixupload）同步到 `E:\codex\AI桌宠最新版`；`-SkipBuild` 可复用现有 dist。
+  2. 同步时清理目标目录旧产物，并生成 `README.md` 与 `latest.json`（版本/提交/时间/SHA256 清单）；README 模板为 `docs/templates/latest-version-readme.md`。
+  3. 每次 main 合并验收后，由协调者运行该脚本作为闭环收尾步骤（已写入 AGENTS.md 常用命令与验收要求）。
+  4. 脚本保持纯 ASCII（Windows PowerShell 5.1 对无 BOM 的 .ps1 按 ANSI/GBK 解析），中文目标路径用 Unicode 码点构造；首次运行误建的乱码目录已重命名保留于 `E:\codex\_stale-sync-mojibake-20260811`（删除被环境策略拦截，待用户手动）。
+- 后果：`E:\codex\AI桌宠最新版` 始终反映 main 最新构建，安装包/商店产物可从该目录直接复制分发；脚本故障仅影响同步，不影响构建产物本身。

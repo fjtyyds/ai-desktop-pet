@@ -22,6 +22,7 @@
 - `npm run check`：环境与关键文件检查（每次改动后必须通过）
 - `npm run smoke`：无头冒烟测试（自动验证渲染页能加载）
 - `npm install`：安装依赖（首次或 package.json 变更后）
+- `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\sync-latest.ps1`：构建并同步“最新版”到 `E:\codex\AI桌宠最新版`（-SkipBuild 复用现有 dist；每次 main 合并验收后由协调者执行，ADR-042）
 - 若 `npm run check` 提示 Electron 未安装（二进制缺失）：`$env:ELECTRON_MIRROR='https://npmmirror.com/mirrors/electron/'; node node_modules/electron/install.js`
 
 ## 并行开发模式（M1 起）
@@ -52,6 +53,7 @@
 - 涉及 UI 的改动必须用 `npm run dev` 人工目检
 - 里程碑完成时更新 `PLAN.md` 并提交
 - 文档与代码同时提交，禁止“只改代码不更新文档”
+- main 合并验收后运行 `scripts\sync-latest.ps1` 同步 `E:\codex\AI桌宠最新版`（ADR-042）
 
 ## 自主执行与交接（2026-08-11）
 

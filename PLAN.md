@@ -240,6 +240,7 @@
 - 2026-08-11：T-52 验收合并（919d837/4dddec5 fast-forward）：MSIX 双产物构建成功（.msix/.msixupload/NSIS 并存）、商店版更新守卫 stub 验证通过、工具链用户态自动下载；check/smoke 全绿。
 - 2026-08-11：T-53 验收合并（70a5b75 fast-forward）：定义 stopDockPolling 清理 dockMoveDebounceTimer（T-25 遗留未定义引用修复），check.js 增加调用-定义防回归断言；check/smoke 全绿。
 - 2026-08-11：用户待办决策收口（ADR-041）：商店/签名/发布因资金暂缺冻结，归档保留，TTS 维持现状，T-44 UI 目检通过；进入等待资金/新需求状态。
+- 2026-08-11：最新版同步机制落地（ADR-042）：scripts/sync-latest.ps1 + E:\codex\AI桌宠最新版（首次构建 f5ffa63：NSIS/MSIX/msixupload + latest.yml + 清单），已写入 AGENTS.md 合并后同步协议。
 
 ## Surprises & Discoveries
 
@@ -299,6 +300,7 @@
 - ADR-039：整体移除专注统计组件（2026-08-11，T-51）。
 - ADR-040：MSIX 打包实施（electron-builder 27 alpha 线）（2026-08-11，T-52）。
 - ADR-041：待办清单收口与资金暂缺下的发布策略（2026-08-11）。
+- ADR-042：最新版同步机制（scripts/sync-latest.ps1 + E:\codex\AI桌宠最新版）（2026-08-11）。
 
 详见 `docs/DECISIONS.md`。
 
