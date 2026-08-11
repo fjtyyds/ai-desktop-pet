@@ -13,8 +13,9 @@ const { initCrash, writeLog } = require('./crash'); // T-11: 崩溃上报与本�
 const { initUpdater, AUTO_UPDATE_CHECK_DELAY_MS } = require('./updater'); // T-37: 自动更新
 const ipc = require('./ipc'); // T-03: 注册 chat/settings IPC；T-15: 空闲互动接线
 const { createSecureSettings } = require('./secure-settings'); // T-19: 窗口设置持久化
-const { createDefaultStore } = require('../storage'); // T-19: 窗口设置写入
+const { createDefaultStore, resolveBaseDir } = require('../storage'); // T-19: 窗口设置写入；T-42: 遥测数据目录
 const { createTranslator } = require('../shared/locales'); // T-21: 通知本地化
+const { initTelemetry } = require('./telemetry'); // T-42: 匿名遥测（opt-in、默认关闭）
 const {
   createIdleMonitor,
   DEFAULT_IDLE_TRIGGER_MS,
@@ -26,6 +27,8 @@ let trayApi = null;
 let isQuitting = false;
 let idleMonitor = null;
 let updaterApi = null; // T-37: 自动更新（仅打包版初始化）
+let telemetryApi = null; // T-42: 匿名遥测实例
+let telemetrySessionStartedAt = 0; // T-42: 会话时长统计起点
 
 /** T-19：窗口体验 IPC 通道（ADR-022 冻结契约；preload.js 同名常量保持一致） */
 const WINDOW_CHANNELS = {
@@ -633,6 +636,29 @@ if (SKIP_BOOTSTRAP || !app || typeof app.requestSingleInstanceLock !== 'function
 
   app.whenReady().then(() => {
     loadWindowSettings(); // T-19: 读取贴边开关
+
+    // T-42：初始化匿名遥测（默认关闭；端点默认空=不上传）。
+    // 开关实时从设置读取：未开启时 track/flush 一律丢弃，绝不外发。
+    telemetryApi = initTelemetry({
+      baseDir: path.join(resolveBaseDir(), 'telemetry'),
+      endpoint: process.env.AI_PET_TELEMETRY_ENDPOINT || '',
+      getEnabled: () => {
+        try {
+          return ipc.getSettings().telemetryEnabled === true;
+        } catch (_error) {
+          return false; // 设置读取失败按关闭处理
+        }
+      }
+    });
+    telemetrySessionStartedAt = Date.now();
+    telemetryApi.trackInstallIfFirstRun();
+    telemetryApi.track('app_start', {
+      sessionId: telemetryApi.getSessionId(),
+      version: app.getVersion(),
+      locale: typeof app.getLocale === 'function' ? app.getLocale() : ''
+    });
+    telemetryApi.flush(); // 尽力补发上次残留队列（失败保留，下次再试）
+
     createMainWindow();
     registerWindowIpc(); // T-19/T-25: window:toggle-dock / window:minimize
     startPomodoroNotificationPolling(); // T-21/T-30: 消费番茄钟完成信号（系统状态轮询已移除）
@@ -680,6 +706,11 @@ if (SKIP_BOOTSTRAP || !app || typeof app.requestSingleInstanceLock !== 'function
     ipc.onActivity(() => idleMonitor.markActivity());
     idleMonitor.start();
 
+    // T-42：网络恢复时立即尝试补发遥测队列（失败不影响应用）
+    app.on('online', () => {
+      telemetryApi?.flush();
+    });
+
     // macOS 点击 Dock 图标时恢复窗口；Windows 下通常不会触发
     app.on('activate', showMainWindow);
   });
@@ -688,6 +719,17 @@ if (SKIP_BOOTSTRAP || !app || typeof app.requestSingleInstanceLock !== 'function
     isQuitting = true;
     stopPomodoroNotificationPolling(); // T-21: 退出前停止番茄钟信号轮询
     updaterApi?.handleBeforeQuit(); // T-37: 用户确认后执行 quitAndInstall
+    // T-42：退出前记录会话时长（留存漏斗）；补发为尽力而为，失败保留队列
+    if (telemetryApi && telemetrySessionStartedAt > 0) {
+      telemetryApi.track('session_end', {
+        sessionId: telemetryApi.getSessionId(),
+        durationSec: Math.max(
+          0,
+          Math.round((Date.now() - telemetrySessionStartedAt) / 1000)
+        )
+      });
+      telemetryApi.flush();
+    }
     if (mainWindow && !mainWindow.isDestroyed() && !dockedEdge) {
       persistWindowBounds(mainWindow.getBounds()); // T-19: 退出前记忆位置
     }

@@ -1,4 +1,5 @@
 const fs = require('fs');
+const http = require('http');
 const os = require('os');
 const path = require('path');
 
@@ -36,6 +37,7 @@ const requiredFiles = [
   'docs/DECISIONS.md',
   'docs/STATUS.md',
   'src/main/main.js',
+  'src/main/telemetry.js',
   'src/main/preload.js',
   'src/renderer/index.html',
   'src/renderer/styles.css',
@@ -920,6 +922,69 @@ if (fs.existsSync(distDir)) {
   pass('T-39 dist 不存在，app-update.yml 断言跳过（打包后运行 check 将断言）');
 }
 
+// T-42：匿名遥测——模块/端点默认空/IPC/preload/渲染层接线静态断言
+const telemetrySource = fs.readFileSync(
+  path.join(root, 'src', 'main', 'telemetry.js'),
+  'utf8'
+);
+const telemetryModule = require(path.join(root, 'src', 'main', 'telemetry.js'));
+if (telemetryModule.DEFAULT_ENDPOINT !== '') {
+  fail('telemetry 上报端点默认应为空串（默认不发送）');
+}
+if (!telemetrySource.includes('AI_PET_TELEMETRY_ENDPOINT')) {
+  fail('telemetry 上报端点应仅由环境变量 AI_PET_TELEMETRY_ENDPOINT 配置');
+}
+if (telemetrySource.includes('https://') || telemetrySource.includes('http://')) {
+  fail('telemetry.js 不得内置任何真实上报端点');
+}
+for (const eventName of [
+  'app_install',
+  'app_start',
+  'chat_sent',
+  'chat_reply',
+  'license_state_change',
+  'pomodoro_complete',
+  'weather_refresh'
+]) {
+  if (!telemetrySource.includes(`'${eventName}'`)) {
+    fail(`telemetry 事件白名单缺少 ${eventName}`);
+  }
+}
+if (!telemetrySource.includes('crypto.randomUUID')) {
+  fail('telemetry deviceId 应使用随机 UUID 生成');
+}
+if (!ipcSource.includes("telemetryGetStatus: 'telemetry:get-status'") ||
+    !ipcSource.includes("telemetrySetEnabled: 'telemetry:set-enabled'") ||
+    !ipcSource.includes("telemetryFlush: 'telemetry:flush'")) {
+  fail('ipc.js 缺少 telemetry:get-status/set-enabled/flush 通道');
+}
+for (const hook of [
+  "track('chat_sent'",
+  "track('chat_reply'",
+  "track('pomodoro_complete'",
+  "track('weather_refresh'"
+]) {
+  if (!ipcSource.includes(hook)) {
+    fail(`ipc.js 缺少事件接线 ${hook}`);
+  }
+}
+if (!preloadSource.includes('telemetry:get-status') ||
+    !preloadSource.includes('telemetry:set-enabled') ||
+    !preloadSource.includes('telemetry:flush') ||
+    !preloadSource.includes('telemetry:')) {
+  fail('preload.js 缺少 petAPI.telemetry API');
+}
+if (!rendererIndexSource.includes('id="telemetry-enabled"') ||
+    !rendererIndexSource.includes('id="telemetry-clear"') ||
+    !rendererIndexSource.includes('id="onboarding-telemetry-enabled"')) {
+  fail('renderer/index.html 缺少遥测 opt-in 控件（设置页/引导）');
+}
+if (!rendererChatSource.includes('petAPI.telemetry') ||
+    !rendererChatSource.includes('telemetryEnabled')) {
+  fail('renderer/chat.js 缺少遥测开关/清除接线');
+}
+pass('T-42 遥测模块、IPC/preload、渲染层接线与端点默认空断言通过');
+
 // T-08：store persona 默认值、读写与清洗（非法值丢弃/超长截断，不破坏 settings.json）
 const { createStore, DEFAULT_SETTINGS } = require(path.join(
   root,
@@ -1267,6 +1332,239 @@ try {
       fail('异步记忆抽取未保存预期事实');
     }
     pass('chat 服务长期记忆注入与异步抽取通过');
+
+    // T-42：遥测运行时验证（默认关闭/开关持久化/脱敏/断网缓存/本地端点批量上报/清除）
+    const telemetryCheckDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'ai-pet-telemetry-check-')
+    );
+    let telemetryServer = null;
+    try {
+      if (DEFAULT_SETTINGS.telemetryEnabled !== false) {
+        fail('DEFAULT_SETTINGS.telemetryEnabled 应为 false（默认关闭）');
+      }
+      const telemetryStore = createStore(telemetryCheckDir);
+      const enabledWrite = telemetryStore.writeSettings({
+        telemetryEnabled: true
+      });
+      if (
+        enabledWrite.telemetryEnabled !== true ||
+        telemetryStore.readSettings().telemetryEnabled !== true
+      ) {
+        fail('store telemetryEnabled 开启后写入/读取不一致');
+      }
+      const invalidTelemetryWrite = telemetryStore.writeSettings({
+        telemetryEnabled: 'yes'
+      });
+      if (invalidTelemetryWrite.telemetryEnabled !== true) {
+        fail('store telemetryEnabled 非布尔值应丢弃（保留当前值）');
+      }
+      telemetryStore.writeSettings({ telemetryEnabled: false });
+      pass('T-42 store telemetryEnabled 默认关闭/读写/清洗通过');
+
+      // 脱敏与字段白名单
+      const telemetry = telemetryModule.createTelemetry({
+        baseDir: path.join(telemetryCheckDir, 't1'),
+        endpoint: '',
+        enabled: true,
+        appName: 'check',
+        version: '0.0.0-test',
+        logger: { warn: () => {}, error: () => {} }
+      });
+      const firstRun = telemetry.trackInstallIfFirstRun();
+      if (!firstRun.isNew) {
+        fail('首次运行应创建新设备标识（app_install 判定）');
+      }
+      const status0 = telemetry.getStatus();
+      if (status0.endpointConfigured !== false) {
+        fail('端点默认空时 endpointConfigured 应为 false');
+      }
+      if (
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(
+          status0.deviceId || ''
+        )
+      ) {
+        fail(`deviceId 应为 UUID v4（实际 ${status0.deviceId}）`);
+      }
+      telemetry.track('chat_sent', {
+        chars: 12,
+        stream: 1,
+        text: '这条消息正文绝不能进队列',
+        apiKey: 'sk-secret',
+        content: '同样敏感',
+        path: 'C:\\Users\\someone\\secret',
+        message: 'nope'
+      });
+      telemetry.track('app_start', {
+        sessionId: 'abc',
+        version: '0.0.0',
+        locale: 'zh-CN'
+      });
+      telemetry.track('license_state_change', { state: 'active', tier: 'pro' });
+      telemetry.track('unknown_event', { anything: 1 });
+
+      const deviceRaw = JSON.parse(
+        fs.readFileSync(path.join(telemetryCheckDir, 't1', 'device.json'), 'utf8')
+      );
+      if (Object.keys(deviceRaw).some((key) => /license|key|user|path/i.test(key))) {
+        fail('device.json 不应包含许可证/用户/路径字段（与许可证解耦）');
+      }
+      const queuedRaw = JSON.parse(
+        fs.readFileSync(path.join(telemetryCheckDir, 't1', 'queue.json'), 'utf8')
+      );
+      const queuedEvents = Array.isArray(queuedRaw.events) ? queuedRaw.events : [];
+      if (queuedEvents.length !== 4) {
+        fail(`脱敏后队列事件数应为 4（实际 ${queuedEvents.length}，未知事件应丢弃）`);
+      }
+      const serialized = JSON.stringify(queuedRaw);
+      for (const needle of [
+        '消息正文',
+        'sk-secret',
+        'C:\\Users',
+        'nope',
+        '同样敏感'
+      ]) {
+        if (serialized.includes(needle)) {
+          fail(`遥测队列出现敏感数据: ${needle}`);
+        }
+      }
+      const chatSentEvent = queuedEvents.find((event) => event.name === 'chat_sent');
+      const licenseEvent = queuedEvents.find(
+        (event) => event.name === 'license_state_change'
+      );
+      if (
+        !chatSentEvent ||
+        chatSentEvent.fields.chars !== 12 ||
+        chatSentEvent.fields.stream !== 1 ||
+        !licenseEvent ||
+        licenseEvent.fields.state !== 'active' ||
+        licenseEvent.fields.tier !== 'pro'
+      ) {
+        fail('遥测白名单字段缺失');
+      }
+      if (!telemetryModule.EVENT_NAMES.includes('license_state_change')) {
+        fail('事件白名单缺少 license_state_change');
+      }
+      pass('T-42 遥测脱敏与字段白名单通过');
+
+      // 断网缓存：指向未监听端口，失败后队列保留
+      const offline = telemetryModule.createTelemetry({
+        baseDir: path.join(telemetryCheckDir, 't2'),
+        endpoint: 'http://127.0.0.1:1/telemetry',
+        enabled: true,
+        appName: 'check',
+        version: '0.0.0-test',
+        logger: { warn: () => {}, error: () => {} }
+      });
+      offline.track('weather_refresh', { ok: 0, latencyMs: 5 });
+      const offlineFlush = await offline.flush();
+      if (offlineFlush.ok !== false) {
+        fail('断网上报应失败（ok=false）');
+      }
+      if (offline.getStatus().queuedCount !== 1) {
+        fail('断网失败后本地队列应保留');
+      }
+      pass('T-42 断网缓存（失败保留队列）通过');
+
+      // 本地端点批量上报
+      const received = [];
+      telemetryServer = http.createServer((req, res) => {
+        let body = '';
+        req.on('data', (chunk) => {
+          body += chunk;
+        });
+        req.on('end', () => {
+          received.push({ url: req.url, body: JSON.parse(body) });
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end('{"ok":true}');
+        });
+      });
+      await new Promise((resolve) =>
+        telemetryServer.listen(0, '127.0.0.1', resolve)
+      );
+      const port = telemetryServer.address().port;
+      const online = telemetryModule.createTelemetry({
+        baseDir: path.join(telemetryCheckDir, 't3'),
+        endpoint: `http://127.0.0.1:${port}/telemetry`,
+        enabled: true,
+        appName: 'check',
+        version: '0.0.0-test',
+        logger: { warn: () => {}, error: () => {} }
+      });
+      online.track('pomodoro_complete', { minutes: 25 });
+      online.track('chat_reply', { ok: 1, replyChars: 42, latencyMs: 321 });
+      const onlineFlush = await online.flush();
+      if (!onlineFlush.ok || onlineFlush.sent !== 2) {
+        fail(`本地端点批量上报失败: ${JSON.stringify(onlineFlush)}`);
+      }
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      if (received.length !== 1) {
+        fail(`本地端点应收到 1 批（实际 ${received.length}）`);
+      }
+      const batch = received[0].body;
+      if (
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(
+          batch.deviceId || ''
+        )
+      ) {
+        fail(`上报 batch.deviceId 应为 UUID（实际 ${JSON.stringify(batch)}）`);
+      }
+      if (!Array.isArray(batch.events) || batch.events.length !== 2) {
+        fail('上报 batch.events 数量应为 2');
+      }
+      const allowedFieldKeys = new Set([
+        'ok',
+        'replyChars',
+        'latencyMs',
+        'minutes',
+        'state',
+        'tier',
+        'chars',
+        'stream',
+        'sessionId',
+        'version',
+        'locale',
+        'durationSec'
+      ]);
+      for (const event of batch.events) {
+        for (const key of Object.keys(event.fields || {})) {
+          if (!allowedFieldKeys.has(key)) {
+            fail(`上报字段超出白名单: ${key}`);
+          }
+        }
+      }
+      if (online.getStatus().queuedCount !== 0) {
+        fail('上报成功后队列未清空');
+      }
+      pass('T-42 本地端点批量上报（字段白名单/队列清空）通过');
+
+      // 一键关闭并清除
+      online.track('app_start', {
+        sessionId: 'x',
+        version: '0.0.0',
+        locale: 'en'
+      });
+      const cleared = online.clear();
+      if (cleared.clearedEvents !== 1 || cleared.deviceReset !== true) {
+        fail(`清除结果异常: ${JSON.stringify(cleared)}`);
+      }
+      const clearedStatus = online.getStatus();
+      if (clearedStatus.queuedCount !== 0 || clearedStatus.deviceId !== null) {
+        fail('清除后队列/deviceId 应清空');
+      }
+      if (fs.existsSync(path.join(telemetryCheckDir, 't3', 'device.json'))) {
+        fail('清除后 device.json 应已删除');
+      }
+      pass('T-42 一键关闭并清除本地数据通过');
+    } finally {
+      if (telemetryServer) {
+        try {
+          telemetryServer.close();
+        } catch (_error) {
+          // 测试服务器关闭失败不影响断言
+        }
+      }
+      fs.rmSync(telemetryCheckDir, { recursive: true, force: true });
+    }
   } catch (error) {
     fail(`chat 服务功能检查异常: ${error && error.message ? error.message : error}`);
   }

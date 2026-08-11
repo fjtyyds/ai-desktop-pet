@@ -70,6 +70,7 @@ const DEFAULT_SETTINGS = {
   pomodoroMinutes: DEFAULT_POMODORO_MINUTES, // T-21：番茄钟时长（分钟）
   pomodoroNotifyAt: 0, // T-21/T-27：渲染层→主进程一次性完成信号（时间戳；主进程消费后清零）
   pomodoroNotifyMinutes: 0, // T-21/T-27：信号携带的时长（分钟；0=未设置；随信号一同清零）
+  telemetryEnabled: false, // T-42：匿名遥测开关（opt-in，默认关闭）
   persona: { ...DEFAULT_PERSONA }
 };
 
@@ -314,6 +315,10 @@ function createStore(baseDir) {
       merged.weatherCity,
       DEFAULT_SETTINGS.weatherCity
     );
+    merged.telemetryEnabled = sanitizeBoolean(
+      merged.telemetryEnabled,
+      DEFAULT_SETTINGS.telemetryEnabled
+    );
     return merged;
   }
 
@@ -339,7 +344,8 @@ function createStore(baseDir) {
       'pomodoroEnabled',
       'pomodoroMinutes',
       'pomodoroNotifyAt',
-      'pomodoroNotifyMinutes'
+      'pomodoroNotifyMinutes',
+      'telemetryEnabled'
     ];
     const next = { ...current };
     for (const key of allowed) {
@@ -450,6 +456,13 @@ function createStore(baseDir) {
             current.pomodoroNotifyMinutes,
             0,
             POMODORO_MINUTES_MAX
+          );
+          continue;
+        }
+        if (key === 'telemetryEnabled') {
+          next.telemetryEnabled = sanitizeBoolean(
+            patch.telemetryEnabled,
+            current.telemetryEnabled
           );
           continue;
         }

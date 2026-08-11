@@ -35,6 +35,9 @@
  * - T-34（ADR-029）：开启语音包时朗读优先走 petAPI.tts.speak（Edge 在线神经语音，
  *   HTMLAudioElement 播放/停止），断网/合成/播放失败自动回退 speechSynthesis，
  *   按钮不失效、不卡死；TTS_VOICE_PACKS 增加 edgeVoice/edgeRate/edgePitch 映射
+ * - T-42 匿名遥测：首次引导与设置页提供 opt-in 开关（默认关闭），
+ *   设置页可一键“关闭并清除”本地遥测数据（petAPI.telemetry.*）；
+ *   事件采集/上报在主进程完成，渲染层不接触消息正文等敏感字段
  */
 (function () {
   'use strict';
@@ -466,10 +469,17 @@
       pomodoroStop: document.getElementById('pomodoro-stop'),
       pomodoroStatus: document.getElementById('pomodoro-status'),
       pomodoroEnabled: document.getElementById('pomodoro-enabled'),
-      pomodoroMinutes: document.getElementById('pomodoro-minutes')
+      pomodoroMinutes: document.getElementById('pomodoro-minutes'),
+      telemetryEnabled: document.getElementById('telemetry-enabled'),
+      telemetryClear: document.getElementById('telemetry-clear'),
+      telemetryStatus: document.getElementById('telemetry-status'),
+      onboardingTelemetryEnabled: document.getElementById(
+        'onboarding-telemetry-enabled'
+      )
     };
     showExportStatus = makeStatusShower(elements.exportStatus);
     showClearStatus = makeStatusShower(elements.clearStatus);
+    showTelemetryStatus = makeStatusShower(elements.telemetryStatus);
   }
 
   /* ---------------- T-19：窗口行为开关与提示（ADR-022 冻结契约） ---------------- */
@@ -625,6 +635,9 @@
       'change',
       updateTtsVoicePackControls
     );
+    elements.telemetryClear.addEventListener('click', () => {
+      void handleTelemetryClear();
+    });
 
     // T-25：点击工具栏外关闭导出菜单；Escape 关闭并归还焦点
     document.addEventListener('click', (event) => {
@@ -2200,7 +2213,8 @@
         weatherEnabled: saved.weatherEnabled === true,
         weatherCity: saved.weatherCity,
         pomodoroEnabled: saved.pomodoroEnabled !== false,
-        pomodoroMinutes: Number(saved.pomodoroMinutes) || DEFAULT_POMODORO_MINUTES
+        pomodoroMinutes: Number(saved.pomodoroMinutes) || DEFAULT_POMODORO_MINUTES,
+        telemetryEnabled: saved.telemetryEnabled === true
       });
     } catch (_error) {
       // 本地设置损坏时静默回退默认值
@@ -2278,6 +2292,7 @@
       pomodoroMinutesFromSettings(currentSettings)
     );
     applyPomodoroSettings(currentSettings);
+    elements.telemetryEnabled.checked = currentSettings.telemetryEnabled === true;
 
     const persona =
       currentSettings.persona && typeof currentSettings.persona === 'object'
@@ -2343,7 +2358,8 @@
         weatherEnabled: elements.weatherEnabled.checked,
         weatherCity: elements.weatherCity.value.trim(),
         pomodoroEnabled: elements.pomodoroEnabled.checked,
-        pomodoroMinutes: Number(elements.pomodoroMinutes.value)
+        pomodoroMinutes: Number(elements.pomodoroMinutes.value),
+        telemetryEnabled: elements.telemetryEnabled.checked
       });
       showSettingsStatus(t('settings.savedLocalFallback'), 'ok');
       return;
@@ -2366,7 +2382,8 @@
         weatherEnabled: elements.weatherEnabled.checked,
         weatherCity: elements.weatherCity.value.trim(),
         pomodoroEnabled: elements.pomodoroEnabled.checked,
-        pomodoroMinutes: Number(elements.pomodoroMinutes.value)
+        pomodoroMinutes: Number(elements.pomodoroMinutes.value),
+        telemetryEnabled: elements.telemetryEnabled.checked
       });
       // 回填清洗后的规范值，保证表单与持久化一致
       applySettings(saved || { petName, persona, language });
@@ -2691,6 +2708,8 @@
       typeof currentSettings.model === 'string' && currentSettings.model.trim()
         ? currentSettings.model.trim()
         : DEFAULT_MODEL;
+    elements.onboardingTelemetryEnabled.checked =
+      currentSettings.telemetryEnabled === true;
     elements.onboardingView.hidden = false;
     elements.onboardingView.setAttribute('aria-label', onboardingText('title'));
     renderOnboardingTemplates();
@@ -2799,7 +2818,8 @@
       petName,
       persona,
       personaTemplate: selectedOnboardingTemplateId || '',
-      onboardingDone: true
+      onboardingDone: true,
+      telemetryEnabled: elements.onboardingTelemetryEnabled.checked
     };
     const settingsApi =
       window.petAPI &&
@@ -2947,8 +2967,61 @@
     }
   }
 
+  /**
+   * T-42：一键“关闭并清除”匿名遥测。
+   * 关闭后不再采集；同时清除本地队列与设备标识（下次启用生成全新 UUID）。
+   */
+  async function handleTelemetryClear() {
+    await window.PetLocales.ready;
+    const t = window.PetLocales.createTranslator(currentLocale);
+    const telemetryApi =
+      window.petAPI &&
+      window.petAPI.telemetry &&
+      typeof window.petAPI.telemetry.setEnabled === 'function'
+        ? window.petAPI.telemetry
+        : null;
+    if (!telemetryApi) {
+      showTelemetryStatus(t('settings.telemetryApiUnavailable'), 'error');
+      return;
+    }
+    elements.telemetryClear.disabled = true;
+    try {
+      const status = await telemetryApi.setEnabled({
+        enabled: false,
+        clearData: true
+      });
+      if (elements.telemetryEnabled) {
+        elements.telemetryEnabled.checked = false;
+      }
+      if (currentSettings && typeof currentSettings === 'object') {
+        currentSettings = { ...currentSettings, telemetryEnabled: false };
+      }
+      if (elements.onboardingTelemetryEnabled) {
+        elements.onboardingTelemetryEnabled.checked = false;
+      }
+      if (status && status.queuedCount === 0) {
+        showTelemetryStatus(t('settings.telemetryCleared'), 'ok');
+      } else {
+        showTelemetryStatus(
+          t('settings.telemetryClearError', { error: '本地数据未清空' }),
+          'error'
+        );
+      }
+    } catch (error) {
+      showTelemetryStatus(
+        t('settings.telemetryClearError', {
+          error: error && error.message ? error.message : String(error)
+        }),
+        'error'
+      );
+    } finally {
+      elements.telemetryClear.disabled = false;
+    }
+  }
+
   let showExportStatus = () => {};
   let showClearStatus = () => {};
+  let showTelemetryStatus = () => {};
 
   window.ChatUI = {
     init,

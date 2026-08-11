@@ -306,6 +306,27 @@
                 >1–120 分钟，保存后生效。</span
               >
             </label>
+          <div class="field">
+            <label class="field-switch">
+              <span class="field-label" data-i18n="settings.telemetryEnabled"
+                >匿名遥测</span
+              >
+              <input id="telemetry-enabled" class="field-checkbox" type="checkbox" />
+              <span class="field-hint" data-i18n="settings.telemetryEnabledHint"
+                >帮助改进产品体验；仅统计聚合数据（次数/时长/档位），不含聊天内容、密钥或文件路径。</span
+              >
+            </label>
+            <span class="field-hint telemetry-privacy" data-i18n="settings.telemetryPrivacy"
+              >默认关闭，可随时关闭；关闭并清除后本地遥测数据立即删除。上报端点默认为空，即默认不上传任何数据。</span
+            >
+            <button
+              id="telemetry-clear"
+              class="secondary-btn telemetry-clear-btn"
+              type="button"
+              data-i18n="settings.telemetryClear"
+            >关闭并清除遥测数据</button>
+            <p id="telemetry-status" class="settings-status" role="status" hidden></p>
+          </div>
           <label class="field">
             <span class="field-label" data-i18n="settings.petName">宠物名称</span>
             <input
@@ -550,6 +571,19 @@
               role="listbox"
               aria-label="人格模板"
             ></div>
+            <label class="field field-switch">
+              <span class="field-label" data-i18n="settings.telemetryEnabled"
+                >匿名遥测</span
+              >
+              <input
+                id="onboarding-telemetry-enabled"
+                class="field-checkbox"
+                type="checkbox"
+              />
+              <span class="field-hint" data-i18n="settings.telemetryOnboardingHint"
+                >可选。默认关闭；开启后仅收集聚合使用数据（次数/时长/档位），不含聊天内容、密钥或文件路径。</span
+              >
+            </label>
           </div>
           <p id="onboarding-status" class="settings-status" role="status" hidden></p>
         </div>

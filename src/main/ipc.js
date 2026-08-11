@@ -12,6 +12,7 @@ const { createSecureSettings } = require('./secure-settings');
 const { createTranslator } = require('../shared/locales');
 const { getWeather } = require('./weather'); // T-22：天气小部件（主进程网络请求）
 const ttsEdge = require('./tts-edge'); // T-34：Edge 在线神经语音（ADR-029）
+const telemetry = require('./telemetry'); // T-42：匿名遥测（opt-in、脱敏、批量上报）
 
 /**
  * T-16：情绪引擎共享单例（ADR-022 mood.get；src/llm/** 只读）。
@@ -50,7 +51,10 @@ const CHANNELS = {
   historyExport: 'history:export', // T-18：导出对话
   historyClear: 'history:clear', // T-18：清除数据
   weatherGet: 'weather:get', // T-22：天气小部件
-  ttsSpeak: 'tts:speak' // T-34：在线神经语音合成（ADR-029）
+  ttsSpeak: 'tts:speak', // T-34：在线神经语音合成（ADR-029）
+  telemetryGetStatus: 'telemetry:get-status', // T-42：遥测状态
+  telemetrySetEnabled: 'telemetry:set-enabled', // T-42：开关（可附带清除本地数据）
+  telemetryFlush: 'telemetry:flush' // T-42：测试/网络恢复用批量补发
 };
 
 /** history.clear 允许的范围（契约：messages / memories / settings / all） */
@@ -132,7 +136,10 @@ async function handleChatSend(_event, payload) {
   notifyActivity(); // T-15：发送消息视为交互
   const text = payload && typeof payload.text === 'string' ? payload.text : '';
   const clientHistory = payload && Array.isArray(payload.history) ? payload.history : [];
-  return getChatService().send(text, clientHistory);
+  const startedAt = Date.now();
+  const result = await getChatService().send(text, clientHistory);
+  trackChatActivity(false, text, result, startedAt); // T-42：匿名事件（仅聚合字段）
+  return result;
 }
 
 /**
@@ -152,7 +159,8 @@ async function handleChatSendStream(event, payload) {
   const sender = event.sender;
 
   try {
-    return await getChatService().sendStream(text, clientHistory, {
+    const startedAt = Date.now();
+    const result = await getChatService().sendStream(text, clientHistory, {
       onDelta: (delta) => {
         if (sender && !sender.isDestroyed()) {
           sender.send(CHANNELS.chatDelta, { delta });
@@ -160,6 +168,8 @@ async function handleChatSendStream(event, payload) {
       },
       signal: controller.signal
     });
+    trackChatActivity(true, text, result, startedAt); // T-42：匿名事件（仅聚合字段）
+    return result;
   } finally {
     if (streamAbortController === controller) {
       streamAbortController = null;
@@ -214,6 +224,8 @@ function consumePomodoroNotificationSignal() {
     pomodoroNotifyAt: 0,
     pomodoroNotifyMinutes: 0
   });
+  // T-42：番茄钟完成事件（仅分钟数；遥测未开启时内部自动丢弃）
+  telemetry.getTelemetry()?.track('pomodoro_complete', { minutes });
   return {
     at,
     minutes,
@@ -493,7 +505,77 @@ async function handleWeatherGet(_event, payload) {
       ? current.language
       : 'system';
   const force = Boolean(payload && payload.force);
-  return getWeather({ city, language, force });
+  const startedAt = Date.now();
+  const result = await getWeather({ city, language, force });
+  // T-42：天气刷新事件（仅结果/耗时，不包含城市名等用户数据）
+  telemetry.getTelemetry()?.track('weather_refresh', {
+    ok: result && result.ok ? 1 : 0,
+    latencyMs: Date.now() - startedAt
+  });
+  return result;
+}
+
+/**
+ * T-42：对话匿名事件（chat_sent / chat_reply）。
+ * 只传聚合字段（字数/是否流式/结果/回复字数/耗时），绝不传消息正文。
+ */
+function trackChatActivity(stream, text, result, startedAt) {
+  const api = telemetry.getTelemetry();
+  if (!api) {
+    return;
+  }
+  api.track('chat_sent', {
+    chars: typeof text === 'string' ? text.length : 0,
+    stream: stream ? 1 : 0
+  });
+  if (result && result.ok) {
+    api.track('chat_reply', {
+      ok: 1,
+      replyChars:
+        result.reply && typeof result.reply === 'string' ? result.reply.length : 0,
+      latencyMs: Math.max(0, Date.now() - startedAt)
+    });
+  }
+}
+
+/** T-42：读取遥测状态（合并设置中的开关状态） */
+function handleTelemetryGetStatus() {
+  const api = telemetry.getTelemetry();
+  const enabled = getSettings().telemetryEnabled === true;
+  if (!api) {
+    return {
+      enabled,
+      endpointConfigured: false,
+      deviceId: null,
+      queuedCount: 0,
+      lastFlushAt: null,
+      flushInFlight: false,
+      reason: 'not-initialized'
+    };
+  }
+  return { ...api.getStatus(), enabled };
+}
+
+/** T-42：设置开关；clearData=true 时同时清除本地队列与设备标识 */
+function handleTelemetrySetEnabled(_event, payload) {
+  notifyActivity(); // T-15：设置遥测视为交互
+  const enabled = Boolean(payload && payload.enabled);
+  const clearData = Boolean(payload && payload.clearData);
+  settings = getSecureSettings().writeSettings({ telemetryEnabled: enabled });
+  const api = telemetry.getTelemetry();
+  if (clearData && api) {
+    api.clear();
+  }
+  return handleTelemetryGetStatus();
+}
+
+/** T-42：立即尝试批量补发（测试/网络恢复时使用；失败不影响应用） */
+function handleTelemetryFlush() {
+  const api = telemetry.getTelemetry();
+  if (!api) {
+    return { ok: false, error: 'not-initialized' };
+  }
+  return api.flush();
 }
 
 /** T-34（ADR-029）：Edge 在线神经语音合成，返回 { ok, audioDataUrl, error } */
@@ -535,6 +617,9 @@ function registerIpcHandlers() {
   ipcMain.handle(CHANNELS.historyClear, handleHistoryClear);
   ipcMain.handle(CHANNELS.weatherGet, handleWeatherGet);
   ipcMain.handle(CHANNELS.ttsSpeak, handleTtsSpeak);
+  ipcMain.handle(CHANNELS.telemetryGetStatus, handleTelemetryGetStatus);
+  ipcMain.handle(CHANNELS.telemetrySetEnabled, handleTelemetrySetEnabled);
+  ipcMain.handle(CHANNELS.telemetryFlush, handleTelemetryFlush);
 }
 
 // 被 src/main/main.js require 后自动注册（M1 集成时由协调者加入 require('./ipc')）

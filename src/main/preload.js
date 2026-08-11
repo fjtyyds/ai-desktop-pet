@@ -21,7 +21,10 @@ const CHANNELS = {
   weatherGet: 'weather:get',
   windowToggleDock: 'window:toggle-dock',
   windowMinimize: 'window:minimize', // T-25：最小化到任务栏（ADR-026 冻结契约）
-  ttsSpeak: 'tts:speak' // T-34：在线神经语音合成（ADR-029）
+  ttsSpeak: 'tts:speak', // T-34：在线神经语音合成（ADR-029）
+  telemetryGetStatus: 'telemetry:get-status', // T-42：匿名遥测状态
+  telemetrySetEnabled: 'telemetry:set-enabled', // T-42：匿名遥测开关
+  telemetryFlush: 'telemetry:flush' // T-42：匿名遥测批量补发（测试用）
 };
 
 contextBridge.exposeInMainWorld('petAPI', {
@@ -84,5 +87,10 @@ contextBridge.exposeInMainWorld('petAPI', {
   },
   tts: {
     speak: (payload) => ipcRenderer.invoke(CHANNELS.ttsSpeak, payload) // T-34
+  },
+  telemetry: {
+    getStatus: () => ipcRenderer.invoke(CHANNELS.telemetryGetStatus),
+    setEnabled: (payload) => ipcRenderer.invoke(CHANNELS.telemetrySetEnabled, payload),
+    flush: () => ipcRenderer.invoke(CHANNELS.telemetryFlush)
   }
 });

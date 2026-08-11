@@ -441,6 +441,18 @@
   flex-basis: 100%;
 }
 
+/* T-42：匿名遥测设置区（opt-in、默认关闭、一键清除） */
+.telemetry-privacy {
+  flex-basis: 100%;
+  margin-top: 2px;
+}
+
+.telemetry-clear-btn {
+  margin-top: 6px;
+  max-width: 190px;
+  align-self: flex-start;
+}
+
 /* T-16 情绪可视化：表情与配色随 mood 变化（ADR-022 mood.get） */
 .mood-indicator {
   flex: 0 0 auto;
