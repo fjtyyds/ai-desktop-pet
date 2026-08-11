@@ -2,9 +2,9 @@
 
 - 更新时间：2026-08-11
 - 当前阶段：T-40~T-47 全部验收合并；v0.1.0 GitHub Release 已发布；v1.0（2026-09-01）发布准备
-- 当前任务：T-52 MSIX 实施（已建卡待派发，codex/m4-msix-impl）；T-51 已验收合并
+- 当前任务：T-52 MSIX 实施已验收合并；下一张卡 T-53 修复 stopDockPolling 未定义（最小化窗口报错）
 - 最近完成：T-50 账户区并入分组 + 移除番茄钟（714b706）；T-48/T-49 验收合并；v0.1.0 Release（GitHub，exe+blockmap+latest.yml，CI 全绿）
-- 下一步：派发 T-52 → 验收合并 → 外部账号与资金事项（Steam 注册、签名采购、商店提审）仍待用户；归档物理删除被环境策略拦截待手动；TTS 试听与 UI 截图已产出
+- 下一步：T-53 修复卡闭环 → 外部账号与资金事项（Steam 注册、签名采购、商店提审）仍待用户；归档物理删除被环境策略拦截待手动；TTS 试听与 UI 截图已产出待用户复核
 - 阻塞：商店注册与预算（Steam $100/MS Store/Azure）、签名采购、MSIX 依赖升级审批、归档目录物理删除、TTS 听感复核、T-44 UI 目检均待用户决策/确认
 - 交接提示：新会话先读 `AGENTS.md` → `PLAN.md` → `docs/STATUS.md` → `docs/reports/2026-08-10-工作对接方案.md` → 自己的任务卡（docs/tasks/T-xx.md）
 
@@ -317,3 +317,14 @@
 
 - 用户批准 MSIX 依赖升级；electron-builder 升级至 27.0.0-alpha.6（dd29cc5，ADR-040）。
 - 范围：electron-builder.yml MSIX 配置（nsis 并存）、updater.js process.windowsStore 守卫、appx logo 占位资源、本地双产物构建验证；商店注册/提审待用户账号与预算。
+
+## T-52 合并记录（2026-08-11，项目内线程闭环）
+
+- worker 完成并回报（分支 codex/m4-msix-impl @ 919d837 + 4dddec5，基线 main 324c1f7）：electron-builder.yml 增加 msix 目标（x64，nsis 并存；identityName/publisher 占位、zh-CN/en-US、四段版本、msixupload）；updater.js `process.windowsStore` 守卫；tray.js 商店版“检查更新”提示走 Store；appx 4 个 logo 占位；check.js 新增 T-52 断言并兼容 electron-builder 27 的 latest.yml 列表格式。
+- 验证：worker 与协调者 check/smoke 全绿；dist 双产物实测（MSIX 150.5MB/msixupload 150.3MB/NSIS 108.7MB+blockmap+latest.yml 引用一致）；守卫 stub 验证 0 初始化/0 调用；AppxManifest 核验通过；工具链自动下载用户态缓存（无系统级安装）；fast-forward 合并，worktree 已清理，分支保留。
+- 遗留：alpha 能力待 27 稳定版重测；占位身份待商店账号回填；真机 MSIX 安装/签名待 T-46/T-47 范围执行。
+
+## T-53 建卡记录（2026-08-11）
+
+- 来源：其他项目线程排查音频时发现本应用日志报 `stopDockPolling is not defined`（最小化窗口时触发）；协调者核实 src/main/main.js:497 调用但全仓无定义（T-25 遗留，T-31 改为 move 防抖后无轮询机制）。
+- 修复方向：minimize 处理器清理 dockMoveDebounceTimer（定义 stopDockPolling 或直接 clearTimeout），check.js 增加“调用存在定义”断言。
