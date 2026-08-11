@@ -52,11 +52,22 @@ const DEFAULT_PERSONA_TEMPLATE_ID = 'warm';
 /** 支持的语言设置：'system' = 跟随系统；'zh-CN' / 'en' 为显式选择（ADR-018，T-12） */
 const SUPPORTED_LANGUAGES = ['system', 'zh-CN', 'en'];
 
+/** 许可证档位（T-40）：与 src/main/license.js TIERS 保持一致 */
+const LICENSE_TIERS = ['free', 'yearly', 'lifetime'];
+/** 许可证字段长度上限（T-40）：与 src/main/license.js 保持一致 */
+const LICENSE_KEY_MAX_LENGTH = 128;
+const LICENSE_DEVICE_ID_MAX_LENGTH = 64;
+
 const DEFAULT_SETTINGS = {
   apiKey: '',
   model: DEFAULT_MODEL,
   petName: 'AI 桌宠',
   language: 'system',
+  licenseTier: 'free', // T-40：free / yearly（Pro 订阅）/ lifetime（永久买断）
+  licenseKey: '', // T-40：激活码/订单号（仅本地校验，不落任何密钥）
+  licenseExpiresAt: 0, // T-40：订阅到期时间戳；0 = 永久/未激活
+  deviceId: '', // T-40：设备绑定标识（首次生成后不再变化）
+  complianceAccepted: false, // T-40：首次启动年龄确认+内容合规声明是否已同意
   idleEnabled: true, // T-15：空闲主动互动开关，默认开启
   dockEnabled: true, // T-31：靠边吸附开关（方案 B：不自动隐藏），默认开启
   windowBounds: null, // T-19：上次窗口位置 { x, y }；null 表示未保存
@@ -178,6 +189,11 @@ function sanitizeWeatherCity(value, current) {
     .slice(0, WEATHER_CITY_MAX_LENGTH);
 }
 
+/** 清洗许可证档位：非法值（不在 free/yearly/lifetime）丢弃，保留当前值 */
+function sanitizeLicenseTier(value, current) {
+  return LICENSE_TIERS.includes(value) ? value : current;
+}
+
 /**
  * 清洗 persona 字段（ADR-011/ADR-013）：
  * - traits 必须是字符串数组；非字符串项/空串丢弃，每项截断到 20 字、最多 10 项；
@@ -254,6 +270,28 @@ function createStore(baseDir) {
       { allowEmpty: false }
     );
     merged.language = sanitizeLanguage(merged.language, DEFAULT_SETTINGS.language);
+    merged.licenseTier = sanitizeLicenseTier(
+      merged.licenseTier,
+      DEFAULT_SETTINGS.licenseTier
+    );
+    merged.licenseKey = sanitizeText(
+      merged.licenseKey,
+      DEFAULT_SETTINGS.licenseKey,
+      LICENSE_KEY_MAX_LENGTH
+    );
+    merged.licenseExpiresAt = sanitizeNonNegativeInteger(
+      merged.licenseExpiresAt,
+      DEFAULT_SETTINGS.licenseExpiresAt
+    );
+    merged.deviceId = sanitizeText(
+      merged.deviceId,
+      DEFAULT_SETTINGS.deviceId,
+      LICENSE_DEVICE_ID_MAX_LENGTH
+    );
+    merged.complianceAccepted = sanitizeBoolean(
+      merged.complianceAccepted,
+      DEFAULT_SETTINGS.complianceAccepted
+    );
     merged.idleEnabled = sanitizeBoolean(
       merged.idleEnabled,
       DEFAULT_SETTINGS.idleEnabled
@@ -327,6 +365,11 @@ function createStore(baseDir) {
       'model',
       'petName',
       'language',
+      'licenseTier',
+      'licenseKey',
+      'licenseExpiresAt',
+      'deviceId',
+      'complianceAccepted',
       'idleEnabled',
       'dockEnabled',
       'windowBounds',
@@ -363,6 +406,43 @@ function createStore(baseDir) {
         }
         if (key === 'language') {
           next.language = sanitizeLanguage(patch.language, current.language);
+          continue;
+        }
+        if (key === 'licenseTier') {
+          next.licenseTier = sanitizeLicenseTier(
+            patch.licenseTier,
+            current.licenseTier
+          );
+          continue;
+        }
+        if (key === 'licenseKey') {
+          next.licenseKey = sanitizeText(
+            patch.licenseKey,
+            current.licenseKey,
+            LICENSE_KEY_MAX_LENGTH
+          );
+          continue;
+        }
+        if (key === 'licenseExpiresAt') {
+          next.licenseExpiresAt = sanitizeNonNegativeInteger(
+            patch.licenseExpiresAt,
+            current.licenseExpiresAt
+          );
+          continue;
+        }
+        if (key === 'deviceId') {
+          next.deviceId = sanitizeText(
+            patch.deviceId,
+            current.deviceId,
+            LICENSE_DEVICE_ID_MAX_LENGTH
+          );
+          continue;
+        }
+        if (key === 'complianceAccepted') {
+          next.complianceAccepted = sanitizeBoolean(
+            patch.complianceAccepted,
+            current.complianceAccepted
+          );
           continue;
         }
         if (key === 'idleEnabled') {
@@ -480,6 +560,8 @@ module.exports = {
   DEFAULT_SETTINGS,
   PERSONA_TEMPLATE_IDS,
   DEFAULT_PERSONA_TEMPLATE_ID,
+  LICENSE_TIERS,
+  LICENSE_KEY_MAX_LENGTH,
   TTS_VOICE_PACK_ID_MAX_LENGTH,
   DEFAULT_POMODORO_MINUTES,
   POMODORO_MINUTES_MIN,

@@ -12,6 +12,7 @@ const { createSecureSettings } = require('./secure-settings');
 const { createTranslator } = require('../shared/locales');
 const { getWeather } = require('./weather'); // T-22：天气小部件（主进程网络请求）
 const ttsEdge = require('./tts-edge'); // T-34：Edge 在线神经语音（ADR-029）
+const { createLicenseManager } = require('./license'); // T-40：许可证与付费墙
 
 /**
  * T-16：情绪引擎共享单例（ADR-022 mood.get；src/llm/** 只读）。
@@ -50,7 +51,10 @@ const CHANNELS = {
   historyExport: 'history:export', // T-18：导出对话
   historyClear: 'history:clear', // T-18：清除数据
   weatherGet: 'weather:get', // T-22：天气小部件
-  ttsSpeak: 'tts:speak' // T-34：在线神经语音合成（ADR-029）
+  ttsSpeak: 'tts:speak', // T-34：在线神经语音合成（ADR-029）
+  licenseGet: 'license:get', // T-40：读取许可证/门控/额度状态
+  licenseActivate: 'license:activate', // T-40：激活码/订单号激活
+  licenseDeactivate: 'license:deactivate' // T-40：注销激活
 };
 
 /** history.clear 允许的范围（契约：messages / memories / settings / all） */
@@ -64,6 +68,7 @@ let chatService = null;
 let registered = false;
 let secureSettings = null;
 let streamAbortController = null;
+let licenseManager = null; // T-40：许可证单例
 
 // T-15：交互活动订阅（主进程空闲计时据此重置）
 const activityListeners = new Set();
@@ -109,6 +114,17 @@ function getSecureSettings() {
   return secureSettings;
 }
 
+function getLicenseManager() {
+  if (!licenseManager) {
+    licenseManager = createLicenseManager({
+      settings: getSecureSettings(),
+      baseDir: resolveBaseDir(),
+      now: () => Date.now()
+    });
+  }
+  return licenseManager;
+}
+
 function getProvider() {
   if (!provider) {
     provider = createProvider(getSettings());
@@ -130,9 +146,30 @@ function getChatService() {
 
 async function handleChatSend(_event, payload) {
   notifyActivity(); // T-15：发送消息视为交互
+  const guard = consumeCloudQuotaIfNeeded();
+  if (!guard.ok) {
+    return { ok: false, reply: '', error: guard.error };
+  }
   const text = payload && typeof payload.text === 'string' ? payload.text : '';
   const clientHistory = payload && Array.isArray(payload.history) ? payload.history : [];
   return getChatService().send(text, clientHistory);
+}
+
+/**
+ * T-40：云 AI 额度门控。
+ * 有 BYOK API Key 时不消耗额度；否则按许可证档位扣减（free 10 次/日、
+ * yearly 200 次/月；lifetime 不含云额度按免费档）。
+ */
+function consumeCloudQuotaIfNeeded() {
+  const current = getSettings();
+  const hasByok =
+    current &&
+    typeof current.apiKey === 'string' &&
+    current.apiKey.trim().length > 0;
+  if (hasByok) {
+    return { ok: true };
+  }
+  return getLicenseManager().consumeCloudQuota();
 }
 
 /**
@@ -140,6 +177,10 @@ async function handleChatSend(_event, payload) {
  * 结束/取消时 sendStream 的 Promise resolve；同一时刻只允许一个活动流，新流会先取消旧流。
  */
 async function handleChatSendStream(event, payload) {
+  const guard = consumeCloudQuotaIfNeeded();
+  if (!guard.ok) {
+    return { ok: false, reply: '', error: guard.error };
+  }
   const text = payload && typeof payload.text === 'string' ? payload.text : '';
   const clientHistory = payload && Array.isArray(payload.history) ? payload.history : [];
 
@@ -189,6 +230,22 @@ function handleSettingsSet(_event, patch) {
   provider = null;
   chatService = null;
   return { ...settings };
+}
+
+/** T-40：读取许可证状态（含门控与云 AI 额度），供设置页“账户/订阅”展示 */
+function handleLicenseGet() {
+  return getLicenseManager().getPublicStatus();
+}
+
+/** T-40：激活码/订单号激活（本地 mock 校验，T-41 接入真实支付） */
+function handleLicenseActivate(_event, payload) {
+  const code = payload && typeof payload.code === 'string' ? payload.code : '';
+  return getLicenseManager().activate(code);
+}
+
+/** T-40：注销激活，回到免费版 */
+function handleLicenseDeactivate() {
+  return getLicenseManager().deactivate();
 }
 
 /**
@@ -400,6 +457,13 @@ function clearData(scope) {
     settings = getSecureSettings().writeSettings({ ...DEFAULT_SETTINGS });
     provider = null;
     chatService = null;
+    // T-40：清除设置时一并清掉许可证 runtime 状态（额度记录），并重建管理器
+    licenseManager = null;
+    try {
+      fs.rmSync(path.join(baseDir, 'license-state.json'), { force: true });
+    } catch (_error) {
+      // runtime 状态清理失败不影响主流程
+    }
   }
   return normalized;
 }
@@ -535,6 +599,9 @@ function registerIpcHandlers() {
   ipcMain.handle(CHANNELS.historyClear, handleHistoryClear);
   ipcMain.handle(CHANNELS.weatherGet, handleWeatherGet);
   ipcMain.handle(CHANNELS.ttsSpeak, handleTtsSpeak);
+  ipcMain.handle(CHANNELS.licenseGet, handleLicenseGet);
+  ipcMain.handle(CHANNELS.licenseActivate, handleLicenseActivate);
+  ipcMain.handle(CHANNELS.licenseDeactivate, handleLicenseDeactivate);
 }
 
 // 被 src/main/main.js require 后自动注册（M1 集成时由协调者加入 require('./ipc')）
@@ -546,6 +613,7 @@ module.exports = {
   registerIpcHandlers,
   CHANNELS,
   getSettings,
+  getLicenseManager,
   consumePomodoroNotificationSignal,
   onActivity,
   notifyActivity,

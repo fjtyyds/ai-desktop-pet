@@ -21,7 +21,10 @@ const CHANNELS = {
   weatherGet: 'weather:get',
   windowToggleDock: 'window:toggle-dock',
   windowMinimize: 'window:minimize', // T-25：最小化到任务栏（ADR-026 冻结契约）
-  ttsSpeak: 'tts:speak' // T-34：在线神经语音合成（ADR-029）
+  ttsSpeak: 'tts:speak', // T-34：在线神经语音合成（ADR-029）
+  licenseGet: 'license:get', // T-40：许可证状态
+  licenseActivate: 'license:activate', // T-40：激活
+  licenseDeactivate: 'license:deactivate' // T-40：注销激活
 };
 
 contextBridge.exposeInMainWorld('petAPI', {
@@ -84,5 +87,10 @@ contextBridge.exposeInMainWorld('petAPI', {
   },
   tts: {
     speak: (payload) => ipcRenderer.invoke(CHANNELS.ttsSpeak, payload) // T-34
+  },
+  license: {
+    get: () => ipcRenderer.invoke(CHANNELS.licenseGet), // T-40
+    activate: (code) => ipcRenderer.invoke(CHANNELS.licenseActivate, { code }), // T-40
+    deactivate: () => ipcRenderer.invoke(CHANNELS.licenseDeactivate) // T-40
   }
 });
