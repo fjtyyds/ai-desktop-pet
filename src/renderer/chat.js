@@ -45,6 +45,10 @@
  *   激活与注销入口）；功能门控（高级神经语音、皮肤市场、专注统计/待办仅
  *   yearly/lifetime）；首次启动年龄确认 + 内容合规声明弹窗（同意后不再弹，
  *   拒绝后 AI 对话停用）；云额度不足时本地拦截并回显主进程错误
+ * - T-44 UI 大改（M3.6）：深色玻璃拟态 + 浅色主题切换（theme 持久化）、
+ *   减弱动效开关（reduceMotion，关闭呼吸/眨眼/过渡）、角色呼吸/眨眼/情绪联动
+ *   微动画（纯 CSS）、效率小组件增强（专注统计/喝水提醒/待办，本地持久化；
+ *   专注统计与待办按 T-40 许可证门控仅 paid 显示）
  */
 (function () {
   'use strict';
@@ -60,6 +64,12 @@
   const WEATHER_RETRY_MAX_MS = 15 * 60 * 1000; // T-26：重试退避上限（不超过自动刷新间隔）
   const DEFAULT_POMODORO_MINUTES = 25; // T-21：与 store.js 默认值一致
   const POMODORO_TICK_MS = 250; // T-21：番茄钟刷新间隔
+  const DEFAULT_THEME = 'dark'; // T-44：与 store.js DEFAULT_THEME 一致
+  const WATER_CHECK_MS = 30 * 1000; // T-44：喝水提醒检查间隔
+  const WATER_INTERVAL_DEFAULT = 60; // T-44：默认 60 分钟
+  const WATER_INTERVAL_MIN = 5; // T-44：与 store.js 保持一致
+  const WATER_INTERVAL_MAX = 240; // T-44：与 store.js 保持一致
+  const TODOS_MAX_LENGTH = 100; // T-44：与 store.js TODOS_MAX_LENGTH 一致
   /** T-31：设置页窗口行为区块文案（双语内联，沿用 T-19 结构，避免无意义的 locale 重构） */
   const WINDOW_FEATURE_HINTS = {
     'zh-CN': {
@@ -378,6 +388,13 @@
     endsAt: 0,
     timerId: null
   };
+  // T-44：主题/减弱动效/效率小组件状态
+  let theme = DEFAULT_THEME;
+  let reduceMotion = false;
+  let waterTimer = null;
+  let waterStatusTimer = null;
+  let waterNotifiedAt = 0;
+  let waterStatusOverrideUntil = 0;
 
   async function init() {
     cacheElements();
@@ -512,6 +529,22 @@
       licenseActivate: document.getElementById('license-activate'),
       licenseDeactivate: document.getElementById('license-deactivate'),
       licenseMessage: document.getElementById('license-message'),
+      // T-44：主题/减弱动效/效率小组件
+      themeSelect: document.getElementById('theme'),
+      reduceMotionCheckbox: document.getElementById('reduce-motion'),
+      waterEnabled: document.getElementById('water-enabled'),
+      waterInterval: document.getElementById('water-interval'),
+      focusWidget: document.getElementById('focus-widget'),
+      focusCount: document.getElementById('focus-count'),
+      focusMinutes: document.getElementById('focus-minutes'),
+      waterWidget: document.getElementById('water-widget'),
+      waterStatus: document.getElementById('water-status'),
+      waterDrink: document.getElementById('water-drink'),
+      todosWidget: document.getElementById('todos-widget'),
+      todoInput: document.getElementById('todo-input'),
+      todoAdd: document.getElementById('todo-add'),
+      todoList: document.getElementById('todo-list'),
+      todoStatus: document.getElementById('todo-status'),
       // T-40：年龄确认 + 内容合规声明弹窗
       complianceView: document.getElementById('compliance-view'),
       complianceAccept: document.getElementById('compliance-accept'),
@@ -677,6 +710,37 @@
     elements.pomodoroStart.addEventListener('click', () => startPomodoro());
     elements.pomodoroReset.addEventListener('click', resetPomodoro);
     elements.pomodoroStop.addEventListener('click', stopPomodoro);
+    // T-44：主题/减弱动效即时生效并持久化
+    elements.themeSelect.addEventListener('change', () => {
+      theme = elements.themeSelect.value === 'light' ? 'light' : 'dark';
+      applyTheme();
+      persistT44Preferences({ theme });
+    });
+    elements.reduceMotionCheckbox.addEventListener('change', () => {
+      reduceMotion = elements.reduceMotionCheckbox.checked;
+      applyTheme();
+      persistT44Preferences({ reduceMotion });
+    });
+    // T-44：喝水提醒（开关即时生效，间隔随保存设置写入）
+    elements.waterEnabled.addEventListener('change', () => {
+      const wr = waterReminderSettings(currentSettings);
+      currentSettings = {
+        ...currentSettings,
+        waterReminder: { ...wr, enabled: elements.waterEnabled.checked }
+      };
+      syncWaterWidget();
+      persistT44Preferences({ waterReminder: currentSettings.waterReminder });
+    });
+    elements.waterDrink.addEventListener('click', () => void recordWaterDrink());
+    // T-44：待办输入
+    elements.todoAdd.addEventListener('click', addTodo);
+    elements.todoInput.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        addTodo();
+      }
+    });
+    elements.todoList.addEventListener('click', handleTodoListClick);
     elements.ttsVoicePackEnabled.addEventListener(
       'change',
       updateTtsVoicePackControls
@@ -953,6 +1017,8 @@
     updatePomodoroControls();
     const t = window.PetLocales.createTranslator(currentLocale);
     showPomodoroStatus(t('pomodoro.finished'), 'ok');
+    // T-44：今日专注统计累计（次数 +1、时长累加；Pro 门控仅影响展示，数据始终本地记录）
+    void recordFocusSession(pomodoroMinutesFromSettings(currentSettings));
     if (currentSettings.pomodoroEnabled !== false) {
       // T-27：一次性完成信号（pomodoroNotifyAt/pomodoroNotifyMinutes）由主进程
       // 幂等消费并清零；普通 saveSettings 的 patch 不携带这两个字段，
@@ -2025,6 +2091,407 @@
     }
   }
 
+  /* ---------------- T-44：主题 / 减弱动效 / 效率小组件 ---------------- */
+
+  /** 把 theme/reduceMotion 写到 html 根节点，驱动 CSS 变量与动效开关 */
+  function applyTheme() {
+    if (!document.documentElement) {
+      return;
+    }
+    document.documentElement.dataset.theme = theme;
+    document.documentElement.classList.toggle('reduce-motion', reduceMotion);
+  }
+
+  /** 主题/动效/喝水开关即时生效并持久化；petAPI 缺失时降级 localStorage */
+  function persistT44Preferences(patch) {
+    const settingsApi =
+      window.petAPI &&
+      window.petAPI.settings &&
+      typeof window.petAPI.settings.set === 'function'
+        ? window.petAPI.settings
+        : null;
+    if (!settingsApi) {
+      try {
+        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...saved, ...patch }));
+      } catch (_error) {
+        // 本地存储不可用时仅本次会话生效
+      }
+      return;
+    }
+    void settingsApi
+      .set(patch)
+      .then((saved) => {
+        if (saved && typeof saved === 'object') {
+          currentSettings = { ...currentSettings, ...saved };
+        }
+      })
+      .catch((error) => {
+        console.warn('保存主题/动效偏好失败：', error);
+      });
+  }
+
+  /** 本地日期键 YYYY-MM-DD（专注统计跨日重置依据） */
+  function todayKey(now) {
+    const date = now || new Date();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${date.getFullYear()}-${month}-${day}`;
+  }
+
+  /** 专注统计规范化：非今日数据视为新的一天（count/minutes 归零） */
+  function normalizeFocusStats(raw, now) {
+    const key = todayKey(now);
+    const source = raw && typeof raw === 'object' ? raw : {};
+    const date =
+      typeof source.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(source.date)
+        ? source.date
+        : '';
+    if (date !== key) {
+      return { date: key, count: 0, minutes: 0 };
+    }
+    return {
+      date: key,
+      count: Math.max(0, Math.floor(Number(source.count) || 0)),
+      minutes: Math.max(0, Math.floor(Number(source.minutes) || 0))
+    };
+  }
+
+  /** 渲染专注统计；Pro 门控（yearly/lifetime 才显示） */
+  function renderFocusStats(raw) {
+    if (!elements.focusWidget || !elements.focusCount || !elements.focusMinutes) {
+      return;
+    }
+    const stats = normalizeFocusStats(raw, new Date());
+    const t = window.PetLocales.createTranslator(currentLocale);
+    elements.focusCount.textContent = String(stats.count);
+    elements.focusMinutes.textContent = String(stats.minutes);
+    elements.focusWidget.hidden = !licenseTierIsPaid();
+    const countLabel = elements.focusCount.parentElement;
+    const minutesLabel = elements.focusMinutes.parentElement;
+    if (countLabel) {
+      countLabel.setAttribute(
+        'aria-label',
+        t('focus.countLabel', { count: stats.count })
+      );
+    }
+    if (minutesLabel) {
+      minutesLabel.setAttribute(
+        'aria-label',
+        t('focus.minutesLabel', { minutes: stats.minutes })
+      );
+    }
+  }
+
+  /** 番茄钟完成时累计今日专注（次数 +1、时长累加），跨日自动重置 */
+  async function recordFocusSession(minutes) {
+    const stats = normalizeFocusStats(
+      currentSettings && currentSettings.focusStats,
+      new Date()
+    );
+    const duration = Math.max(1, Math.round(Number(minutes) || 0));
+    const next = {
+      date: stats.date,
+      count: stats.count + 1,
+      minutes: stats.minutes + duration
+    };
+    currentSettings = { ...currentSettings, focusStats: next };
+    renderFocusStats(next);
+    const settingsApi =
+      window.petAPI &&
+      window.petAPI.settings &&
+      typeof window.petAPI.settings.set === 'function'
+        ? window.petAPI.settings
+        : null;
+    if (!settingsApi) {
+      return;
+    }
+    try {
+      const saved = await settingsApi.set({ focusStats: next });
+      if (saved && typeof saved === 'object') {
+        currentSettings = { ...currentSettings, focusStats: saved.focusStats };
+        renderFocusStats(currentSettings.focusStats);
+      }
+    } catch (error) {
+      console.warn('保存专注统计失败：', error);
+    }
+  }
+
+  /** 喝水提醒设置规范化（enabled / 5~240 分钟 / lastDrinkAt） */
+  function waterReminderSettings(settings) {
+    const wr =
+      settings &&
+      settings.waterReminder &&
+      typeof settings.waterReminder === 'object'
+        ? settings.waterReminder
+        : {};
+    const interval = Math.round(Number(wr.intervalMinutes));
+    return {
+      enabled: wr.enabled === true,
+      intervalMinutes: Number.isFinite(interval)
+        ? Math.min(WATER_INTERVAL_MAX, Math.max(WATER_INTERVAL_MIN, interval))
+        : WATER_INTERVAL_DEFAULT,
+      lastDrinkAt:
+        Number.isFinite(Number(wr.lastDrinkAt)) && Number(wr.lastDrinkAt) > 0
+          ? Number(wr.lastDrinkAt)
+          : 0
+    };
+  }
+
+  function nextWaterTime(wr) {
+    const last = wr.lastDrinkAt > 0 ? wr.lastDrinkAt : Date.now();
+    return last + wr.intervalMinutes * 60 * 1000;
+  }
+
+  function formatClockTime(ts) {
+    return new Date(ts).toLocaleTimeString(
+      currentLocale === 'en' ? 'en-US' : 'zh-CN',
+      { hour: '2-digit', minute: '2-digit' }
+    );
+  }
+
+  function showWaterStatus(text, type) {
+    if (!elements.waterStatus) {
+      return;
+    }
+    waterStatusOverrideUntil = Date.now() + 4000;
+    elements.waterStatus.textContent = text;
+    elements.waterStatus.dataset.type = type || '';
+    clearTimeout(waterStatusTimer);
+    waterStatusTimer = setTimeout(() => {
+      elements.waterStatus.textContent = '';
+      syncWaterWidget();
+    }, 4000);
+  }
+
+  /** 到点提醒：每 60 秒最多弹一次系统通知，失败静默降级为面板提示 */
+  function maybeNotifyWaterDue(t) {
+    const now = Date.now();
+    if (waterNotifiedAt > now - 60 * 1000) {
+      return;
+    }
+    waterNotifiedAt = now;
+    if (typeof window.Notification !== 'function') {
+      return;
+    }
+    try {
+      if (
+        window.Notification.permission === 'granted' ||
+        window.Notification.permission === 'default'
+      ) {
+        const notice = new window.Notification(t('water.notificationTitle'), {
+          body: t('water.notificationBody')
+        });
+        setTimeout(() => notice.close(), 10000);
+      }
+    } catch (_error) {
+      // 通知不可用时面板提醒仍可见
+    }
+  }
+
+  /** 渲染喝水状态并保持检查定时器；记录后 4 秒内不覆盖“已记录”文案 */
+  function syncWaterWidget() {
+    if (!elements.waterWidget) {
+      return;
+    }
+    const wr = waterReminderSettings(currentSettings);
+    const t = window.PetLocales.createTranslator(currentLocale);
+    elements.waterWidget.hidden = !wr.enabled;
+    clearInterval(waterTimer);
+    if (wr.enabled) {
+      waterTimer = setInterval(syncWaterWidget, WATER_CHECK_MS);
+    }
+    if (!wr.enabled || Date.now() < waterStatusOverrideUntil) {
+      return;
+    }
+    const next = nextWaterTime(wr);
+    if (Date.now() >= next) {
+      elements.waterStatus.textContent = t('water.due');
+      elements.waterStatus.dataset.type = 'ok';
+      maybeNotifyWaterDue(t);
+    } else {
+      elements.waterStatus.textContent = t('water.next', {
+        time: formatClockTime(next)
+      });
+      elements.waterStatus.dataset.type = '';
+    }
+  }
+
+  /** 记录喝水：写入最近喝水时间并持久化 */
+  async function recordWaterDrink() {
+    if (!elements.waterDrink) {
+      return;
+    }
+    const wr = waterReminderSettings(currentSettings);
+    const next = { ...wr, lastDrinkAt: Date.now() };
+    currentSettings = { ...currentSettings, waterReminder: next };
+    const t = window.PetLocales.createTranslator(currentLocale);
+    showWaterStatus(t('water.recorded'), 'ok');
+    const settingsApi =
+      window.petAPI &&
+      window.petAPI.settings &&
+      typeof window.petAPI.settings.set === 'function'
+        ? window.petAPI.settings
+        : null;
+    if (!settingsApi) {
+      return;
+    }
+    try {
+      const saved = await settingsApi.set({ waterReminder: next });
+      if (saved && typeof saved === 'object') {
+        currentSettings = { ...currentSettings, waterReminder: saved.waterReminder };
+      }
+    } catch (error) {
+      console.warn('保存喝水提醒失败：', error);
+    }
+  }
+
+  /** 待办读取与渲染（Pro 门控） */
+  function todosFromSettings(settings) {
+    return Array.isArray(settings && settings.todos) ? settings.todos : [];
+  }
+
+  function makeTodoId() {
+    return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  }
+
+  function showTodoStatus(text, type) {
+    if (!elements.todoStatus) {
+      return;
+    }
+    elements.todoStatus.textContent = text;
+    elements.todoStatus.dataset.type = type || '';
+    elements.todoStatus.hidden = false;
+    clearTimeout(showTodoStatus._timer);
+    showTodoStatus._timer = setTimeout(() => {
+      elements.todoStatus.hidden = true;
+    }, 4000);
+  }
+
+  function renderTodos(items) {
+    if (!elements.todosWidget || !elements.todoList) {
+      return;
+    }
+    const t = window.PetLocales.createTranslator(currentLocale);
+    elements.todosWidget.hidden = !licenseTierIsPaid();
+    elements.todoList.textContent = '';
+    if (!items || items.length === 0) {
+      const empty = document.createElement('li');
+      empty.className = 'todo-empty';
+      empty.textContent = t('todos.empty');
+      elements.todoList.appendChild(empty);
+      return;
+    }
+    for (const item of items) {
+      const li = document.createElement('li');
+      li.className = `todo-item${item.done ? ' is-done' : ''}`;
+      const check = document.createElement('input');
+      check.type = 'checkbox';
+      check.className = 'todo-check';
+      check.checked = item.done === true;
+      check.setAttribute(
+        'aria-label',
+        t(item.done ? 'todos.undoAria' : 'todos.doneAria')
+      );
+      const text = document.createElement('span');
+      text.className = 'todo-text';
+      text.textContent = item.text;
+      const del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'todo-delete';
+      del.textContent = '✕';
+      del.setAttribute('aria-label', t('todos.delete'));
+      li.append(check, text, del);
+      elements.todoList.appendChild(li);
+    }
+  }
+
+  function handleTodoListClick(event) {
+    const itemEl = event.target.closest('.todo-item');
+    if (!itemEl || !elements.todoList) {
+      return;
+    }
+    const items = todosFromSettings(currentSettings);
+    const index = Array.prototype.indexOf.call(elements.todoList.children, itemEl);
+    if (index < 0 || index >= items.length) {
+      return;
+    }
+    if (event.target.classList.contains('todo-delete')) {
+      const next = items.filter((_item, i) => i !== index);
+      void saveTodos(next);
+    } else if (event.target.classList.contains('todo-check')) {
+      const done = event.target.checked;
+      const next = items.map((item, i) =>
+        i === index
+          ? {
+              ...item,
+              done,
+              completedAt: done ? Date.now() : 0
+            }
+          : item
+      );
+      void saveTodos(next);
+    }
+  }
+
+  async function saveTodos(next) {
+    currentSettings = { ...currentSettings, todos: next };
+    renderTodos(next);
+    const settingsApi =
+      window.petAPI &&
+      window.petAPI.settings &&
+      typeof window.petAPI.settings.set === 'function'
+        ? window.petAPI.settings
+        : null;
+    if (!settingsApi) {
+      return;
+    }
+    try {
+      const saved = await settingsApi.set({ todos: next });
+      if (saved && typeof saved === 'object') {
+        currentSettings = { ...currentSettings, todos: saved.todos };
+        renderTodos(currentSettings.todos);
+      }
+    } catch (error) {
+      console.warn('保存待办失败：', error);
+    }
+  }
+
+  function addTodo() {
+    if (!elements.todoInput) {
+      return;
+    }
+    const text = elements.todoInput.value.trim();
+    if (!text) {
+      return;
+    }
+    const items = todosFromSettings(currentSettings);
+    if (items.length >= TODOS_MAX_LENGTH) {
+      const t = window.PetLocales.createTranslator(currentLocale);
+      showTodoStatus(t('todos.limit'), 'error');
+      return;
+    }
+    const next = [
+      ...items,
+      {
+        id: makeTodoId(),
+        text: text.slice(0, 200),
+        done: false,
+        createdAt: Date.now(),
+        completedAt: 0
+      }
+    ];
+    elements.todoInput.value = '';
+    void saveTodos(next);
+  }
+
+  /** 许可证变化/语言切换/设置恢复后同步三个小组件的可见性与内容 */
+  function updateWidgetVisibility() {
+    renderFocusStats(currentSettings && currentSettings.focusStats);
+    renderTodos(todosFromSettings(currentSettings));
+    syncWaterWidget();
+  }
+
   /* 设置页 */
   function showSettingsView() {
     elements.chatView.hidden = true;
@@ -2622,7 +3089,12 @@
         weatherCity: saved.weatherCity,
         pomodoroEnabled: saved.pomodoroEnabled !== false,
         pomodoroMinutes: Number(saved.pomodoroMinutes) || DEFAULT_POMODORO_MINUTES,
-        telemetryEnabled: saved.telemetryEnabled === true
+        telemetryEnabled: saved.telemetryEnabled === true,
+        theme: saved.theme === 'light' ? 'light' : 'dark',
+        reduceMotion: saved.reduceMotion === true,
+        focusStats: saved.focusStats,
+        waterReminder: saved.waterReminder,
+        todos: saved.todos
       });
     } catch (_error) {
       // 本地设置损坏时静默回退默认值
@@ -2701,6 +3173,15 @@
     );
     applyPomodoroSettings(currentSettings);
     elements.telemetryEnabled.checked = currentSettings.telemetryEnabled === true;
+    // T-44：主题/减弱动效/喝水/待办/专注统计
+    theme = currentSettings.theme === 'light' ? 'light' : 'dark';
+    reduceMotion = currentSettings.reduceMotion === true;
+    elements.themeSelect.value = theme;
+    elements.reduceMotionCheckbox.checked = reduceMotion;
+    applyTheme();
+    const water = waterReminderSettings(currentSettings);
+    elements.waterEnabled.checked = water.enabled;
+    elements.waterInterval.value = String(water.intervalMinutes);
 
     const persona =
       currentSettings.persona && typeof currentSettings.persona === 'object'
@@ -2725,6 +3206,7 @@
     syncComplianceVisibility(); // T-40：合规弹窗状态
     syncOnboardingVisibility(); // T-20：首次启动引导（完成标志持久化）
     applyComplianceLock(); // T-40：拒绝合规后锁定 AI 对话
+    updateWidgetVisibility(); // T-44：效率小组件随设置/门控/语言刷新
     stopSpeaking(); // T-23: 语言切换后停止当前朗读，并刷新按钮文案
     updateAllSpeakButtons();
     if (elements.memoryPage && !elements.memoryPage.hidden) {
@@ -2774,7 +3256,14 @@
         weatherCity: elements.weatherCity.value.trim(),
         pomodoroEnabled: elements.pomodoroEnabled.checked,
         pomodoroMinutes: Number(elements.pomodoroMinutes.value),
-        telemetryEnabled: elements.telemetryEnabled.checked
+        telemetryEnabled: elements.telemetryEnabled.checked,
+        theme,
+        reduceMotion,
+        waterReminder: {
+          ...waterReminderSettings(currentSettings),
+          intervalMinutes: Number(elements.waterInterval.value)
+        },
+        todos: todosFromSettings(currentSettings)
       });
       showSettingsStatus(t('settings.savedLocalFallback'), 'ok');
       return;
@@ -2798,7 +3287,14 @@
         weatherCity: elements.weatherCity.value.trim(),
         pomodoroEnabled: elements.pomodoroEnabled.checked,
         pomodoroMinutes: Number(elements.pomodoroMinutes.value),
-        telemetryEnabled: elements.telemetryEnabled.checked
+        telemetryEnabled: elements.telemetryEnabled.checked,
+        theme,
+        reduceMotion,
+        waterReminder: {
+          ...waterReminderSettings(currentSettings),
+          intervalMinutes: Number(elements.waterInterval.value)
+        },
+        todos: todosFromSettings(currentSettings)
       });
       // 回填清洗后的规范值，保证表单与持久化一致
       applySettings(saved || { petName, persona, language });
@@ -2992,6 +3488,7 @@
     }
 
     updateTtsVoicePackControls(); // 免费版锁定高级神经语音
+    updateWidgetVisibility(); // T-44：专注统计/待办按付费档显示，喝水提醒随设置
   }
 
   /** 激活码/订单号激活（T-41 前为本地 mock 校验） */
@@ -3757,6 +4254,15 @@
     getPomodoroState,
     refreshSkins, // T-43：皮肤列表刷新（测试/手动入口）
     getSkinItems: () => skinItems, // T-43
-    applySkin // T-43
+    applySkin, // T-43
+    // T-44：主题/效率小组件（测试与快捷入口）
+    applyTheme,
+    getFocusStats: () =>
+      currentSettings && typeof currentSettings.focusStats === 'object'
+        ? currentSettings.focusStats
+        : { date: '', count: 0, minutes: 0 },
+    getTodos: () => todosFromSettings(currentSettings),
+    addTodo,
+    recordWaterDrink
   };
 })();

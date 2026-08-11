@@ -117,6 +117,12 @@
     "languageSystem": "Follow system",
     "languageZhCN": "Chinese (Simplified)",
     "languageEn": "English",
+    "theme": "Theme",
+    "themeDark": "Dark glass",
+    "themeLight": "Light",
+    "themeHint": "Switch the UI look: dark uses restrained glassmorphism, light uses a bright panel. The choice persists after restart.",
+    "reduceMotion": "Reduce motion",
+    "reduceMotionHint": "Turn off the pet's breathing/blinking, transitions and effects to reduce visual stimulation.",
     "idleEnabled": "Idle chat",
     "idleEnabledHint": "When there has been no interaction for a while, the pet may proactively send a bubble. Saved on submit and can be turned off anytime.",
     "ttsVoicePackEnabled": "Voice pack",
@@ -171,6 +177,39 @@
     "memoryNotFound": "Memory not found; it may have been deleted",
     "memoryInvalidId": "Invalid memory ID",
     "memoryUpdatedAt": "Updated {time}"
+  },
+  "focus": {
+    "widgetAriaLabel": "Focus stats",
+    "title": "Focus stats",
+    "countLabel": "{count} sessions today",
+    "minutesLabel": "{minutes} minutes total",
+    "proOnly": "Pro only: upgrade to see today's focus stats"
+  },
+  "water": {
+    "widgetAriaLabel": "Water reminder",
+    "title": "Water reminder",
+    "settingsLabel": "Water reminder",
+    "settingsHint": "Remind you to drink water at a chosen interval in the panel; log a drink whenever you do.",
+    "interval": "Reminder interval (minutes)",
+    "intervalHint": "5–240 minutes, applied after saving.",
+    "next": "Next reminder: {time}",
+    "due": "Time to drink some water 💧",
+    "drinkNow": "Log a drink",
+    "recorded": "Water logged 💧",
+    "notificationTitle": "Time to drink water",
+    "notificationBody": "Take a sip and rest for a moment."
+  },
+  "todos": {
+    "widgetAriaLabel": "To-dos",
+    "title": "To-dos",
+    "inputPlaceholder": "Add a to-do…",
+    "inputAriaLabel": "New to-do text",
+    "add": "Add",
+    "empty": "No to-dos yet",
+    "delete": "Delete",
+    "doneAria": "Mark as done",
+    "undoAria": "Mark as not done",
+    "limit": "Up to 100 to-dos"
   },
   "skin": {
     "manage": "Skins & accessories",

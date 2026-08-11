@@ -117,6 +117,12 @@
     "languageSystem": "跟随系统",
     "languageZhCN": "简体中文",
     "languageEn": "English",
+    "theme": "主题",
+    "themeDark": "深色玻璃",
+    "themeLight": "浅色",
+    "themeHint": "切换界面配色：深色为克制版玻璃拟态，浅色为明亮面板；保存后重启仍生效。",
+    "reduceMotion": "减弱动效",
+    "reduceMotionHint": "关闭角色的呼吸/眨眼、过渡与动效，减少视觉刺激。",
     "idleEnabled": "空闲互动",
     "idleEnabledHint": "长时间无交互时，桌宠会主动冒泡和你打招呼；保存后生效，可随时关闭。",
     "ttsVoicePackEnabled": "专属语音包",
@@ -171,6 +177,39 @@
     "memoryNotFound": "未找到该记忆，可能已被删除",
     "memoryInvalidId": "记忆 ID 无效",
     "memoryUpdatedAt": "更新于 {time}"
+  },
+  "focus": {
+    "widgetAriaLabel": "专注统计",
+    "title": "专注统计",
+    "countLabel": "今日专注 {count} 次",
+    "minutesLabel": "累计 {minutes} 分钟",
+    "proOnly": "Pro 专属：升级后查看今日专注统计"
+  },
+  "water": {
+    "widgetAriaLabel": "喝水提醒",
+    "title": "喝水提醒",
+    "settingsLabel": "喝水提醒",
+    "settingsHint": "按设定间隔在面板内提醒喝水，可随时记录“已喝水”。",
+    "interval": "提醒间隔（分钟）",
+    "intervalHint": "5–240 分钟，保存后生效。",
+    "next": "下次提醒：{time}",
+    "due": "该喝水啦 💧",
+    "drinkNow": "记录喝水",
+    "recorded": "已记录喝水 💧",
+    "notificationTitle": "喝水时间到",
+    "notificationBody": "记得喝口水，休息一下。"
+  },
+  "todos": {
+    "widgetAriaLabel": "待办事项",
+    "title": "待办",
+    "inputPlaceholder": "添加待办…",
+    "inputAriaLabel": "新待办内容",
+    "add": "添加",
+    "empty": "暂无待办",
+    "delete": "删除",
+    "doneAria": "标记完成",
+    "undoAria": "标记未完成",
+    "limit": "最多 100 条待办"
   },
   "skin": {
     "manage": "皮肤与配件",

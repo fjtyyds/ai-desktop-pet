@@ -14,7 +14,10 @@
     <main id="pet-card" class="pet-card">
       <header class="drag-bar">
         <!-- T-43：当前皮肤角色形象（idle 资源，data URL 由 petAPI.skin.list 提供） -->
-        <img id="pet-avatar" class="pet-avatar" alt="" hidden />
+        <!-- T-44：外层容器承载呼吸/眨眼/情绪联动微动画（纯 CSS，尊重减弱动效） -->
+        <div class="pet-avatar-wrap" aria-hidden="true">
+          <img id="pet-avatar" class="pet-avatar" alt="" hidden />
+        </div>
         <span id="header-title" class="drag-bar-title">AI 桌宠</span>
         <div class="drag-bar-actions">
           <!-- T-25：导出对话移入聊天工具栏（设置页导出区块已移除） -->
@@ -181,6 +184,85 @@
             </div>
             <p id="pomodoro-status" class="widget-status" role="status" hidden></p>
           </div>
+        <!-- T-44：效率小组件增强（专注统计/待办受 Pro 门控，喝水提醒常驻可开关） -->
+        <div
+          id="focus-widget"
+          class="widget-card t44-widget"
+          role="region"
+          aria-label="专注统计"
+          data-i18n-aria-label="focus.widgetAriaLabel"
+          hidden
+        >
+          <div class="widget-card-header">
+            <span class="widget-title" data-i18n="focus.title">专注统计</span>
+          </div>
+          <div class="focus-stats">
+            <span
+              class="focus-stat"
+              aria-label="今日专注 0 次"
+              ><span id="focus-count" class="focus-stat-value">0</span> 次</span
+            >
+            <span
+              class="focus-stat"
+              aria-label="累计 0 分钟"
+              ><span id="focus-minutes" class="focus-stat-value">0</span> 分钟</span
+            >
+          </div>
+        </div>
+        <div
+          id="water-widget"
+          class="widget-card t44-widget"
+          role="region"
+          aria-label="喝水提醒"
+          data-i18n-aria-label="water.widgetAriaLabel"
+          hidden
+        >
+          <div class="widget-card-header">
+            <span class="widget-title" data-i18n="water.title">喝水提醒</span>
+          </div>
+          <p id="water-status" class="widget-status water-status" role="status"></p>
+          <div class="water-actions">
+            <button
+              id="water-drink"
+              class="secondary-btn"
+              type="button"
+              data-i18n="water.drinkNow"
+            >记录喝水</button>
+          </div>
+        </div>
+        <div
+          id="todos-widget"
+          class="widget-card t44-widget"
+          role="region"
+          aria-label="待办事项"
+          data-i18n-aria-label="todos.widgetAriaLabel"
+          hidden
+        >
+          <div class="widget-card-header">
+            <span class="widget-title" data-i18n="todos.title">待办</span>
+          </div>
+          <div class="todos-input-row">
+            <input
+              id="todo-input"
+              class="todos-input"
+              type="text"
+              maxlength="200"
+              autocomplete="off"
+              placeholder="添加待办…"
+              aria-label="新待办内容"
+              data-i18n-placeholder="todos.inputPlaceholder"
+              data-i18n-aria-label="todos.inputAriaLabel"
+            />
+            <button
+              id="todo-add"
+              class="secondary-btn todos-add-btn"
+              type="button"
+              data-i18n="todos.add"
+            >添加</button>
+          </div>
+          <ul id="todo-list" class="todo-list" aria-label="待办列表"></ul>
+          <p id="todo-status" class="widget-status" role="status" hidden></p>
+        </div>
         <div id="message-list" class="message-list" aria-live="polite"></div>
         <div id="service-status" class="service-status" role="status"></div>
         <form id="chat-form" class="chat-form">
@@ -328,6 +410,24 @@
               <option value="en" data-i18n="settings.languageEn">English</option>
             </select>
           </label>
+          <!-- T-44：主题与减弱动效（theme/reduceMotion 白名单持久化） -->
+          <label class="field">
+            <span class="field-label" data-i18n="settings.theme">主题</span>
+            <select id="theme" class="field-select">
+              <option value="dark" data-i18n="settings.themeDark">深色玻璃</option>
+              <option value="light" data-i18n="settings.themeLight">浅色</option>
+            </select>
+            <span class="field-hint" data-i18n="settings.themeHint"
+              >切换界面配色：深色为克制版玻璃拟态，浅色为明亮面板；保存后重启仍生效。</span
+            >
+          </label>
+          <label class="field field-switch">
+            <span class="field-label" data-i18n="settings.reduceMotion">减弱动效</span>
+            <input id="reduce-motion" class="field-checkbox" type="checkbox" />
+            <span class="field-hint" data-i18n="settings.reduceMotionHint"
+              >关闭角色的呼吸/眨眼、过渡与动效，减少视觉刺激。</span
+            >
+          </label>
           <label class="field field-switch">
             <span class="field-label" data-i18n="settings.idleEnabled">空闲互动</span>
             <input id="idle-enabled" class="field-checkbox" type="checkbox" />
@@ -357,7 +457,30 @@
               data-i18n-placeholder="weather.cityPlaceholder"
             />
           </label>
-            <label class="field field-switch">
+          <!-- T-44：喝水提醒（间隔设置，本地持久化） -->
+          <label class="field field-switch">
+            <span class="field-label" data-i18n="water.settingsLabel">喝水提醒</span>
+            <input id="water-enabled" class="field-checkbox" type="checkbox" />
+            <span class="field-hint" data-i18n="water.settingsHint"
+              >按设定间隔在面板内提醒喝水，可随时记录“已喝水”。</span
+            >
+          </label>
+          <label class="field">
+            <span class="field-label" data-i18n="water.interval">提醒间隔（分钟）</span>
+            <input
+              id="water-interval"
+              class="field-input"
+              type="number"
+              min="5"
+              max="240"
+              step="1"
+              inputmode="numeric"
+            />
+            <span class="field-hint" data-i18n="water.intervalHint"
+              >5–240 分钟，保存后生效。</span
+            >
+          </label>
+          <label class="field field-switch">
               <span class="field-label" data-i18n="settings.pomodoroEnabled"
                 >番茄钟提醒</span
               >
