@@ -2,9 +2,9 @@
 
 - 更新时间：2026-08-11
 - 当前阶段：T-40~T-47 全部验收合并；v0.1.0 GitHub Release 已发布；v1.0（2026-09-01）发布准备
-- 当前任务：T-48 设置界面布局重构（豆包式分组列表，已派发，等待 worker 回报）
-- 最近完成：T-47 MSIX 技术验证（a723513）；v0.1.0 Release（GitHub，exe+blockmap+latest.yml，CI 全绿）
-- 下一步：验收 T-48（设置页布局）→ 合并 main → 继续用户最新请求队列；商店/签名/预算仍待用户
+- 当前任务：T-48 已验收合并；等待用户 `npm run dev` 目检新设置页视觉效果（分组默认收起，可要求调整）
+- 最近完成：T-48 设置页三段式布局重构（7b448cf）；T-47 MSIX 技术验证（a723513）；v0.1.0 Release（GitHub，exe+blockmap+latest.yml，CI 全绿）
+- 下一步：按用户目检反馈微调 T-48（如默认展开/分组命名）→ 继续用户最新请求队列；商店/签名/预算仍待用户
 - 阻塞：商店注册与预算（Steam $100/MS Store/Azure）、签名采购、MSIX 依赖升级审批、归档目录物理删除、TTS 听感复核、T-44 UI 目检均待用户决策/确认
 - 交接提示：新会话先读 `AGENTS.md` → `PLAN.md` → `docs/STATUS.md` → `docs/reports/2026-08-10-工作对接方案.md` → 自己的任务卡（docs/tasks/T-xx.md）
 
@@ -273,3 +273,9 @@
 - 用户最新请求：设置界面布局重构，参考两张豆包设置页截图（OCR 描述见交接文件 20260811-1301）；注意上下文过长时总工交接。
 - ADR-036 落盘；任务卡 docs/tasks/T-48.md 入库；worktree E:\codex\AI桌宠-m4-settings-layout 与分支 codex/m4-settings-layout 已创建（基线 main 2938cb0）。
 - 设计：顶部账号卡片（复用 account-section）+ 外观/对话/陪伴与效率/隐私与数据 四组分组列表 + 底部版本页脚；保留全部元素 id 与既有功能。
+
+## T-48 合并记录（2026-08-11，项目内线程闭环）
+
+- worker 完成并回报（分支 codex/m4-settings-layout @ 7b448cf，基线 main 0c95bb3）：settings-home 重构为三段式——账号卡片（account-card + account-upgrade-btn“升级/激活”入口）、四分组列表（settings-groups，行=图标+组名+箭头，aria-expanded/aria-controls，默认收起）、底部固定保存栏 + 版本页脚（settings-version + “由 DeepSeek 大模型提供支持”）；47 个既有元素 id 与事件全部保留；皮肤/记忆跳转行进入既有子页；zh-CN/en 新增 8 个文案 key；check.js 新增 T-48 断言。
+- 验证：worker 与协调者 check/smoke 全绿；worker 离屏 DOM 验证（分组展开/收起、版本号 0.1.0、保存端到端）通过；fast-forward 合并入 main（7b448cf），worktree 已清理，分支保留。
+- 遗留：分组默认收起；升级按钮当前为滚动聚焦激活码输入框；视觉效果待用户 dev 目检确认。
