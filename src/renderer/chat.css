@@ -15,6 +15,23 @@
   opacity: 0.8;
 }
 
+/* T-43：当前皮肤角色形象（标题栏小头像） */
+.pet-avatar {
+  width: 26px;
+  height: 26px;
+  flex: none;
+  border-radius: 50%;
+  object-fit: cover;
+  margin-right: 6px;
+  vertical-align: middle;
+  background: rgba(255, 255, 255, 0.08);
+  -webkit-app-region: no-drag;
+}
+
+.pet-avatar[hidden] {
+  display: none;
+}
+
 .icon-btn {
   -webkit-app-region: no-drag;
   display: inline-flex;
@@ -638,6 +655,160 @@
 
 .memory-btn-danger:hover {
   background: rgba(244, 67, 54, 0.15);
+}
+
+/* T-43：皮肤页/商店页框架 */
+.skin-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.skin-action-btn {
+  padding: 8px 14px;
+}
+
+.skin-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.skin-card {
+  display: flex;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.skin-card.is-applied {
+  border-color: rgba(138, 180, 255, 0.55);
+  background: rgba(65, 96, 222, 0.12);
+}
+
+.skin-preview {
+  width: 64px;
+  height: 64px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.07);
+  overflow: hidden;
+}
+
+.skin-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.skin-preview-empty {
+  font-size: 10px;
+  opacity: 0.5;
+  text-align: center;
+  padding: 4px;
+}
+
+.skin-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.skin-name-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.skin-name {
+  font-size: 13px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.skin-badge {
+  flex: none;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(129, 199, 132, 0.18);
+  color: #81c784;
+  font-size: 10px;
+}
+
+.skin-meta {
+  font-size: 11px;
+  opacity: 0.6;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.skin-card-actions {
+  margin-top: 6px;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.skin-btn {
+  padding: 4px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  background: transparent;
+  color: #e8eaf6;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.skin-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.skin-btn:focus-visible {
+  outline: 2px solid #8ab4ff;
+  outline-offset: 1px;
+}
+
+.skin-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.skin-btn-primary {
+  background: #4160de;
+  border-color: #4160de;
+  color: #fff;
+}
+
+.skin-btn-primary:hover {
+  background: #4a66ea;
+}
+
+.skin-btn-danger {
+  color: #ef9a9a;
+  border-color: rgba(244, 67, 54, 0.45);
+}
+
+.skin-btn-danger:hover {
+  background: rgba(244, 67, 54, 0.15);
+}
+
+.skin-empty {
+  font-size: 12px;
+  opacity: 0.75;
+  text-align: center;
+  padding: 18px 0;
+  line-height: 1.6;
 }
 
 /* T-20：首次启动引导与预设人格模板 */

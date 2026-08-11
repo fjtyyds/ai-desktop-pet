@@ -13,6 +13,8 @@
   <body>
     <main id="pet-card" class="pet-card">
       <header class="drag-bar">
+        <!-- T-43：当前皮肤角色形象（idle 资源，data URL 由 petAPI.skin.list 提供） -->
+        <img id="pet-avatar" class="pet-avatar" alt="" hidden />
         <span id="header-title" class="drag-bar-title">AI 桌宠</span>
         <div class="drag-bar-actions">
           <!-- T-25：导出对话移入聊天工具栏（设置页导出区块已移除） -->
@@ -392,6 +394,12 @@
             type="button"
             data-i18n="settings.memoryManage"
           >记忆管理</button>
+          <button
+            id="skin-manage-btn"
+            class="secondary-btn"
+            type="button"
+            data-i18n="skin.manage"
+          >皮肤与配件</button>
           <button id="settings-save" class="primary-btn" type="button" data-i18n="settings.save"
             >保存设置</button
           >
@@ -451,6 +459,33 @@
             >暂无长期记忆，聊天中的关键事实会自动保存到这里。</p
           >
           <div id="memory-list" class="memory-list"></div>
+        </div>
+      </div>
+      <div id="skin-page" class="settings-page" hidden>
+        <div class="settings-header">
+          <button
+            id="skin-back"
+            class="icon-btn"
+            type="button"
+            aria-label="返回"
+            data-i18n-aria-label="settings.back"
+          >←</button>
+          <h2 class="settings-title" data-i18n="skin.title">皮肤与配件</h2>
+        </div>
+        <div class="settings-body">
+          <p class="memory-hint" data-i18n="skin.hint">
+            皮肤包仅包含图片与清单（PNG/JSON），不包含可执行代码；支持 zip 或目录导入。
+          </p>
+          <div class="skin-actions">
+            <button
+              id="skin-import-btn"
+              class="secondary-btn skin-action-btn"
+              type="button"
+              data-i18n="skin.import"
+            >导入皮肤包</button>
+          </div>
+          <p id="skin-status" class="settings-status" role="status" hidden></p>
+          <div id="skin-list" class="skin-list"></div>
         </div>
       </div>
         </div>

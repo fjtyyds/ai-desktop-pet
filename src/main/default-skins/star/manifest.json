@@ -1,0 +1,10 @@
+{
+  "id": "star",
+  "name": "星夜紫 Starlight",
+  "author": "AI 桌宠内置",
+  "version": "1.0.0",
+  "preview": "preview.png",
+  "roleAssets": {
+    "idle": "assets/idle.png"
+  }
+}

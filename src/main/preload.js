@@ -21,7 +21,12 @@ const CHANNELS = {
   weatherGet: 'weather:get',
   windowToggleDock: 'window:toggle-dock',
   windowMinimize: 'window:minimize', // T-25：最小化到任务栏（ADR-026 冻结契约）
-  ttsSpeak: 'tts:speak' // T-34：在线神经语音合成（ADR-029）
+  ttsSpeak: 'tts:speak', // T-34：在线神经语音合成（ADR-029）
+  skinList: 'skin:list', // T-43：皮肤列表
+  skinImport: 'skin:import', // T-43：导入皮肤包
+  skinExport: 'skin:export', // T-43：导出皮肤包
+  skinApply: 'skin:apply', // T-43：应用皮肤
+  skinRemove: 'skin:remove' // T-43：卸载皮肤
 };
 
 contextBridge.exposeInMainWorld('petAPI', {
@@ -84,5 +89,12 @@ contextBridge.exposeInMainWorld('petAPI', {
   },
   tts: {
     speak: (payload) => ipcRenderer.invoke(CHANNELS.ttsSpeak, payload) // T-34
+  },
+  skin: {
+    list: () => ipcRenderer.invoke(CHANNELS.skinList), // T-43
+    import: (payload) => ipcRenderer.invoke(CHANNELS.skinImport, payload), // T-43
+    export: (payload) => ipcRenderer.invoke(CHANNELS.skinExport, payload), // T-43
+    apply: (payload) => ipcRenderer.invoke(CHANNELS.skinApply, payload), // T-43
+    remove: (payload) => ipcRenderer.invoke(CHANNELS.skinRemove, payload) // T-43
   }
 });

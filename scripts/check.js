@@ -920,6 +920,261 @@ if (fs.existsSync(distDir)) {
   pass('T-39 dist 不存在，app-update.yml 断言跳过（打包后运行 check 将断言）');
 }
 
+// T-43：皮肤与配件 MVP——模块/默认皮肤/IPC/preload/渲染层/locales/格式校验/往返断言
+const skinStoreModule = require(path.join(root, 'src', 'main', 'skin-store.js'));
+if (typeof skinStoreModule.createSkinStore !== 'function') {
+  fail('skin-store.js 缺少 createSkinStore');
+}
+if (skinStoreModule.DEFAULT_SKIN_ID !== 'default') {
+  fail('skin-store DEFAULT_SKIN_ID 应为 default');
+}
+if (skinStoreModule.SKIN_ID_MAX_LENGTH !== 64) {
+  fail('skin-store SKIN_ID_MAX_LENGTH 应为 64');
+}
+if (skinStoreModule.MAX_PACK_BYTES !== 10 * 1024 * 1024) {
+  fail('skin-store MAX_PACK_BYTES 应为 10 MB');
+}
+const skinStoreSource = fs.readFileSync(
+  path.join(root, 'src', 'main', 'skin-store.js'),
+  'utf8'
+);
+for (const token of ['child_process', 'eval(', 'new Function']) {
+  if (skinStoreSource.includes(token)) {
+    fail(`skin-store.js 不应包含 ${token}（禁止引入代码执行机制）`);
+  }
+}
+pass('T-43 skin-store 模块与安全边界（无代码执行机制）');
+
+const defaultSkinsDir = path.join(root, 'src', 'main', 'default-skins');
+const builtinIds = fs.existsSync(defaultSkinsDir)
+  ? fs
+      .readdirSync(defaultSkinsDir, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name)
+  : [];
+if (!builtinIds.includes('default') || builtinIds.length < 3) {
+  fail(
+    `内置默认皮肤应至少 3 套且包含 default（当前: ${builtinIds.join(',')}）`
+  );
+}
+for (const id of builtinIds) {
+  const dir = path.join(defaultSkinsDir, id);
+  for (const rel of ['manifest.json', 'preview.png', 'assets/idle.png']) {
+    if (!fs.existsSync(path.join(dir, rel))) {
+      fail(`内置皮肤 ${id} 缺少 ${rel}`);
+    }
+  }
+  const manifest = JSON.parse(
+    fs.readFileSync(path.join(dir, 'manifest.json'), 'utf8')
+  );
+  if (
+    manifest.id !== id ||
+    !manifest.preview ||
+    !manifest.roleAssets ||
+    !manifest.roleAssets.idle
+  ) {
+    fail(`内置皮肤 ${id} manifest 结构非法`);
+  }
+}
+pass(`T-43 内置默认皮肤齐全（${builtinIds.join(', ')}）`);
+
+for (const channel of [
+  "skinList: 'skin:list'",
+  "skinImport: 'skin:import'",
+  "skinExport: 'skin:export'",
+  "skinApply: 'skin:apply'",
+  "skinRemove: 'skin:remove'"
+]) {
+  if (!ipcSource.includes(channel) || !preloadSource.includes(channel)) {
+    fail(`ipc.js/preload.js 缺少皮肤通道定义: ${channel}`);
+  }
+}
+for (const channel of [
+  'skinList',
+  'skinImport',
+  'skinExport',
+  'skinApply',
+  'skinRemove'
+]) {
+  if (!ipcSource.includes(`ipcMain.handle(CHANNELS.${channel}`)) {
+    fail(`ipc.js 未注册 ${channel} 处理器`);
+  }
+}
+if (!preloadSource.includes('skin: {')) {
+  fail('preload.js 缺少 petAPI.skin 命名空间');
+}
+for (const token of ['petAPI.skin.list', 'petAPI.skin.apply', 'renderSkinList']) {
+  if (!rendererChatSource.includes(token)) {
+    fail(`renderer/chat.js 缺少皮肤逻辑: ${token}`);
+  }
+}
+for (const id of ['skin-page', 'skin-list', 'skin-import-btn', 'pet-avatar']) {
+  if (!rendererIndexSource.includes(`id="${id}"`)) {
+    fail(`renderer/index.html 缺少皮肤控件: ${id}`);
+  }
+}
+pass('T-43 IPC/preload/渲染层皮肤通道与页面骨架齐全');
+
+const skinLocaleKeys = [
+  'manage',
+  'title',
+  'hint',
+  'import',
+  'export',
+  'apply',
+  'applied',
+  'remove',
+  'builtin',
+  'installed'
+];
+for (const localeFile of ['zh-CN', 'en']) {
+  const locale = JSON.parse(
+    fs.readFileSync(
+      path.join(root, 'src', 'shared', 'locales', `${localeFile}.json`),
+      'utf8'
+    )
+  );
+  for (const key of skinLocaleKeys) {
+    if (!locale.skin || typeof locale.skin[key] !== 'string' || !locale.skin[key].trim()) {
+      fail(`${localeFile}.json 缺少 skin.${key} 文案`);
+    }
+  }
+}
+pass('T-43 皮肤双语文案齐全（zh-CN/en）');
+
+const skinCheckDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-pet-skin-check-'));
+try {
+  const skinStore = skinStoreModule.createSkinStore({
+    baseDir: path.join(skinCheckDir, 'skins'),
+    defaultsDir: defaultSkinsDir
+  });
+  const builtinList = skinStore.list();
+  if (builtinList.length < 3) {
+    fail(`皮肤索引内置套数不足（实际 ${builtinList.length}）`);
+  }
+  const defaultEntry = builtinList.find((entry) => entry.id === 'default');
+  if (
+    !defaultEntry ||
+    defaultEntry.builtin !== true ||
+    !defaultEntry.previewDataUrl.startsWith('data:image/png;base64,') ||
+    !defaultEntry.roleAssets.idle ||
+    !defaultEntry.roleAssets.idle.startsWith('data:image/png;base64,')
+  ) {
+    fail('内置 default 皮肤索引/预览/角色资源异常');
+  }
+
+  // 合法目录包导入
+  const packDir = path.join(skinCheckDir, 'pack');
+  fs.mkdirSync(path.join(packDir, 'assets'), { recursive: true });
+  fs.writeFileSync(
+    path.join(packDir, 'manifest.json'),
+    JSON.stringify({
+      id: 'roundtrip',
+      name: 'Round Trip',
+      author: 'check',
+      version: '1.0.0',
+      preview: 'preview.png',
+      roleAssets: { idle: 'assets/idle.png' }
+    })
+  );
+  fs.writeFileSync(path.join(packDir, 'preview.png'), Buffer.from('fake-preview'));
+  fs.writeFileSync(path.join(packDir, 'assets', 'idle.png'), Buffer.from('fake-idle'));
+  const imported = skinStore.importPack(packDir);
+  if (imported.id !== 'roundtrip' || imported.name !== 'Round Trip') {
+    fail('目录皮肤包导入失败');
+  }
+
+  // 导出 → 移除 → 重导入（zip 往返一致）
+  const zipOut = path.join(skinCheckDir, 'roundtrip.zip');
+  const exported = skinStore.exportPack('roundtrip', zipOut);
+  if (!fs.existsSync(exported.path)) {
+    fail('导出 zip 文件不存在');
+  }
+  skinStore.remove('roundtrip');
+  if (skinStore.find('roundtrip')) {
+    fail('移除导入皮肤失败');
+  }
+  const reimported = skinStore.importPack(zipOut);
+  if (
+    reimported.id !== 'roundtrip' ||
+    reimported.name !== 'Round Trip' ||
+    reimported.version !== '1.0.0'
+  ) {
+    fail('zip 导出→重导入清单不一致');
+  }
+  if (
+    !fs.existsSync(
+      path.join(skinCheckDir, 'skins', 'roundtrip', 'assets', 'idle.png')
+    )
+  ) {
+    fail('zip 往返后角色资源缺失');
+  }
+  pass('T-43 导入→导出→重导入往返一致');
+
+  // 非法包拒绝（缺清单/exe/脚本/超大小/路径跳转/内置不可移除），全程不崩溃
+  function expectSkinReject(label, fn, keyword) {
+    let thrown = null;
+    try {
+      fn();
+    } catch (error) {
+      thrown = error;
+    }
+    if (!thrown) {
+      fail(`T-43 ${label} 未被拒绝`);
+    }
+    if (keyword && !String(thrown.message).includes(keyword)) {
+      fail(`T-43 ${label} 错误信息不符: ${thrown.message}`);
+    }
+  }
+  const noManifest = path.join(skinCheckDir, 'no-manifest');
+  fs.mkdirSync(noManifest);
+  fs.writeFileSync(path.join(noManifest, 'preview.png'), Buffer.from('x'));
+  expectSkinReject('缺清单包', () => skinStore.importPack(noManifest), 'manifest');
+
+  function makeValidPack(name, id) {
+    const dir = path.join(skinCheckDir, name);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(
+      path.join(dir, 'manifest.json'),
+      JSON.stringify({
+        id,
+        name: 'Bad',
+        author: 'check',
+        version: '1.0.0',
+        preview: 'preview.png',
+        roleAssets: { idle: 'a.png' }
+      })
+    );
+    fs.writeFileSync(path.join(dir, 'preview.png'), Buffer.from('x'));
+    fs.writeFileSync(path.join(dir, 'a.png'), Buffer.from('x'));
+    return dir;
+  }
+  const exePack = makeValidPack('exe-pack', 'exebad');
+  fs.writeFileSync(path.join(exePack, 'evil.exe'), Buffer.from('MZ'));
+  expectSkinReject('含可执行文件包', () => skinStore.importPack(exePack), '不允许的文件类型');
+
+  const jsPack = makeValidPack('js-pack', 'jsbad');
+  fs.writeFileSync(path.join(jsPack, 'evil.js'), Buffer.from('alert(1)'));
+  expectSkinReject('含脚本文件包', () => skinStore.importPack(jsPack), '不允许的文件类型');
+
+  const bigPack = makeValidPack('big-pack', 'bigbad');
+  fs.writeFileSync(path.join(bigPack, 'preview.png'), Buffer.alloc(11 * 1024 * 1024));
+  expectSkinReject('超大小包', () => skinStore.importPack(bigPack), '大小上限');
+
+  expectSkinReject(
+    '路径跳转',
+    () =>
+      skinStoreModule.validateSkinPackFiles([
+        { name: '../evil.png', data: Buffer.from('x') }
+      ]),
+    '上级跳转'
+  );
+  expectSkinReject('内置皮肤移除', () => skinStore.remove('default'), '内置');
+  pass('T-43 非法皮肤包（缺清单/exe/脚本/超大小/路径跳转）拒绝且不崩溃');
+} finally {
+  fs.rmSync(skinCheckDir, { recursive: true, force: true });
+}
+
 // T-08：store persona 默认值、读写与清洗（非法值丢弃/超长截断，不破坏 settings.json）
 const { createStore, DEFAULT_SETTINGS } = require(path.join(
   root,
@@ -1155,6 +1410,31 @@ try {
     fail('ttsVoicePackId 持久化后读取不一致');
   }
   pass('store TTS 语音包设置读写与清洗通过');
+
+  // T-43：skinId 白名单字段（默认 default、≤64 清洗、非法值丢弃、可回退默认）
+  if (DEFAULT_SETTINGS.skinId !== 'default') {
+    fail('DEFAULT_SETTINGS.skinId 应为 default（内置经典皮肤）');
+  }
+  const skinLong = store.writeSettings({ skinId: 'x'.repeat(100) });
+  if (skinLong.skinId.length !== 64) {
+    fail(`skinId 未按 64 截断（实际 ${skinLong.skinId.length}）`);
+  }
+  const skinInvalid = store.writeSettings({ skinId: 12345 });
+  if (skinInvalid.skinId !== skinLong.skinId) {
+    fail('skinId 非字符串应丢弃（保留当前值）');
+  }
+  if (store.readSettings().skinId !== skinLong.skinId) {
+    fail('skinId 持久化后读取不一致');
+  }
+  const skinOk = store.writeSettings({ skinId: 'star' });
+  if (skinOk.skinId !== 'star') {
+    fail('skinId 显式写入失败');
+  }
+  const skinReset = store.writeSettings({ skinId: 'default' });
+  if (skinReset.skinId !== 'default') {
+    fail('skinId 回退 default 失败');
+  }
+  pass('store skinId 白名单读写与清洗通过');
 } finally {
   fs.rmSync(checkDir, { recursive: true, force: true });
 }

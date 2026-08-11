@@ -12,6 +12,7 @@ const { createSecureSettings } = require('./secure-settings');
 const { createTranslator } = require('../shared/locales');
 const { getWeather } = require('./weather'); // T-22：天气小部件（主进程网络请求）
 const ttsEdge = require('./tts-edge'); // T-34：Edge 在线神经语音（ADR-029）
+const skinStore = require('./skin-store'); // T-43：皮肤包导入/导出/索引/卸载（ADR-032）
 
 /**
  * T-16：情绪引擎共享单例（ADR-022 mood.get；src/llm/** 只读）。
@@ -50,7 +51,12 @@ const CHANNELS = {
   historyExport: 'history:export', // T-18：导出对话
   historyClear: 'history:clear', // T-18：清除数据
   weatherGet: 'weather:get', // T-22：天气小部件
-  ttsSpeak: 'tts:speak' // T-34：在线神经语音合成（ADR-029）
+  ttsSpeak: 'tts:speak', // T-34：在线神经语音合成（ADR-029）
+  skinList: 'skin:list', // T-43：皮肤列表（含预览/角色资源 data URL）
+  skinImport: 'skin:import', // T-43：导入皮肤包（zip 或目录）
+  skinExport: 'skin:export', // T-43：导出皮肤包为 zip
+  skinApply: 'skin:apply', // T-43：应用皮肤（写入 settings.skinId）
+  skinRemove: 'skin:remove' // T-43：卸载导入的皮肤包
 };
 
 /** history.clear 允许的范围（契约：messages / memories / settings / all） */
@@ -64,6 +70,7 @@ let chatService = null;
 let registered = false;
 let secureSettings = null;
 let streamAbortController = null;
+let skinStoreInstance = null; // T-43：皮肤存储单例
 
 // T-15：交互活动订阅（主进程空闲计时据此重置）
 const activityListeners = new Set();
@@ -126,6 +133,16 @@ function getChatService() {
     chatService.loadHistory();
   }
   return chatService;
+}
+
+/** T-43：皮肤存储单例（用户数据目录下的 skins/） */
+function getSkinStore() {
+  if (!skinStoreInstance) {
+    skinStoreInstance = skinStore.createSkinStore({
+      baseDir: path.join(resolveBaseDir(), 'skins')
+    });
+  }
+  return skinStoreInstance;
 }
 
 async function handleChatSend(_event, payload) {
@@ -514,6 +531,136 @@ async function handleTtsSpeak(_event, payload) {
   return ttsEdge.synthesize({ text, voice, rate, pitch });
 }
 
+/* ---------------- T-43：皮肤与配件（ADR-032 上线方案） ---------------- */
+
+/** 皮肤操作错误统一包装：不抛异常、不崩溃 */
+function skinErrorResult(error) {
+  return {
+    ok: false,
+    error: error && error.message ? error.message : String(error)
+  };
+}
+
+/** skin:list：返回全部皮肤（内置优先）与当前应用的 skinId */
+function handleSkinList() {
+  try {
+    const current = getSettings();
+    return {
+      ok: true,
+      skins: getSkinStore().list(),
+      appliedId:
+        current && typeof current.skinId === 'string' && current.skinId
+          ? current.skinId
+          : skinStore.DEFAULT_SKIN_ID
+    };
+  } catch (error) {
+    return skinErrorResult(error);
+  }
+}
+
+/** skin:import：传入 path 直接导入（测试/自动化）；缺省弹出文件/目录选择框 */
+async function handleSkinImport(event, payload) {
+  try {
+    let sourcePath =
+      payload && typeof payload.path === 'string' ? payload.path.trim() : '';
+    if (!sourcePath) {
+      const t = getTranslator();
+      const win = BrowserWindow.fromWebContents(event.sender);
+      const options = {
+        title: t('skin.importDialogTitle'),
+        properties: ['openFile', 'openDirectory'],
+        filters: [{ name: 'Zip', extensions: ['zip'] }]
+      };
+      const result =
+        win && !win.isDestroyed()
+          ? await dialog.showOpenDialog(win, options)
+          : await dialog.showOpenDialog(options);
+      if (result.canceled || !result.filePaths || result.filePaths.length === 0) {
+        return { ok: false, error: 'cancelled' };
+      }
+      sourcePath = result.filePaths[0];
+    }
+    const skin = getSkinStore().importPack(sourcePath);
+    return { ok: true, skin, error: null };
+  } catch (error) {
+    return skinErrorResult(error);
+  }
+}
+
+/** skin:export：传入 targetPath 直接导出；缺省弹出保存框 */
+async function handleSkinExport(event, payload) {
+  try {
+    const store = getSkinStore();
+    const id =
+      payload && typeof payload.id === 'string' ? payload.id.trim() : '';
+    if (!store.find(id)) {
+      return { ok: false, error: `皮肤不存在: ${id}` };
+    }
+    let targetPath =
+      payload && typeof payload.targetPath === 'string'
+        ? payload.targetPath.trim()
+        : '';
+    if (!targetPath) {
+      const t = getTranslator();
+      const win = BrowserWindow.fromWebContents(event.sender);
+      const options = {
+        title: t('skin.exportDialogTitle'),
+        defaultPath: `${id}-skin.zip`,
+        filters: [{ name: 'Zip', extensions: ['zip'] }]
+      };
+      const result =
+        win && !win.isDestroyed()
+          ? await dialog.showSaveDialog(win, options)
+          : await dialog.showSaveDialog(options);
+      if (result.canceled || !result.filePath) {
+        return { ok: false, error: 'cancelled' };
+      }
+      targetPath = result.filePath;
+    }
+    const exported = store.exportPack(id, targetPath);
+    return { ok: true, path: exported.path, error: null };
+  } catch (error) {
+    return skinErrorResult(error);
+  }
+}
+
+/** skin:apply：校验皮肤存在后写入 settings.skinId（store.js 白名单清洗） */
+function handleSkinApply(_event, payload) {
+  try {
+    const id =
+      payload && typeof payload.id === 'string' ? payload.id.trim() : '';
+    if (!getSkinStore().find(id)) {
+      return { ok: false, error: `皮肤不存在: ${id}` };
+    }
+    settings = getSecureSettings().writeSettings({ skinId: id });
+    return { ok: true, settings: { ...settings }, error: null };
+  } catch (error) {
+    return skinErrorResult(error);
+  }
+}
+
+/** skin:remove：仅允许移除导入皮肤；若移除的是当前皮肤则回退 default */
+function handleSkinRemove(_event, payload) {
+  try {
+    const id =
+      payload && typeof payload.id === 'string' ? payload.id.trim() : '';
+    const store = getSkinStore();
+    if (store.isBuiltin(id)) {
+      return { ok: false, error: '内置皮肤不可移除' };
+    }
+    store.remove(id);
+    const current = getSettings();
+    if (current && current.skinId === id) {
+      settings = getSecureSettings().writeSettings({
+        skinId: skinStore.DEFAULT_SKIN_ID
+      });
+    }
+    return { ok: true, error: null };
+  } catch (error) {
+    return skinErrorResult(error);
+  }
+}
+
 function registerIpcHandlers() {
   if (registered) {
     return;
@@ -535,6 +682,11 @@ function registerIpcHandlers() {
   ipcMain.handle(CHANNELS.historyClear, handleHistoryClear);
   ipcMain.handle(CHANNELS.weatherGet, handleWeatherGet);
   ipcMain.handle(CHANNELS.ttsSpeak, handleTtsSpeak);
+  ipcMain.handle(CHANNELS.skinList, handleSkinList);
+  ipcMain.handle(CHANNELS.skinImport, handleSkinImport);
+  ipcMain.handle(CHANNELS.skinExport, handleSkinExport);
+  ipcMain.handle(CHANNELS.skinApply, handleSkinApply);
+  ipcMain.handle(CHANNELS.skinRemove, handleSkinRemove);
 }
 
 // 被 src/main/main.js require 后自动注册（M1 集成时由协调者加入 require('./ipc')）
