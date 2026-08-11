@@ -729,6 +729,39 @@ if (
 }
 pass('T-35 贴边吸附拖放结束防抖与 moved 兼容保留');
 
+// T-53：源码出现 stopDockPolling( 调用时，必须存在其函数声明/定义（T-25 遗留回归防复发）
+const srcJsFiles = [];
+function collectSrcJs(dir, out) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (!entry.isDirectory() && !entry.isFile()) continue;
+    if (entry.name === 'node_modules' || entry.name.startsWith('.')) continue;
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) collectSrcJs(full, out);
+    else if (entry.isFile() && entry.name.endsWith('.js')) out.push(full);
+  }
+}
+collectSrcJs(path.join(root, 'src'), srcJsFiles);
+let stopDockPollingCallCount = 0;
+for (const file of srcJsFiles) {
+  const source = fs.readFileSync(file, 'utf8');
+  const callCount =
+    (source.match(/stopDockPolling\s*\(/g) || []).length -
+    (source.match(/function\s+stopDockPolling\s*\(/g) || []).length;
+  if (callCount === 0) continue;
+  stopDockPollingCallCount += callCount;
+  const hasDefinition =
+    /function\s+stopDockPolling\s*\(/.test(source) ||
+    /(?:const|let|var)\s+stopDockPolling\s*=/.test(source);
+  if (!hasDefinition) {
+    fail(`stopDockPolling() 调用缺少函数声明/定义（T-53）: ${path.relative(root, file)}`);
+  }
+}
+if (stopDockPollingCallCount > 0) {
+  pass(`T-53 stopDockPolling 调用（${stopDockPollingCallCount} 处）均存在定义`);
+} else {
+  pass('T-53 无 stopDockPolling 调用残留');
+}
+
 // T-37：自动更新（ADR-031）——updater 模块、isPackaged 守卫、托盘接入、双语文案
 const updaterSource = fs.readFileSync(
   path.join(root, 'src', 'main', 'updater.js'),

@@ -375,6 +375,13 @@ function scheduleDockMoveEnd() {
   }, DOCK_MOVE_DEBOUNCE_MS);
 }
 
+/** T-53：最小化时停止“贴边轮询”的 T-25 语义保留；
+ * T-31/T-35 起已改为 move 防抖（scheduleDockMoveEnd），不再有轮询，
+ * 此处仅清理防抖定时器，避免对最小化窗口执行拖放结束处理。 */
+function stopDockPolling() {
+  clearTimeout(dockMoveDebounceTimer);
+}
+
 /** 缩放时保持吸附边贴齐；缩放导致吸附边离开边缘则取消吸附 */
 function handleWindowResize() {
   if (!mainWindow || mainWindow.isDestroyed() || !dockedEdge) {
