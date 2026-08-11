@@ -2632,5 +2632,198 @@ pass('payment 双语文案键齐全（zh-CN/en）');
   } catch (error) {
     fail(`chat 服务功能检查异常: ${error && error.message ? error.message : error}`);
   }
+
+  // T-45：应用内分享 + 官网落地页 + 社媒素材
+  const websiteIndexSource = fs.readFileSync(
+    path.join(root, 'website', 'index.html'),
+    'utf8'
+  );
+  const websiteCssSource = fs.readFileSync(
+    path.join(root, 'website', 'style.css'),
+    'utf8'
+  );
+  for (const file of [
+    'website/index.html',
+    'website/style.css',
+    'website/README.md'
+  ]) {
+    if (!fs.existsSync(path.join(root, file))) {
+      fail(`缺少 T-45 官网文件: ${file}`);
+    }
+  }
+  for (const id of [
+    'download',
+    'pricing',
+    'privacy',
+    'features',
+    'faq',
+    'skin-market'
+  ]) {
+    if (!websiteIndexSource.includes(`id="${id}"`)) {
+      fail(`website/index.html 缺少 ${id} 区块`);
+    }
+  }
+  if (
+    !websiteIndexSource.includes('免费') ||
+    !websiteIndexSource.includes('Pro') ||
+    !websiteIndexSource.includes('永久买断') ||
+    !websiteIndexSource.includes('皮肤')
+  ) {
+    fail('website/index.html 定价区缺少 免费/Pro/永久/皮肤市场 信息');
+  }
+  if (
+    websiteIndexSource.includes('src="http') ||
+    websiteIndexSource.includes("src='http")
+  ) {
+    fail('website/index.html 引入了外部脚本/资源（违反无外部依赖）');
+  }
+  if (!websiteIndexSource.includes('stylesheet')) {
+    fail('website/index.html 未引用本地样式');
+  }
+  if (/url\(\s*['"]?https?:/.test(websiteCssSource)) {
+    fail('website/style.css 引用了外部资源（违反无外部依赖）');
+  }
+  pass('T-45 官网落地页齐全（下载/定价/隐私/亮点/皮肤预览/FAQ，无外部依赖）');
+
+  const socialCopySource = fs.readFileSync(
+    path.join(root, 'docs', 'marketing', 'social-copy.md'),
+    'utf8'
+  );
+  for (const keyword of ['小红书', 'B 站', '抖音', '封面尺寸', '投放建议']) {
+    if (!socialCopySource.includes(keyword)) {
+      fail(`docs/marketing/social-copy.md 缺少 ${keyword}`);
+    }
+  }
+  const templateCount = (socialCopySource.match(/模板/g) || []).length;
+  if (templateCount < 6) {
+    fail(
+      `docs/marketing/social-copy.md 文案模板不足（要求每平台 2 组以上，至少 6 个，实际 ${templateCount}）`
+    );
+  }
+  pass('T-45 社媒素材齐全（3 平台 × 2 组文案 + 封面尺寸 + 投放建议）');
+
+  for (const channel of [
+    "shareSaveCard: 'share:save-card'",
+    "shareCopyCard: 'share:copy-card'"
+  ]) {
+    if (!ipcSource.includes(channel) || !preloadSource.includes(channel)) {
+      fail(`ipc.js/preload.js 缺少 T-45 分享通道: ${channel}`);
+    }
+  }
+  for (const handler of ['shareSaveCard', 'shareCopyCard']) {
+    if (!ipcSource.includes(`ipcMain.handle(CHANNELS.${handler}`)) {
+      fail(`ipc.js 未注册 ${handler} 处理器`);
+    }
+  }
+  if (!preloadSource.includes('share: {')) {
+    fail('preload.js 缺少 petAPI.share 命名空间');
+  }
+  for (const token of [
+    'share.saveCard',
+    'share.copyCard',
+    'generateShareCard',
+    'sanitizeShareText',
+    'attachMessageShareGesture'
+  ]) {
+    if (!rendererChatSource.includes(token)) {
+      fail(`renderer/chat.js 缺少 T-45 分享逻辑: ${token}`);
+    }
+  }
+  for (const id of ['share-btn', 'share-menu', 'share-save', 'share-copy']) {
+    if (!rendererIndexSource.includes(`id="${id}"`)) {
+      fail(`renderer/index.html 缺少分享控件: ${id}`);
+    }
+  }
+  for (const token of [
+    'sk-[A-Za-z0-9_-]{8,}',
+    'api[_-]?key',
+    '[A-Za-z]:\\\\',
+    'maskedText',
+    'maskedPath'
+  ]) {
+    if (!rendererChatSource.includes(token)) {
+      fail(`renderer/chat.js 脱敏逻辑缺少: ${token}`);
+    }
+  }
+  pass('T-45 分享通道 IPC/preload/渲染层接线与脱敏字段齐全');
+
+  const shareLocaleKeys = [
+    'title',
+    'saveCard',
+    'copyCard',
+    'generating',
+    'saved',
+    'copied',
+    'error',
+    'noMessages',
+    'unmasked',
+    'saveDialogTitle',
+    'saveDialogDefaultName',
+    'cardFooter',
+    'maskedText',
+    'maskedPath'
+  ];
+  for (const localeFile of ['zh-CN', 'en']) {
+    const locale = JSON.parse(
+      fs.readFileSync(
+        path.join(root, 'src', 'shared', 'locales', `${localeFile}.json`),
+        'utf8'
+      )
+    );
+    for (const key of shareLocaleKeys) {
+      if (
+        !locale.share ||
+        typeof locale.share[key] !== 'string' ||
+        !locale.share[key].trim()
+      ) {
+        fail(`${localeFile}.json 缺少 share.${key} 文案`);
+      }
+    }
+  }
+  pass('T-45 分享双语文案齐全（zh-CN/en）');
+
+  try {
+    const ipcModule = require(path.join(root, 'src', 'main', 'ipc.js'));
+    if (typeof ipcModule.decodeSharePng !== 'function') {
+      fail('ipc.js 未导出 decodeSharePng');
+    }
+    // 1×1 透明 PNG，验证合法输入可解码且魔数校验通过
+    const tinyPng = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+      'base64'
+    );
+    const decoded = ipcModule.decodeSharePng(
+      `data:image/png;base64,${tinyPng.toString('base64')}`
+    );
+    if (!Buffer.isBuffer(decoded) || decoded.length !== tinyPng.length) {
+      fail('decodeSharePng 解码结果异常');
+    }
+    for (const bad of [
+      'data:text/html;base64,xxx',
+      'data:image/png;base64,AAAA',
+      'sk-1234567890',
+      ''
+    ]) {
+      let rejected = false;
+      try {
+        ipcModule.decodeSharePng(bad);
+      } catch (_error) {
+        rejected = true;
+      }
+      if (!rejected) {
+        fail(`decodeSharePng 未拒绝非法输入: ${bad}`);
+      }
+    }
+    if (ipcModule.sanitizeShareFileName('a/b*c?.png', 'fallback') !== 'a-b-c-.png') {
+      fail('sanitizeShareFileName 清洗结果异常');
+    }
+    if (ipcModule.sanitizeShareFileName('', 'fallback') !== 'fallback') {
+      fail('sanitizeShareFileName 空值未回退默认名');
+    }
+    pass('T-45 分享 PNG 校验与文件名清洗运行时断言通过');
+  } catch (error) {
+    fail(`T-45 分享校验检查异常: ${error && error.message ? error.message : error}`);
+  }
+
   console.log('[check] 全部通过');
 })();

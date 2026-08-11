@@ -254,6 +254,25 @@
     "clearError": "清除失败：{error}",
     "apiUnavailable": "接口不可用"
   },
+  "share": {
+    "title": "分享",
+    "saveCard": "生成对话卡片并保存",
+    "copyCard": "复制对话卡片到剪贴板",
+    "generating": "正在生成卡片…",
+    "saved": "已保存：{filePath}",
+    "copied": "已复制对话卡片到剪贴板",
+    "cancelled": "已取消",
+    "error": "分享失败：{error}",
+    "noMessages": "还没有可分享的对话",
+    "unmasked": "分享卡片会自动隐藏 API Key 与本地路径等敏感信息。",
+    "saveDialogTitle": "保存对话卡片",
+    "saveDialogDefaultName": "AI桌宠对话卡片",
+    "cardSubtitle": "对话卡片",
+    "cardFooter": "AI 桌宠 · 桌面上会说话、记得你、还帮你专注的 AI 伙伴",
+    "cardTag": "#AI桌宠",
+    "maskedText": "[已脱敏]",
+    "maskedPath": "[路径已隐藏]"
+  },
   "updater": {
     "checkForUpdates": "检查更新",
     "checking": "正在检查更新…",
