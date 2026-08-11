@@ -2,9 +2,9 @@
 
 - 更新时间：2026-08-11
 - 当前阶段：T-40~T-47 全部验收合并；v0.1.0 GitHub Release 已发布；v1.0（2026-09-01）发布准备
-- 当前任务：T-48/T-49/T-50 已验收合并；等待用户 `npm run dev` 目检（账户区分组外观 + 番茄钟消失）
+- 当前任务：T-48/T-49/T-50 已验收合并；用户已目检确认 T-50（2026-08-11 14:17，效果可以）；无待验收项
 - 最近完成：T-50 账户区并入分组 + 移除番茄钟（714b706）；T-48/T-49 验收合并；v0.1.0 Release（GitHub，exe+blockmap+latest.yml，CI 全绿）
-- 下一步：按用户目检反馈微调 → 继续用户最新请求队列；商店/签名/预算仍待用户
+- 下一步：用户最新请求队列已收口；待用户决策：push 授权（main 领先 origin 9 提交）、专注统计去留、商店/签名/预算、归档删除、TTS 听感复核、T-44 UI 目检
 - 阻塞：商店注册与预算（Steam $100/MS Store/Azure）、签名采购、MSIX 依赖升级审批、归档目录物理删除、TTS 听感复核、T-44 UI 目检均待用户决策/确认
 - 交接提示：新会话先读 `AGENTS.md` → `PLAN.md` → `docs/STATUS.md` → `docs/reports/2026-08-10-工作对接方案.md` → 自己的任务卡（docs/tasks/T-xx.md）
 
@@ -299,4 +299,4 @@
 - worker 完成并回报（分支 codex/m4-account-pomodoro @ 714b706，基线 main ff51bec）：account-section 改为 settings-groups 第一组（行式分组，aria 完整，account-upgrade-btn 保留，license/payment id 全保留）；番茄钟全链路移除（面板/设置/store 字段/主进程轮询与系统通知/telemetry 事件/license 权益/文案/check/smoke）。
 - 验证：worker 与协调者 check/smoke 全绿（含“番茄钟已移除”断言与存量字段清理断言）；fast-forward 合并入 main（714b706），worktree 已清理，分支保留。
 - 兼容：存量 settings.json 的 pomodoro 字段在读写时删除（不迁移）；focusStats 保留但不再增长（ADR-038）。
-- 遗留：chat.js 两处历史注释仍提及番茄钟（无功能影响）；视觉效果待用户 dev 目检确认。
+- 遗留：chat.js 两处历史注释仍提及番茄钟（无功能影响）；视觉效果用户已目检确认（2026-08-11 14:17，效果可以）。
