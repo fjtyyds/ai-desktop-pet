@@ -2,9 +2,9 @@
 
 - 更新时间：2026-08-11
 - 当前阶段：T-40~T-47 全部验收合并；v0.1.0 GitHub Release 已发布；v1.0（2026-09-01）发布准备
-- 当前任务：T-48 已验收合并；等待用户 `npm run dev` 目检新设置页视觉效果（分组默认收起，可要求调整）
-- 最近完成：T-48 设置页三段式布局重构（7b448cf）；T-47 MSIX 技术验证（a723513）；v0.1.0 Release（GitHub，exe+blockmap+latest.yml，CI 全绿）
-- 下一步：按用户目检反馈微调 T-48（如默认展开/分组命名）→ 继续用户最新请求队列；商店/签名/预算仍待用户
+- 当前任务：T-48/T-49 已验收合并；等待用户 `npm run dev` 目检（新设置页布局 + 紧凑小部件 + 情绪变化）
+- 最近完成：T-49 小部件紧凑化与情绪中性化（d0fbc70）；T-48 设置页三段式布局重构（7b448cf）；v0.1.0 Release（GitHub，exe+blockmap+latest.yml，CI 全绿）
+- 下一步：按用户目检反馈微调（设置分组默认展开/命名、小部件尺寸、情绪幅度）→ 继续用户最新请求队列；商店/签名/预算仍待用户
 - 阻塞：商店注册与预算（Steam $100/MS Store/Azure）、签名采购、MSIX 依赖升级审批、归档目录物理删除、TTS 听感复核、T-44 UI 目检均待用户决策/确认
 - 交接提示：新会话先读 `AGENTS.md` → `PLAN.md` → `docs/STATUS.md` → `docs/reports/2026-08-10-工作对接方案.md` → 自己的任务卡（docs/tasks/T-xx.md）
 
@@ -279,3 +279,11 @@
 - worker 完成并回报（分支 codex/m4-settings-layout @ 7b448cf，基线 main 0c95bb3）：settings-home 重构为三段式——账号卡片（account-card + account-upgrade-btn“升级/激活”入口）、四分组列表（settings-groups，行=图标+组名+箭头，aria-expanded/aria-controls，默认收起）、底部固定保存栏 + 版本页脚（settings-version + “由 DeepSeek 大模型提供支持”）；47 个既有元素 id 与事件全部保留；皮肤/记忆跳转行进入既有子页；zh-CN/en 新增 8 个文案 key；check.js 新增 T-48 断言。
 - 验证：worker 与协调者 check/smoke 全绿；worker 离屏 DOM 验证（分组展开/收起、版本号 0.1.0、保存端到端）通过；fast-forward 合并入 main（7b448cf），worktree 已清理，分支保留。
 - 遗留：分组默认收起；升级按钮当前为滚动聚焦激活码输入框；视觉效果待用户 dev 目检确认。
+
+## T-49 建卡与合并记录（2026-08-11）
+
+- 来源：用户与 T-48 线程直接交流改进方案（超出 T-48 卡边界），worker 提交 d0fbc70（分支 codex/m4-widget-mood，在 main 工作区直接开发，流程违规）。
+- 内容：天气（折叠高约 31px）与番茄钟（高约 61px）紧凑化；情绪默认 60→52（平静）、反馈 ±8→±12（上限 24）、无交互回归后确定性小幅呼吸（±5/±0.05，4 分钟周期）。
+- 验证：worker 与协调者 check/smoke 全绿；元素 id 保留；52 落在“平静”区间；离屏 DOM 尺寸实测通过。
+- 处置：主工作区已恢复 main；ADR-037 + 任务卡 T-49 入库；分支 rebase 后 fast-forward 合并 d0fbc70；无 worktree 需清理。
+- 纪律重申：任何任务必须独立 worktree 开发，main 工作区保持 main（T-44/T-45 同类问题第三次发生，已记录）。
