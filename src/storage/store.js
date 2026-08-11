@@ -43,6 +43,18 @@ const DEFAULT_POMODORO_MINUTES = 25;
 const POMODORO_MINUTES_MIN = 1;
 const POMODORO_MINUTES_MAX = 120;
 
+/** T-44：主题（深色玻璃拟态/浅色），默认深色 */
+const THEMES = ['dark', 'light'];
+const DEFAULT_THEME = 'dark';
+/** T-44：喝水提醒间隔（分钟），默认 60，允许 5~240 */
+const WATER_INTERVAL_MIN_MIN = 5;
+const WATER_INTERVAL_MIN_MAX = 240;
+const DEFAULT_WATER_INTERVAL_MINUTES = 60;
+/** T-44：待办数量与字段上限 */
+const TODOS_MAX_LENGTH = 100;
+const TODO_ID_MAX_LENGTH = 64;
+const TODO_TEXT_MAX_LENGTH = 200;
+
 /**
  * 预设人格模板 id（T-20）。
  * 与渲染层 chat.js 内联双语模板表（PERSONA_TEMPLATES）的键一一对应；
@@ -86,6 +98,15 @@ const DEFAULT_SETTINGS = {
   pomodoroNotifyAt: 0, // T-21/T-27：渲染层→主进程一次性完成信号（时间戳；主进程消费后清零）
   pomodoroNotifyMinutes: 0, // T-21/T-27：信号携带的时长（分钟；0=未设置；随信号一同清零）
   telemetryEnabled: false, // T-42：匿名遥测开关（opt-in，默认关闭）
+  theme: DEFAULT_THEME, // T-44：主题（dark/light，默认深色玻璃拟态）
+  reduceMotion: false, // T-44：减弱动效开关（关闭呼吸/眨眼/过渡动画）
+  focusStats: { date: '', count: 0, minutes: 0 }, // T-44：今日专注统计（跨日由渲染层重置）
+  waterReminder: {
+    enabled: false,
+    intervalMinutes: DEFAULT_WATER_INTERVAL_MINUTES,
+    lastDrinkAt: 0
+  }, // T-44：喝水提醒（间隔与最近一次喝水时间）
+  todos: [], // T-44：待办列表 { id, text, done, createdAt, completedAt }
   skinId: DEFAULT_SKIN_ID, // T-43：当前启用皮肤 id（≤64；default=内置经典皮肤）
   persona: { ...DEFAULT_PERSONA }
 };
@@ -193,6 +214,98 @@ function sanitizeWeatherCity(value, current) {
     .trim()
     .replace(/\s+/g, ' ')
     .slice(0, WEATHER_CITY_MAX_LENGTH);
+}
+
+/** T-44：主题清洗：仅允许 dark/light，非法值保留当前值 */
+function sanitizeTheme(value, current) {
+  return THEMES.includes(value) ? value : current;
+}
+
+/** T-44：专注统计清洗：{ date: 'YYYY-MM-DD', count: >=0, minutes: >=0 } */
+function sanitizeFocusStats(value, current) {
+  const fallback = { date: '', count: 0, minutes: 0 };
+  if (value === null || value === undefined) {
+    return fallback;
+  }
+  if (typeof value !== 'object' || Array.isArray(value)) {
+    return current && typeof current === 'object' ? current : fallback;
+  }
+  const base = current && typeof current === 'object' ? current : fallback;
+  const date =
+    typeof value.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value.date)
+      ? value.date
+      : typeof base.date === 'string'
+        ? base.date.slice(0, 10)
+        : '';
+  return {
+    date,
+    count: sanitizeNonNegativeInteger(value.count, base.count),
+    minutes: sanitizeNonNegativeInteger(value.minutes, base.minutes)
+  };
+}
+
+/** T-44：喝水提醒清洗：enabled 布尔 + 间隔 5~240 分钟 + 最近喝水时间戳 */
+function sanitizeWaterReminder(value, current) {
+  const fallback = {
+    enabled: false,
+    intervalMinutes: DEFAULT_WATER_INTERVAL_MINUTES,
+    lastDrinkAt: 0
+  };
+  if (value === null || value === undefined) {
+    return fallback;
+  }
+  if (typeof value !== 'object' || Array.isArray(value)) {
+    return current && typeof current === 'object' ? current : fallback;
+  }
+  const base = current && typeof current === 'object' ? current : fallback;
+  return {
+    enabled: sanitizeBoolean(value.enabled, base.enabled),
+    intervalMinutes: sanitizeInteger(
+      value.intervalMinutes,
+      base.intervalMinutes,
+      WATER_INTERVAL_MIN_MIN,
+      WATER_INTERVAL_MIN_MAX
+    ),
+    lastDrinkAt: sanitizeNonNegativeInteger(value.lastDrinkAt, base.lastDrinkAt)
+  };
+}
+
+/** T-44：待办清洗：数组、上限 100 条、id 去重、text 去空白截断 */
+function sanitizeTodos(value, current) {
+  if (value === null || value === undefined) {
+    return [];
+  }
+  if (!Array.isArray(value)) {
+    return Array.isArray(current) ? current : [];
+  }
+  const seen = new Set();
+  const next = [];
+  for (const item of value) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      continue;
+    }
+    const id = typeof item.id === 'string' ? item.id.slice(0, TODO_ID_MAX_LENGTH) : '';
+    if (!id || seen.has(id)) {
+      continue;
+    }
+    const text =
+      typeof item.text === 'string' ? item.text.trim().slice(0, TODO_TEXT_MAX_LENGTH) : '';
+    if (!text) {
+      continue;
+    }
+    seen.add(id);
+    next.push({
+      id,
+      text,
+      done: sanitizeBoolean(item.done, false),
+      createdAt: sanitizeNonNegativeInteger(item.createdAt, Date.now()),
+      completedAt: sanitizeNonNegativeInteger(item.completedAt, 0)
+    });
+    if (next.length >= TODOS_MAX_LENGTH) {
+      break;
+    }
+  }
+  return next;
 }
 
 /** 清洗许可证档位：非法值（不在 free/yearly/lifetime）丢弃，保留当前值 */
@@ -367,6 +480,20 @@ function createStore(baseDir) {
       merged.telemetryEnabled,
       DEFAULT_SETTINGS.telemetryEnabled
     );
+    merged.theme = sanitizeTheme(merged.theme, DEFAULT_SETTINGS.theme);
+    merged.reduceMotion = sanitizeBoolean(
+      merged.reduceMotion,
+      DEFAULT_SETTINGS.reduceMotion
+    );
+    merged.focusStats = sanitizeFocusStats(
+      merged.focusStats,
+      DEFAULT_SETTINGS.focusStats
+    );
+    merged.waterReminder = sanitizeWaterReminder(
+      merged.waterReminder,
+      DEFAULT_SETTINGS.waterReminder
+    );
+    merged.todos = sanitizeTodos(merged.todos, DEFAULT_SETTINGS.todos);
     return merged;
   }
 
@@ -399,7 +526,12 @@ function createStore(baseDir) {
       'pomodoroMinutes',
       'pomodoroNotifyAt',
       'pomodoroNotifyMinutes',
-      'telemetryEnabled'
+      'telemetryEnabled',
+      'theme',
+      'reduceMotion',
+      'focusStats',
+      'waterReminder',
+      'todos'
     ];
     const next = { ...current };
     for (const key of allowed) {
@@ -565,6 +697,35 @@ function createStore(baseDir) {
           );
           continue;
         }
+        if (key === 'theme') {
+          next.theme = sanitizeTheme(patch.theme, current.theme);
+          continue;
+        }
+        if (key === 'reduceMotion') {
+          next.reduceMotion = sanitizeBoolean(
+            patch.reduceMotion,
+            current.reduceMotion
+          );
+          continue;
+        }
+        if (key === 'focusStats') {
+          next.focusStats = sanitizeFocusStats(
+            patch.focusStats,
+            current.focusStats
+          );
+          continue;
+        }
+        if (key === 'waterReminder') {
+          next.waterReminder = sanitizeWaterReminder(
+            patch.waterReminder,
+            current.waterReminder
+          );
+          continue;
+        }
+        if (key === 'todos') {
+          next.todos = sanitizeTodos(patch.todos, current.todos);
+          continue;
+        }
         next[key] = typeof patch[key] === 'string' ? patch[key].trim() : String(patch[key]);
       }
     }
@@ -597,5 +758,13 @@ module.exports = {
   TTS_VOICE_PACK_ID_MAX_LENGTH,
   DEFAULT_POMODORO_MINUTES,
   POMODORO_MINUTES_MIN,
-  POMODORO_MINUTES_MAX
+  POMODORO_MINUTES_MAX,
+  THEMES,
+  DEFAULT_THEME,
+  WATER_INTERVAL_MIN_MIN,
+  WATER_INTERVAL_MIN_MAX,
+  DEFAULT_WATER_INTERVAL_MINUTES,
+  TODOS_MAX_LENGTH,
+  TODO_ID_MAX_LENGTH,
+  TODO_TEXT_MAX_LENGTH
 };

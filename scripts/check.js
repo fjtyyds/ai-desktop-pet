@@ -1660,6 +1660,313 @@ for (const locale of [zhLocales, enLocales]) {
 }
 pass('license 双语文案键齐全（zh-CN/en）');
 
+// T-44：UI 大改 M3.6——主题/动效/小组件/无障碍（源码接线 + store 白名单 + 对比度）
+const t44IndexIds = [
+  'id="theme"',
+  'id="reduce-motion"',
+  'id="focus-widget"',
+  'id="water-widget"',
+  'id="water-enabled"',
+  'id="water-interval"',
+  'id="todos-widget"',
+  'id="todo-input"',
+  'id="todo-list"',
+  'id="todo-status"'
+];
+for (const id of t44IndexIds) {
+  if (!rendererIndexSource.includes(id)) {
+    fail(`renderer/index.html 缺少 T-44 元素：${id}`);
+  }
+}
+for (const token of [
+  'applyTheme',
+  'reduceMotion',
+  'renderFocusStats',
+  'recordFocusSession',
+  'waterReminderSettings',
+  'syncWaterWidget',
+  'recordWaterDrink',
+  'renderTodos',
+  'saveTodos',
+  'updateWidgetVisibility',
+  'licenseTierIsPaid',
+  'dataset.theme'
+]) {
+  if (!rendererChatSource.includes(token)) {
+    fail(`renderer/chat.js 缺少 T-44 逻辑：${token}`);
+  }
+}
+for (const token of [
+  ":root[data-theme='light']",
+  'html.reduce-motion',
+  '@keyframes pet-breathe',
+  '@keyframes pet-blink',
+  '@keyframes pet-bounce',
+  '--t44-text-primary',
+  '--t44-assistant-bubble',
+  '.message-assistant .bubble',
+  'backdrop-filter',
+  '.t44-widget[hidden]',
+  '0.3s ease'
+]) {
+  if (!rendererChatCssSource.includes(token)) {
+    fail(`chat.css 缺少 T-44 主题/动效/小组件样式：${token}`);
+  }
+}
+const t44LocaleKeys = {
+  settings: [
+    'theme',
+    'themeDark',
+    'themeLight',
+    'themeHint',
+    'reduceMotion',
+    'reduceMotionHint'
+  ],
+  focus: ['widgetAriaLabel', 'title', 'countLabel', 'minutesLabel'],
+  water: [
+    'widgetAriaLabel',
+    'title',
+    'settingsLabel',
+    'settingsHint',
+    'interval',
+    'intervalHint',
+    'next',
+    'due',
+    'drinkNow',
+    'recorded'
+  ],
+  todos: [
+    'widgetAriaLabel',
+    'title',
+    'inputPlaceholder',
+    'inputAriaLabel',
+    'add',
+    'empty',
+    'delete',
+    'doneAria',
+    'undoAria',
+    'limit'
+  ]
+};
+for (const locale of [zhLocales, enLocales]) {
+  for (const [section, keys] of Object.entries(t44LocaleKeys)) {
+    for (const key of keys) {
+      if (
+        !locale[section] ||
+        typeof locale[section][key] !== 'string' ||
+        !locale[section][key].trim()
+      ) {
+        fail(`locales 缺少 ${section}.${key} 文案（T-44）`);
+      }
+    }
+  }
+}
+
+// 对比度断言：提取 CSS 变量中的主/次文本色与底色，按 WCAG 2.1 计算
+function hexToRgb(hex) {
+  const value = hex.replace('#', '');
+  return {
+    r: parseInt(value.slice(0, 2), 16),
+    g: parseInt(value.slice(2, 4), 16),
+    b: parseInt(value.slice(4, 6), 16)
+  };
+}
+function channelLuminance(channel) {
+  const c = channel / 255;
+  return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+}
+function luminance(hex) {
+  const rgb = hexToRgb(hex);
+  return (
+    0.2126 * channelLuminance(rgb.r) +
+    0.7152 * channelLuminance(rgb.g) +
+    0.0722 * channelLuminance(rgb.b)
+  );
+}
+function contrastRatio(a, b) {
+  const la = luminance(a);
+  const lb = luminance(b);
+  const lighter = Math.max(la, lb);
+  const darker = Math.min(la, lb);
+  return (lighter + 0.05) / (darker + 0.05);
+}
+function cssVarValues(source, name) {
+  const re = new RegExp(`--${name}:\\s*(#[0-9a-fA-F]{6})`, 'g');
+  const values = [];
+  let match = null;
+  while ((match = re.exec(source)) !== null) {
+    values.push(match[1].toLowerCase());
+  }
+  return values;
+}
+const cssVar = (name) => cssVarValues(rendererChatCssSource, name);
+const darkBg = '#171a2b';
+const lightBg = '#eef0f8';
+const darkPrimary = cssVar('t44-text-primary')[0];
+const darkSecondary = cssVar('t44-text-secondary')[0];
+const lightPrimary = cssVar('t44-text-primary').pop();
+const lightSecondary = cssVar('t44-text-secondary').pop();
+const darkFocus = cssVar('t44-focus-ring')[0];
+const lightFocus = cssVar('t44-focus-ring').pop();
+const contrastPairs = [
+  [darkPrimary, darkBg, '深色主文本'],
+  [darkSecondary, darkBg, '深色次要文本'],
+  [lightPrimary, lightBg, '浅色主文本'],
+  [lightSecondary, lightBg, '浅色次要文本']
+];
+for (const [foreground, background, label] of contrastPairs) {
+  if (!foreground || !/^#[0-9a-f]{6}$/.test(foreground)) {
+    fail(`chat.css 缺少可解析的 ${label} 色值`);
+  }
+  const ratio = contrastRatio(foreground, background);
+  if (ratio < 4.5) {
+    fail(`T-44 ${label} 对比度不足：${foreground} vs ${background} = ${ratio.toFixed(2)}（需 ≥4.5）`);
+  }
+}
+for (const [foreground, background, label] of [
+  [darkFocus, darkBg, '深色焦点环'],
+  [lightFocus, lightBg, '浅色焦点环']
+]) {
+  if (!foreground || !/^#[0-9a-f]{6}$/.test(foreground)) {
+    fail(`chat.css 缺少可解析的 ${label} 色值`);
+  }
+  const ratio = contrastRatio(foreground, background);
+  if (ratio < 3) {
+    fail(`T-44 ${label} 对比度不足：${foreground} vs ${background} = ${ratio.toFixed(2)}（非文本需 ≥3）`);
+  }
+}
+pass('T-44 主题变量/动效/小组件源码接线与 WCAG 对比度断言通过');
+
+// T-44：store 白名单默认值、读写与清洗（theme/reduceMotion/focusStats/waterReminder/todos）
+const t44CheckDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-pet-t44-'));
+try {
+  const t44Store = createStore(t44CheckDir);
+  if (DEFAULT_SETTINGS.theme !== 'dark') {
+    fail('DEFAULT_SETTINGS.theme 应为 dark（默认深色玻璃拟态）');
+  }
+  if (DEFAULT_SETTINGS.reduceMotion !== false) {
+    fail('DEFAULT_SETTINGS.reduceMotion 应为 false（默认不减弱动效）');
+  }
+  const defaultFocus = DEFAULT_SETTINGS.focusStats;
+  const defaultWater = DEFAULT_SETTINGS.waterReminder;
+  if (
+    !defaultFocus ||
+    typeof defaultFocus !== 'object' ||
+    defaultFocus.count !== 0 ||
+    defaultFocus.minutes !== 0
+  ) {
+    fail('DEFAULT_SETTINGS.focusStats 默认形状非法');
+  }
+  if (
+    !defaultWater ||
+    typeof defaultWater !== 'object' ||
+    defaultWater.enabled !== false ||
+    defaultWater.intervalMinutes !== 60 ||
+    defaultWater.lastDrinkAt !== 0
+  ) {
+    fail('DEFAULT_SETTINGS.waterReminder 默认形状非法');
+  }
+  if (!Array.isArray(DEFAULT_SETTINGS.todos) || DEFAULT_SETTINGS.todos.length !== 0) {
+    fail('DEFAULT_SETTINGS.todos 应为空数组');
+  }
+
+  // 主题与减弱动效
+  const themeLight = t44Store.writeSettings({ theme: 'light' });
+  if (themeLight.theme !== 'light' || t44Store.readSettings().theme !== 'light') {
+    fail('store theme 浅色写入/读取不一致');
+  }
+  const themeInvalid = t44Store.writeSettings({ theme: 'blue' });
+  if (themeInvalid.theme !== 'light') {
+    fail('store theme 非法值应丢弃（保留当前值）');
+  }
+  const motionOn = t44Store.writeSettings({ reduceMotion: true });
+  if (motionOn.reduceMotion !== true) {
+    fail('store reduceMotion 开启失败');
+  }
+  const motionInvalid = t44Store.writeSettings({ reduceMotion: 'yes' });
+  if (motionInvalid.reduceMotion !== true) {
+    fail('store reduceMotion 非布尔值应丢弃（保留当前值）');
+  }
+
+  // 专注统计（日期校验/负数钳制/读写一致）
+  const focusWritten = t44Store.writeSettings({
+    focusStats: { date: '2026-08-11', count: 3, minutes: 75 }
+  });
+  if (
+    focusWritten.focusStats.date !== '2026-08-11' ||
+    focusWritten.focusStats.count !== 3 ||
+    focusWritten.focusStats.minutes !== 75
+  ) {
+    fail('store focusStats 写入失败');
+  }
+  const focusBadDate = t44Store.writeSettings({
+    focusStats: { date: '11/08/2026', count: 9, minutes: 10 }
+  });
+  if (focusBadDate.focusStats.date !== '2026-08-11' || focusBadDate.focusStats.count !== 9) {
+    fail('store focusStats 非法日期应丢弃、合法数字应保留');
+  }
+  const focusClamped = t44Store.writeSettings({
+    focusStats: { date: '2026-08-11', count: -5, minutes: -1 }
+  });
+  if (focusClamped.focusStats.count !== 0 || focusClamped.focusStats.minutes !== 0) {
+    fail('store focusStats 负数应钳制为 0');
+  }
+
+  // 喝水提醒（间隔钳制/时间戳清洗）
+  const waterWritten = t44Store.writeSettings({
+    waterReminder: { enabled: true, intervalMinutes: 90, lastDrinkAt: 12345 }
+  });
+  if (
+    waterWritten.waterReminder.enabled !== true ||
+    waterWritten.waterReminder.intervalMinutes !== 90 ||
+    waterWritten.waterReminder.lastDrinkAt !== 12345
+  ) {
+    fail('store waterReminder 写入失败');
+  }
+  const waterClamped = t44Store.writeSettings({
+    waterReminder: { enabled: true, intervalMinutes: 999, lastDrinkAt: -1 }
+  });
+  if (
+    waterClamped.waterReminder.intervalMinutes !== 240 ||
+    waterClamped.waterReminder.lastDrinkAt !== 0
+  ) {
+    fail('store waterReminder 间隔未钳制到 240 / 时间戳未钳制到 0');
+  }
+
+  // 待办（上限 100、去重、文本截断、done 布尔清洗）
+  const manyTodos = Array.from({ length: 99 }, (_v, i) => ({
+    id: `todo-${i}`,
+    text: `任务 ${i}`,
+    done: i % 2 === 0,
+    createdAt: i,
+    completedAt: 0
+  }));
+  manyTodos.push({ id: 'todo-0', text: '重复 id 应被丢弃' });
+  manyTodos.push({ id: 'no-text', text: '   ' });
+  manyTodos.push({ id: 'long', text: '长'.repeat(300), done: 'yes' });
+  const todosWritten = t44Store.writeSettings({ todos: manyTodos });
+  if (todosWritten.todos.length !== 100) {
+    fail(`store todos 应截断到 100 条（实际 ${todosWritten.todos.length}）`);
+  }
+  if (todosWritten.todos.some((item) => item.text.length > 200)) {
+    fail('store todos 文本未按 200 截断');
+  }
+  const longItem = todosWritten.todos.find((item) => item.id === 'long');
+  if (!longItem || longItem.done !== false || longItem.text.length !== 200) {
+    fail('store todos done 非布尔值应清洗为 false，长文本应截断');
+  }
+  if (todosWritten.todos.filter((item) => item.id === 'todo-0').length !== 1) {
+    fail('store todos 重复 id 未去重');
+  }
+  const todosInvalid = t44Store.writeSettings({ todos: 'bad' });
+  if (todosInvalid.todos.length !== 100) {
+    fail('store todos 非数组应丢弃（保留当前值）');
+  }
+  pass('T-44 store 白名单（theme/reduceMotion/focusStats/waterReminder/todos）读写与清洗通过');
+} finally {
+  fs.rmSync(t44CheckDir, { recursive: true, force: true });
+}
+
 (async () => {
   try {
     // T-40：许可证状态机（三态切换/持久化/过期/吊销/设备绑定/额度/mock 回调）
