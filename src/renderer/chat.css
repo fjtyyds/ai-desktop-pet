@@ -1235,10 +1235,10 @@ html.reduce-motion *::after {
 /* T-22：天气小部件（角色面板顶部，可选，设置页开关 + 城市配置） */
 .weather-widget {
   flex: 0 0 auto;
-  margin: 0 12px 8px;
-  padding: 8px 10px;
+  margin: 0 10px 6px;
+  padding: 5px 8px;
   border: 1px solid var(--t44-glass-border);
-  border-radius: 12px;
+  border-radius: 10px;
   background: var(--t44-glass-bg);
   backdrop-filter: blur(10px);
 }
@@ -1251,14 +1251,14 @@ html.reduce-motion *::after {
 }
 
 .weather-widget.collapsed .weather-main {
-  gap: 6px;
+  gap: 5px;
 }
 
 .weather-toggle-btn {
   flex: 0 0 auto;
-  width: 22px;
-  height: 22px;
-  font-size: 12px;
+  width: 20px;
+  height: 20px;
+  font-size: 11px;
 }
 
 .weather-toggle-btn:hover {
@@ -1268,7 +1268,10 @@ html.reduce-motion *::after {
 /* T-21：番茄钟小部件（系统状态小部件已按 T-30 移除） */
 #pomodoro-widget {
   flex: 0 0 auto;
-  margin: 0 12px 8px;
+  margin: 0 10px 6px;
+  padding: 5px 8px;
+  gap: 4px;
+  border-radius: 10px;
 }
 
 .widget-card {
@@ -1299,7 +1302,7 @@ html.reduce-motion *::after {
 
 .weather-icon {
   flex: 0 0 auto;
-  font-size: 20px;
+  font-size: 15px;
   line-height: 1;
 }
 
@@ -1312,7 +1315,7 @@ html.reduce-motion *::after {
 }
 
 .weather-location {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--t44-text-primary);
   white-space: nowrap;
@@ -1322,7 +1325,7 @@ html.reduce-motion *::after {
 }
 
 .weather-desc {
-  font-size: 11px;
+  font-size: 10px;
   color: var(--t44-text-secondary);
   white-space: nowrap;
   overflow: hidden;
@@ -1332,16 +1335,16 @@ html.reduce-motion *::after {
 
 .weather-temp {
   flex: 0 0 auto;
-  font-size: 18px;
+  font-size: 15px;
   font-weight: 700;
   user-select: text;
 }
 
 .weather-refresh-btn {
   flex: 0 0 auto;
-  width: 24px;
-  height: 24px;
-  font-size: 13px;
+  width: 20px;
+  height: 20px;
+  font-size: 11px;
 }
 
 .weather-refresh-btn:disabled {
@@ -1350,8 +1353,8 @@ html.reduce-motion *::after {
 }
 
 .weather-meta {
-  margin-top: 4px;
-  font-size: 11px;
+  margin-top: 2px;
+  font-size: 10px;
   color: var(--t44-text-secondary);
   line-height: 1.45;
   user-select: text;
@@ -1375,8 +1378,8 @@ html.reduce-motion *::after {
 
 /* T-26：独立“上次更新”时间行，随状态着色 */
 .weather-updated {
-  margin-top: 2px;
-  font-size: 11px;
+  margin-top: 1px;
+  font-size: 10px;
   font-weight: 600;
   color: var(--t44-text-secondary);
   line-height: 1.4;
@@ -1409,9 +1412,20 @@ html.reduce-motion *::after {
   letter-spacing: 0.02em;
 }
 
+.pomodoro-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+#pomodoro-widget .widget-title {
+  font-size: 10px;
+}
+
 .pomodoro-time {
-  align-self: center;
-  font-size: 20px;
+  align-self: auto;
+  font-size: 16px;
   font-weight: 700;
   line-height: 1.2;
   letter-spacing: 0.04em;
@@ -1420,19 +1434,19 @@ html.reduce-motion *::after {
 
 .pomodoro-controls {
   display: flex;
-  gap: 6px;
+  gap: 4px;
 }
 
 .pomodoro-controls .secondary-btn {
   flex: 1;
   min-width: 0;
-  padding: 6px 0;
-  font-size: 12px;
+  padding: 4px 0;
+  font-size: 11px;
 }
 
 .widget-status {
   margin: 0;
-  font-size: 11px;
+  font-size: 10px;
   line-height: 1.4;
   text-align: center;
   color: var(--t44-text-secondary);

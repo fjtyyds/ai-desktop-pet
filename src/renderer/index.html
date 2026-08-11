@@ -201,15 +201,15 @@
         </div>
         <!-- T-21：番茄钟小部件（系统状态小部件已按 T-30 移除） -->
           <div id="pomodoro-widget" class="widget-card">
-            <div class="widget-card-header">
+            <div class="pomodoro-head">
               <span class="widget-title" data-i18n="pomodoro.title">番茄钟</span>
+              <div
+                id="pomodoro-time"
+                class="pomodoro-time"
+                role="timer"
+                aria-live="polite"
+              >25:00</div>
             </div>
-            <div
-              id="pomodoro-time"
-              class="pomodoro-time"
-              role="timer"
-              aria-live="polite"
-            >25:00</div>
             <div class="pomodoro-controls">
               <button
                 id="pomodoro-start"
