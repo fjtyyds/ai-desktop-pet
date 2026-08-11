@@ -2353,6 +2353,117 @@ for (const locale of [zhLocales, enLocales]) {
 }
 pass('payment 双语文案键齐全（zh-CN/en）');
 
+// T-48：设置页三段式布局（顶部账号卡片 + 分组列表 + 版本页脚）
+const t48RequiredIds = [
+  'id="settings-groups"',
+  'id="settings-group-appearance"',
+  'id="settings-group-conversation"',
+  'id="settings-group-companion"',
+  'id="settings-group-privacy"',
+  'id="account-upgrade-btn"',
+  'id="settings-version"',
+  'id="account-section"',
+  'id="license-tier"',
+  'id="license-status"',
+  'id="license-expiry"',
+  'id="license-quota"',
+  'id="license-code"',
+  'id="license-activate"',
+  'id="license-deactivate"',
+  'id="license-message"',
+  'id="payment-buy-yearly"',
+  'id="payment-buy-lifetime"',
+  'id="payment-message"',
+  'id="api-key"',
+  'id="model"',
+  'id="language"',
+  'id="theme"',
+  'id="reduce-motion"',
+  'id="idle-enabled"',
+  'id="weather-enabled"',
+  'id="weather-city"',
+  'id="water-enabled"',
+  'id="water-interval"',
+  'id="pomodoro-enabled"',
+  'id="pomodoro-minutes"',
+  'id="telemetry-enabled"',
+  'id="telemetry-clear"',
+  'id="pet-name"',
+  'id="persona-template-list"',
+  'id="persona-traits"',
+  'id="persona-tone"',
+  'id="persona-backstory"',
+  'id="tts-voice-pack-enabled"',
+  'id="tts-voice-pack-id"',
+  'id="memory-manage-btn"',
+  'id="skin-manage-btn"',
+  'id="settings-save"',
+  'id="settings-status"',
+  'id="clear-scope"',
+  'id="clear-data"',
+  'id="clear-status"'
+];
+for (const token of t48RequiredIds) {
+  if (!rendererIndexSource.includes(token)) {
+    fail(`renderer/index.html 缺少 T-48 保留元素：${token}`);
+  }
+}
+for (const token of [
+  'settings-group-toggle',
+  'aria-controls="settings-group-panel-appearance"',
+  'aria-expanded="false"'
+]) {
+  if (!rendererIndexSource.includes(token)) {
+    fail(`renderer/index.html 缺少 T-48 分组行结构：${token}`);
+  }
+}
+for (const token of [
+  'toggleSettingsGroup',
+  'refreshSettingsGroupTitles',
+  'bindSettingsGroups',
+  'settingsVersion',
+  'window.petAPI.version',
+  'accountUpgradeBtn'
+]) {
+  if (!rendererChatSource.includes(token)) {
+    fail(`renderer/chat.js 缺少 T-48 逻辑：${token}`);
+  }
+}
+for (const token of [
+  '.account-card',
+  '.settings-groups',
+  '.settings-group-toggle',
+  '.settings-group-panel',
+  '.settings-save-bar',
+  '.settings-footer'
+]) {
+  if (!rendererChatCssSource.includes(token)) {
+    fail(`chat.css 缺少 T-48 三段式样式：${token}`);
+  }
+}
+const t48RequiredLocaleKeys = [
+  'upgradeActivate',
+  'groupAppearance',
+  'groupConversation',
+  'groupCompanion',
+  'groupPrivacy',
+  'groupExpandHint',
+  'groupCollapseHint',
+  'footerPoweredBy'
+];
+for (const locale of [zhLocales, enLocales]) {
+  for (const key of t48RequiredLocaleKeys) {
+    if (
+      !locale.settings ||
+      typeof locale.settings[key] !== 'string' ||
+      !locale.settings[key]
+    ) {
+      fail(`locales 缺少 settings.${key} 文案`);
+    }
+  }
+}
+pass('T-48 设置页三段式布局、既有元素 id 与双语文案断言通过');
+
 (async () => {
   try {
     const fixedNow = Date.UTC(2026, 7, 11, 8, 0, 0);

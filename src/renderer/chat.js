@@ -399,6 +399,8 @@
   async function init() {
     cacheElements();
     bindEvents();
+    bindSettingsGroups(); // T-48：设置页分组展开/收起
+    renderSettingsFooter(); // T-48：页脚版本号
     bindActivityEvents();
     bindWeatherRefreshTriggers();
     subscribeIdle();
@@ -477,6 +479,8 @@
       idleEnabled: document.getElementById('idle-enabled'),
       settingsSave: document.getElementById('settings-save'),
       settingsStatus: document.getElementById('settings-status'),
+      settingsVersion: document.getElementById('settings-version'),
+      accountUpgradeBtn: document.getElementById('account-upgrade-btn'),
       exportMdBtn: document.getElementById('export-md'),
       exportJsonBtn: document.getElementById('export-json'),
       exportStatus: document.getElementById('export-status'),
@@ -688,6 +692,50 @@
     }
   }
 
+  /* T-48：设置页三段式——分组展开/收起、升级入口、页脚版本号 */
+  function renderSettingsFooter() {
+    if (!elements.settingsVersion) {
+      return;
+    }
+    const appVersion =
+      window.petAPI && typeof window.petAPI.version === 'string'
+        ? window.petAPI.version
+        : 'dev';
+    elements.settingsVersion.textContent = appVersion;
+  }
+
+  function toggleSettingsGroup(toggle) {
+    if (!toggle) {
+      return;
+    }
+    const panelId = toggle.getAttribute('aria-controls');
+    const panel = panelId ? document.getElementById(panelId) : null;
+    const expanded = toggle.getAttribute('aria-expanded') === 'true';
+    toggle.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+    if (panel) {
+      panel.hidden = expanded;
+    }
+    refreshSettingsGroupTitles();
+  }
+
+  /** 分组行 tooltip 随展开态切换（语言切换后由 applyStaticText 重新同步） */
+  function refreshSettingsGroupTitles() {
+    const t = window.PetLocales.createTranslator(currentLocale);
+    document.querySelectorAll('.settings-group-toggle').forEach((toggle) => {
+      const expanded = toggle.getAttribute('aria-expanded') === 'true';
+      toggle.title = t(
+        expanded ? 'settings.groupCollapseHint' : 'settings.groupExpandHint'
+      );
+    });
+  }
+
+  function bindSettingsGroups() {
+    document.querySelectorAll('.settings-group-toggle').forEach((toggle) => {
+      toggle.addEventListener('click', () => toggleSettingsGroup(toggle));
+    });
+    refreshSettingsGroupTitles();
+  }
+
   function bindEvents() {
     elements.chatForm.addEventListener('submit', handleSubmit);
     elements.settingsBtn.addEventListener('click', showSettingsView);
@@ -704,6 +752,17 @@
     elements.skinBack.addEventListener('click', closeSkinView);
     elements.skinImportBtn.addEventListener('click', () => void handleSkinImport());
     elements.settingsSave.addEventListener('click', saveSettings);
+    if (elements.accountUpgradeBtn) {
+      elements.accountUpgradeBtn.addEventListener('click', () => {
+        if (elements.licenseCode) {
+          elements.licenseCode.scrollIntoView({
+            behavior: 'smooth',
+            block: 'center'
+          });
+          elements.licenseCode.focus();
+        }
+      });
+    }
     elements.exportMdBtn.addEventListener('click', () => void exportConversation('markdown'));
     elements.exportJsonBtn.addEventListener('click', () => void exportConversation('json'));
     elements.clearDataBtn.addEventListener('click', handleClearData);
@@ -3175,6 +3234,7 @@
     document.querySelectorAll('[data-i18n-aria-label]').forEach((el) => {
       el.setAttribute('aria-label', t(el.dataset.i18nAriaLabel));
     });
+    refreshSettingsGroupTitles(); // T-48：分组展开提示随语言与展开态刷新
 
     elements.headerTitle.textContent = currentPetName;
     renderServiceStatus();
