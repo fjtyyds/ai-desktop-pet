@@ -2,9 +2,9 @@
 
 - 更新时间：2026-08-11
 - 当前阶段：T-40~T-47 全部验收合并；v0.1.0 GitHub Release 已发布；v1.0（2026-09-01）发布准备
-- 当前任务：T-51 专注统计移除（已派发，codex/m4-focus-stats）；T-48/T-49/T-50 已验收合并且用户已目检确认 T-50
+- 当前任务：T-51 专注统计移除已验收合并（1e9d73e）；下一张卡 T-52 MSIX 实施（待派发）
 - 最近完成：T-50 账户区并入分组 + 移除番茄钟（714b706）；T-48/T-49 验收合并；v0.1.0 Release（GitHub，exe+blockmap+latest.yml，CI 全绿）
-- 下一步：T-51 闭环（派发→验收→合并）→ 商店/签名/MSIX 可自主部分 → 归档删除/TTS 试听/UI 目检；外部账号与资金事项（Steam 注册、签名采购、商店提审）仍待用户
+- 下一步：T-52 MSIX 实施（依赖升级+打包验证+商店版更新守卫）→ 外部账号与资金事项（Steam 注册、签名采购、商店提审）仍待用户；归档物理删除被环境策略拦截待手动；TTS 试听与 UI 截图已产出
 - 阻塞：商店注册与预算（Steam $100/MS Store/Azure）、签名采购、MSIX 依赖升级审批、归档目录物理删除、TTS 听感复核、T-44 UI 目检均待用户决策/确认
 - 交接提示：新会话先读 `AGENTS.md` → `PLAN.md` → `docs/STATUS.md` → `docs/reports/2026-08-10-工作对接方案.md` → 自己的任务卡（docs/tasks/T-xx.md）
 
@@ -306,3 +306,9 @@
 - 用户授权依次解决待办清单；专注统计去留决策为整体移除（ADR-039）：唯一数据源（番茄钟）已删，组件永不增长，保留会误导用户。
 - 范围：focus-widget/chat.js 逻辑/store 字段/license 权益/双语文案/check-smoke 断言全链路移除；喝水提醒与待办保留；存量 focusStats 字段读写时删除。
 - 任务卡 docs/tasks/T-51.md 入库；worktree E:\codex\AI桌宠-m4-focus-stats 与分支 codex/m4-focus-stats 已创建（基线 main 41cc892，已推送 origin）。
+
+## T-51 合并记录（2026-08-11，项目内线程闭环）
+
+- worker 完成并回报（分支 codex/m4-focus-stats @ 1e9d73e，基线 main 87cf5a5）：专注统计全链路移除（index.html #focus-widget 与 license-feature-focus、chat.js focus 专属函数/导出/读写、chat.css .focus-* 样式、store focusStats 字段与存量清理、license 权益、双语文案、check 断言改写为“已移除”语义）；待办/喝水组件保留。
+- 验证：worker 与协调者 check/smoke 全绿；fast-forward 合并入 main（1e9d73e），worktree 已清理，分支保留。
+- 兼容：存量 settings.json 的 focusStats 字段读写时删除（不迁移、不暴露，ADR-039）。
