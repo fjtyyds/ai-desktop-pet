@@ -209,6 +209,8 @@
 - 2026-08-10：T-39 M4 P4 最终打包与安装冒烟经项目内线程闭环完成并合并（0a8f8bc fast-forward）：dist 产物 ASCII 命名、latest.yml 与产物一致、app-update.yml 指向 github/fjtyyds/ai-desktop-pet、静默安装/卸载冒烟零污染（临时 userData）；check 增加 T-39 断言；check/smoke 全部通过；安装版更新检查实测“No published versions”，证明更新源已生效；真实更新链路待首次 v0.1.0 发布验证。
 - 2026-08-11：目录规范化（ADR-033）：移除 6 个已合并 M3.5 worktree，多线程开发/ 与探针/日志归档至 E:\codex\_archive_20260811（可恢复）；scripts/orchestrator 加入 .gitignore；git 工作区干净。
 - 2026-08-11：商业化上线方案落盘（ADR-032）：市场调研（AI 陪伴 371 亿美元/2025、AI 桌宠细分 CAGR 75%、Wallpaper Engine 约 1.6 亿美元流水等 20+ 数据源）、竞品分析、优势功能、UI 依据、混合盈利模式、财务预测与 30 天计划；任务卡 T-40~T-46 已建。
+- 2026-08-11：T-42 匿名遥测与留存漏斗验收合并（fd0b3a3 fast-forward）：opt-in 默认关闭、事件/字段白名单脱敏、端点仅环境变量配置（默认空=不发送）、断网缓存批量上报、一键清除；worker 与协调者 check/smoke 全绿；Electron 端到端（本地端点）验证通过。
+- 2026-08-11：T-43 皮肤与配件市场 MVP 验收合并（df99fa2 merge，5 个共享文件冲突已解决）：皮肤包格式（JSON+PNG/zip，10MB 上限、拒绝可执行文件/路径跳转）、3 套内置皮肤、导入导出往返、商店页框架；check/smoke 全绿。
 
 ## Surprises & Discoveries
 
