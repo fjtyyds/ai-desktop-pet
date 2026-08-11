@@ -167,6 +167,8 @@
 - [x] `docs/tasks/T-52.md` — MSIX 打包实施与商店版更新守卫（codex/m4-msix-impl，919d837 已合并）
 - [x] `docs/tasks/T-53.md` — 修复 stopDockPolling 未定义（codex/m4-dock-fix，70a5b75 已合并）
 
+状态（2026-08-11 15:07，ADR-041）：待办清单全部收口；商店/签名因资金暂缺冻结；v1.0 商店发布待资金，GitHub Release 可随时授权。
+
 30 天节奏：W1（8/11-8/17）T-40/T-41/T-42 → W2（8/18-8/24）T-43/T-44 → W3（8/25-8/31）T-45/T-46 + 集成 → 09-01 v1.0 发布。
 
 详见 `docs/reports/2026-08-11-商业化上线方案.md`。
@@ -237,6 +239,7 @@
 - 2026-08-11：MSIX 前置完成：electron-builder 升级 27.0.0-alpha.6（dd29cc5，ADR-040）；T-52 建卡待派发。
 - 2026-08-11：T-52 验收合并（919d837/4dddec5 fast-forward）：MSIX 双产物构建成功（.msix/.msixupload/NSIS 并存）、商店版更新守卫 stub 验证通过、工具链用户态自动下载；check/smoke 全绿。
 - 2026-08-11：T-53 验收合并（70a5b75 fast-forward）：定义 stopDockPolling 清理 dockMoveDebounceTimer（T-25 遗留未定义引用修复），check.js 增加调用-定义防回归断言；check/smoke 全绿。
+- 2026-08-11：用户待办决策收口（ADR-041）：商店/签名/发布因资金暂缺冻结，归档保留，TTS 维持现状，T-44 UI 目检通过；进入等待资金/新需求状态。
 
 ## Surprises & Discoveries
 
@@ -293,6 +296,9 @@
 - ADR-036：设置界面布局重构——豆包式分组列表（2026-08-11，T-48）。
 - ADR-037：小部件紧凑化与情绪中性化（2026-08-11，T-49）。
 - ADR-038：设置页账户区并入分组列表 + 整体移除番茄钟（2026-08-11，T-50）。
+- ADR-039：整体移除专注统计组件（2026-08-11，T-51）。
+- ADR-040：MSIX 打包实施（electron-builder 27 alpha 线）（2026-08-11，T-52）。
+- ADR-041：待办清单收口与资金暂缺下的发布策略（2026-08-11）。
 
 详见 `docs/DECISIONS.md`。
 

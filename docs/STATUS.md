@@ -1,11 +1,11 @@
 # 项目状态
 
 - 更新时间：2026-08-11
-- 当前阶段：T-40~T-47 全部验收合并；v0.1.0 GitHub Release 已发布；v1.0（2026-09-01）发布准备
-- 当前任务：T-53 stopDockPolling 修复已验收合并；待办清单可自主项已全部完成
-- 最近完成：T-50 账户区并入分组 + 移除番茄钟（714b706）；T-48/T-49 验收合并；v0.1.0 Release（GitHub，exe+blockmap+latest.yml，CI 全绿）
-- 下一步：外部账号与资金事项（Steam 注册、签名采购、商店提审）仍待用户；归档物理删除被环境策略拦截待手动；TTS 试听与 UI 截图已产出待用户复核
-- 阻塞：商店注册与预算（Steam $100/MS Store/Azure）、签名采购、MSIX 依赖升级审批、归档目录物理删除、TTS 听感复核、T-44 UI 目检均待用户决策/确认
+- 当前阶段：M4.5 商业化功能全部完成；v0.1.0 GitHub Release 已发布；v1.0（2026-09-01）发布准备——商店/签名因资金暂缺冻结（ADR-041）
+- 当前任务：待办清单全部收口（用户 2026-08-11 15:07 决策）；无自主可派发卡，等待资金/新需求
+- 最近完成：T-51/52/53 验收合并推送；用户确认 TTS 维持现状、T-44 UI 目检通过；归档目录保留
+- 下一步：资金到位后恢复商店注册（Steam $100/MS Store）、签名采购与 v1.0 全渠道发布；GitHub Release 路径无需资金，可随时授权
+- 阻塞：商店与签名资金暂缺（Steam $100/MS Store/Azure Artifact Signing 或 OV/EV）；v1.0 商店发布待资金与授权
 - 交接提示：新会话先读 `AGENTS.md` → `PLAN.md` → `docs/STATUS.md` → `docs/reports/2026-08-10-工作对接方案.md` → 自己的任务卡（docs/tasks/T-xx.md）
 
 ## M1 集成完成记录（2026-08-09）
@@ -334,3 +334,9 @@
 - worker 完成并回报（分支 codex/m4-dock-fix @ 70a5b75，基线 main 23a6e3d）：方案 a 定义 `stopDockPolling()`（clearTimeout(dockMoveDebounceTimer)，保留 T-25 最小化语义与注释）；check.js 新增递归扫描防回归断言（调用必须有函数声明/定义）。
 - 验证：worker 与协调者 check/smoke 全绿；fast-forward 合并入 main（70a5b75），worktree 已清理，分支保留。
 - 遗留：无；最小化窗口 ReferenceError 已消除。
+
+## 待办清单收口记录（2026-08-11，ADR-041）
+
+- 用户决策（15:07）：①商店/签名暂无资金支持，冻结；②归档目录 E:\codex\_archive_20260811\ 暂时保留；③TTS 听感维持现状；④T-44 UI 目检通过；⑤v1.0 发布是资金事项的延续，暂缓。
+- 影响：无自主可派发卡；闭环 watcher 保持运行；资金到位或用户提供新需求后恢复派活。
+- GitHub Release（免费路径）不受资金影响，仍待用户授权（push/tag/Release 边界）。

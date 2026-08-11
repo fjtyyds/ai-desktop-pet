@@ -347,3 +347,15 @@
   2. T-52 实施：electron-builder.yml 增加 MSIX 配置（identityName/publisher 占位、zh-CN/en-US、四段版本、appx logo 占位资源）；updater.js 增加 `process.windowsStore` 守卫，商店版禁用 electron-updater（更新走商店）。
   3. 本地构建验证 MSIX 与 NSIS 双产物；真实商店注册/提审、签名采购需用户账号与预算，另行执行。
 - 后果：打包工具链进入 alpha 线（配置面可能演进），T-52 必须回归 NSIS 产物与自动更新链路；如 alpha 不稳定可回退 26.15.3（分支保留）；MSIX 产物可供后续 MS Store 提审准备。
+
+## ADR-041：待办清单收口与资金暂缺下的发布策略（2026-08-11）
+
+- 状态：Accepted
+- 背景：总工上岗后向用户汇报剩余待决项（商店/签名/预算、归档删除、TTS 试听、UI 目检、v1.0 发布授权）；用户逐项答复：①暂时没有资金支持；②归档暂时保留；③TTS 先这样吧；④UI 目前可以；⑤v1.0 发布是①的延续，问题仍是无资金。
+- 决策：
+  1. 商店/签名事项冻结：Steam 开发者账号（$100）、MS Store 开发者账号、代码签名采购（Azure Artifact Signing 或 OV/EV）在资金到位前不实施；MSIX identityName/publisher 继续使用占位（T-52）。
+  2. 归档目录 `E:\codex\_archive_20260811\`（约 5.4GB）暂时保留，不物理删除。
+  3. TTS 听感维持现状（T-33/T-34/T-36 产物接受，不再调整）。
+  4. T-44 UI 目检通过（用户确认，2026-08-11 15:07）。
+  5. v1.0 全渠道发布（含商店提审）暂缓；GitHub Release 路径无需资金，待用户另行授权；正式发布仍受“push/tag/Release 需确认”边界约束。
+- 后果：项目进入“功能与文档冻结、等待资金/新需求”状态；无自主可派发卡；闭环 watcher 保持运行，用户提供资金或新需求后恢复派活。
