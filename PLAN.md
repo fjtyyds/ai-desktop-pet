@@ -162,6 +162,7 @@
 - [x] `docs/tasks/T-47.md` — MSIX 打包与商店沙箱技术验证（codex/m4-msix）
 - [x] `docs/tasks/T-48.md` — 设置界面布局重构（豆包式分组列表，codex/m4-settings-layout，7b448cf 已合并）
 - [x] `docs/tasks/T-49.md` — 小部件紧凑化与情绪中性化（codex/m4-widget-mood，026c1c5 已合并）
+- [x] `docs/tasks/T-50.md` — 设置页账户区并入分组 + 移除番茄钟（codex/m4-account-pomodoro，714b706 已合并）
 - [ ] `docs/tasks/T-50.md` — 设置页账户区并入分组 + 移除番茄钟（codex/m4-account-pomodoro）
 
 30 天节奏：W1（8/11-8/17）T-40/T-41/T-42 → W2（8/18-8/24）T-43/T-44 → W3（8/25-8/31）T-45/T-46 + 集成 → 09-01 v1.0 发布。
@@ -227,6 +228,7 @@
 - 2026-08-11：T-48 验收合并（7b448cf fast-forward）：设置页三段式布局（账号卡片+外观/对话/陪伴与效率/隐私与数据四分组+版本页脚）落地；47 个既有元素 id 保留、check.js 新增 T-48 断言；worker 与协调者 check/smoke 全绿；worktree 已清理，待用户 dev 目检视觉效果。
 - 2026-08-11：T-49 验收合并（d0fbc70 → rebase 后 026c1c5，fast-forward）：天气/番茄钟小部件紧凑化（31/61px）+ 情绪中性化（默认 52、反馈 ±12、回归后小幅呼吸波动）；check/smoke 全绿；说明：本卡由用户与 T-48 线程直接交流产生，实施在 main 工作区（流程违规已记录并恢复），工作区已回 main。
 - 2026-08-11：T-50 建卡并派发（ADR-038）：账户与订阅改为分组行外观（第一组）；番茄钟全链路移除（面板/设置/主进程通知/store/遥测/权益/文案/断言）；worktree E:\codex\AI桌宠-m4-account-pomodoro、分支 codex/m4-account-pomodoro 就绪。
+- 2026-08-11：T-50 验收合并（714b706 fast-forward）：账户与订阅并入分组列表（第一组，id 全保留）；番茄钟全链路移除（含存量字段清理与“已移除”断言）；check/smoke 全绿；worktree 已清理，待用户 dev 目检。
 
 ## Surprises & Discoveries
 
