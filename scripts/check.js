@@ -1745,8 +1745,6 @@ pass('license:get/activate/deactivate IPC 与 preload 接线存在');
 // 渲染层门控/合规/额度接线
 for (const token of [
   'license.get',
-  'license.activate',
-  'license.deactivate',
   'license-quota-exceeded',
   'complianceRefused',
   'syncComplianceVisibility',
@@ -1758,8 +1756,6 @@ for (const token of [
 }
 for (const token of [
   'id="account-section"',
-  'id="license-activate"',
-  'id="license-deactivate"',
   'id="compliance-view"',
   'id="compliance-accept"',
   'id="compliance-decline"'
@@ -1772,6 +1768,59 @@ for (const token of ['.license-row', '.license-pro-features', '.compliance-view'
   if (!rendererChatCssSource.includes(token)) {
     fail(`chat.css 缺少许可证/合规样式：${token}`);
   }
+}
+for (const token of [
+  'id="license-activate"',
+  'id="license-deactivate"',
+  'id="license-code"',
+  'id="license-message"',
+  'id="payment-plans"',
+  'id="payment-buy-yearly"',
+  'id="payment-buy-lifetime"',
+  'id="payment-message"'
+]) {
+  if (rendererIndexSource.includes(token)) {
+    fail(`renderer/index.html 仍保留已移除的开发测试桩元素：${token}`);
+  }
+}
+for (const token of [
+  'activateLicense',
+  'deactivateLicense',
+  'sandboxPurchase',
+  'showLicenseMessage',
+  'showPaymentMessage'
+]) {
+  if (rendererChatSource.includes(token)) {
+    fail(`renderer/chat.js 仍保留已移除的开发测试桩流程：${token}`);
+  }
+}
+for (const token of ['payment-plans', 'payment-plan', 'payment-buy-btn', 'payment-notice']) {
+  if (rendererChatCssSource.includes(token)) {
+    fail(`chat.css 仍保留已移除的沙箱支付样式：${token}`);
+  }
+}
+const zhLocalesRaw = fs.readFileSync(
+  path.join(root, 'src', 'shared', 'locales', 'zh-CN.json'),
+  'utf8'
+);
+const enLocalesRaw = fs.readFileSync(
+  path.join(root, 'src', 'shared', 'locales', 'en.json'),
+  'utf8'
+);
+for (const [sourceName, source] of [
+  ['renderer/index.html', rendererIndexSource],
+  ['zh-CN.json', zhLocalesRaw],
+  ['en.json', enLocalesRaw]
+]) {
+  if (/沙箱|模拟支付|未接入真实网关|sandbox\s*purchase|sandbox\s*buy/i.test(source)) {
+    fail(`${sourceName} 仍包含沙箱/模拟支付测试文案`);
+  }
+}
+if (!rendererIndexSource.includes('id="review-onboarding-btn"')) {
+  fail('renderer/index.html 缺少“重新查看新手引导”入口（review-onboarding-btn）');
+}
+if (!rendererChatSource.includes('reviewOnboardingBtn')) {
+  fail('renderer/chat.js 缺少“重新查看新手引导”入口接线');
 }
 pass('渲染层账户/订阅区块、门控与合规弹窗接线存在');
 
@@ -1790,10 +1839,8 @@ const requiredLicenseKeys = [
   'quotaMonth',
   'quotaByok',
   'quotaExceeded',
-  'activateButton',
-  'deactivateButton',
-  'activateError',
-  'deactivated',
+  'comingSoonTitle',
+  'comingSoonHint',
   'complianceTitle',
   'complianceAccept',
   'complianceDecline',
@@ -2464,68 +2511,29 @@ for (const token of ['activateByPayment', 'downgradeByPayment', 'PAY-${']) {
 }
 pass('license.js 已提供支付升档/降级联动');
 
-// 渲染层订阅页接线
+// T-54：生产 UI 防回归——渲染层不得再暴露沙箱支付/mock 激活流程
 for (const token of [
   'payment.createOrder',
   'payment.mockCallback',
+  'payment.activated',
   'sandboxPurchase',
   'showPaymentMessage',
-  'payment.activated'
+  'showLicenseMessage'
 ]) {
-  if (!rendererChatSource.includes(token)) {
-    fail(`renderer/chat.js 缺少支付流程接线：${token}`);
+  if (rendererChatSource.includes(token)) {
+    fail(`renderer/chat.js 仍残留开发测试桩流程：${token}`);
   }
 }
-for (const token of [
-  'id="payment-plans"',
-  'id="payment-buy-yearly"',
-  'id="payment-buy-lifetime"',
-  'id="payment-message"'
-]) {
-  if (!rendererIndexSource.includes(token)) {
-    fail(`renderer/index.html 缺少沙箱支付元素：${token}`);
-  }
+if (!rendererIndexSource.includes('id="pro-coming-soon"')) {
+  fail('renderer/index.html 缺少 Pro 即将上线占位（pro-coming-soon）');
 }
-for (const token of [
-  '.payment-plans',
-  '.payment-plan',
-  '.payment-buy-btn',
-  '.payment-notice'
-]) {
-  if (!rendererChatCssSource.includes(token)) {
-    fail(`chat.css 缺少沙箱支付样式：${token}`);
-  }
+if (!rendererChatCssSource.includes('.pro-coming-soon')) {
+  fail('chat.css 缺少 Pro 即将上线占位样式');
 }
-pass('渲染层订阅页价格展示与沙箱购买按钮接线存在');
-
-// 双语文案键
-const requiredPaymentKeys = [
-  'plansTitle',
-  'planYearly',
-  'planLifetime',
-  'priceYearly',
-  'priceLifetime',
-  'sandboxBuy',
-  'sandboxNotice',
-  'activated',
-  'alreadyActivated',
-  'createFailed',
-  'callbackFailed',
-  'unavailable',
-  'invalidTier'
-];
-for (const locale of [zhLocales, enLocales]) {
-  for (const key of requiredPaymentKeys) {
-    if (
-      !locale.payment ||
-      typeof locale.payment[key] !== 'string' ||
-      !locale.payment[key]
-    ) {
-      fail(`locales 缺少 payment.${key} 文案`);
-    }
-  }
+if (zhLocales.payment || enLocales.payment) {
+  fail('locales 仍包含 payment.* 死文案');
 }
-pass('payment 双语文案键齐全（zh-CN/en）');
+pass('T-54 沙箱支付/mock 激活 UI 已从生产界面移除');
 
 // T-48：设置页三段式布局（顶部账号卡片 + 分组列表 + 版本页脚）
 const t48RequiredIds = [
@@ -2534,20 +2542,14 @@ const t48RequiredIds = [
   'id="settings-group-conversation"',
   'id="settings-group-companion"',
   'id="settings-group-privacy"',
-  'id="account-upgrade-btn"',
   'id="settings-version"',
   'id="account-section"',
   'id="license-tier"',
   'id="license-status"',
   'id="license-expiry"',
   'id="license-quota"',
-  'id="license-code"',
-  'id="license-activate"',
-  'id="license-deactivate"',
-  'id="license-message"',
-  'id="payment-buy-yearly"',
-  'id="payment-buy-lifetime"',
-  'id="payment-message"',
+  'id="pro-coming-soon"',
+  'id="review-onboarding-btn"',
   'id="api-key"',
   'id="model"',
   'id="language"',
@@ -2598,14 +2600,14 @@ for (const token of [
   'bindSettingsGroups',
   'settingsVersion',
   'window.petAPI.version',
-  'accountUpgradeBtn'
+  'reviewOnboardingBtn'
 ]) {
   if (!rendererChatSource.includes(token)) {
     fail(`renderer/chat.js 缺少 T-48 逻辑：${token}`);
   }
 }
 for (const token of [
-  '.account-upgrade-btn',
+  '.pro-coming-soon',
   '.settings-groups',
   '.settings-group-toggle',
   '.settings-group-panel',
@@ -2617,7 +2619,7 @@ for (const token of [
   }
 }
 const t48RequiredLocaleKeys = [
-  'upgradeActivate',
+  'reviewOnboarding',
   'groupAppearance',
   'groupConversation',
   'groupCompanion',

@@ -80,13 +80,30 @@ app.whenReady().then(() => {
             }
           }, 50);
         });
+        // T-54：全新档案首启断言——等待 restoreSettings 完成后再核对引导可见性
+        const onboardingView = document.getElementById('onboarding-view');
+        let onboardingVisible = Boolean(onboardingView && !onboardingView.hidden);
+        const onboardingDeadline = Date.now() + 5000;
+        while (!onboardingVisible && Date.now() < onboardingDeadline) {
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          const view = document.getElementById('onboarding-view');
+          onboardingVisible = Boolean(view && !view.hidden);
+        }
+        const settingsApi =
+          api.settings && typeof api.settings.get === 'function' ? api.settings : null;
+        const freshSettings = settingsApi ? await settingsApi.get() : null;
         const firstBubble = list.querySelector('.message .bubble');
         return {
           historyApi,
           historyCount,
           chatReady,
           bubbleCount: list.querySelectorAll('.message').length,
-          firstBubbleText: firstBubble ? firstBubble.textContent : ''
+          firstBubbleText: firstBubble ? firstBubble.textContent : '',
+          onboardingExists: Boolean(onboardingView),
+          onboardingVisible,
+          onboardingDoneDefault: freshSettings
+            ? freshSettings.onboardingDone
+            : undefined
         };
       })()`);
 
@@ -109,6 +126,18 @@ app.whenReady().then(() => {
       }
 
       console.log(`[smoke] chat 表单端到端通过（气泡 ${state.bubbleCount}）`);
+      if (!state.onboardingExists) {
+        fail('新用户首启：onboarding-view 不存在');
+      }
+      if (!state.onboardingVisible) {
+        fail('新用户首启：onboarding-view 未显示（全新档案应显示首次引导）');
+      }
+      if (state.onboardingDoneDefault !== false) {
+        fail(
+          `新用户首启：默认 onboardingDone 应为 false，实际 ${state.onboardingDoneDefault}`
+        );
+      }
+      console.log('[smoke] 新用户首启引导可见且默认 onboardingDone=false 通过');
       app.quit();
     } catch (error) {
       fail(`端到端断言异常: ${error && error.message ? error.message : error}`);

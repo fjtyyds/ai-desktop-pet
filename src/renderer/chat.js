@@ -39,10 +39,12 @@
  * - T-43 皮肤与配件（ADR-032）：设置页“皮肤与配件”子页——皮肤列表（预览图/名称/
  *   作者/版本/内置或导入标识）、应用/导出/移除按钮、zip 或目录导入入口；
  *   标题栏角色形象（pet-avatar）随 settings.skinId 切换默认皮肤资源（T-44 再做动效）
- * - T-40 许可证与付费墙：设置页“账户/订阅”区块（档位/状态/有效期/云 AI 额度/
- *   激活与注销入口）；功能门控（高级神经语音、皮肤市场、待办仅
+ * - T-40 许可证与付费墙：设置页“账户/订阅”区块（档位/状态/有效期/云 AI 额度）；
+ *   功能门控（高级神经语音、皮肤市场、待办仅
  *   yearly/lifetime）；首次启动年龄确认 + 内容合规声明弹窗（同意后不再弹，
- *   拒绝后 AI 对话停用）；云额度不足时本地拦截并回显主进程错误
+ *   拒绝后 AI 对话停用）；云额度不足时本地拦截并回显主进程错误；
+ *   T-54：移除支付与激活测试桩 UI（主进程内部桩保留，不暴露给终端用户），
+ *   新增设置页“重新查看新手引导”入口（复用 T-20 三步引导覆盖层）
  * - T-44 UI 大改（M3.6）：深色玻璃拟态 + 浅色主题切换（theme 持久化）、
  *   减弱动效开关（reduceMotion，关闭呼吸/眨眼/过渡）、角色呼吸/眨眼/情绪联动
  *   微动画（纯 CSS）、效率小组件增强（喝水提醒/待办，本地持久化；
@@ -467,7 +469,6 @@
       settingsSave: document.getElementById('settings-save'),
       settingsStatus: document.getElementById('settings-status'),
       settingsVersion: document.getElementById('settings-version'),
-      accountUpgradeBtn: document.getElementById('account-upgrade-btn'),
       exportMdBtn: document.getElementById('export-md'),
       exportJsonBtn: document.getElementById('export-json'),
       exportStatus: document.getElementById('export-status'),
@@ -514,15 +515,8 @@
       licenseFeatureNeural: document.getElementById('license-feature-neural'),
       licenseFeatureSkin: document.getElementById('license-feature-skin'),
       licenseFeatureTodo: document.getElementById('license-feature-todo'),
-      licenseCode: document.getElementById('license-code'),
-      licenseActivate: document.getElementById('license-activate'),
-      licenseDeactivate: document.getElementById('license-deactivate'),
-      licenseMessage: document.getElementById('license-message'),
-      // T-41：沙箱支付区块
-      paymentPlans: document.getElementById('payment-plans'),
-      paymentBuyYearly: document.getElementById('payment-buy-yearly'),
-      paymentBuyLifetime: document.getElementById('payment-buy-lifetime'),
-      paymentMessage: document.getElementById('payment-message'),
+      // T-54：设置页“重新查看新手引导”入口（复用 T-20 三步引导覆盖层）
+      reviewOnboardingBtn: document.getElementById('review-onboarding-btn'),
       // T-44：主题/减弱动效/效率小组件
       themeSelect: document.getElementById('theme'),
       reduceMotionCheckbox: document.getElementById('reduce-motion'),
@@ -547,8 +541,6 @@
     showClearStatus = makeStatusShower(elements.clearStatus);
     showTelemetryStatus = makeStatusShower(elements.telemetryStatus);
     showSkinStatus = makeStatusShower(elements.skinStatus);
-    showLicenseMessage = makeStatusShower(elements.licenseMessage);
-    showPaymentMessage = makeStatusShower(elements.paymentMessage);
   }
 
   /* ---------------- T-19：窗口行为开关与提示（ADR-022 冻结契约） ---------------- */
@@ -728,17 +720,6 @@
     elements.skinBack.addEventListener('click', closeSkinView);
     elements.skinImportBtn.addEventListener('click', () => void handleSkinImport());
     elements.settingsSave.addEventListener('click', saveSettings);
-    if (elements.accountUpgradeBtn) {
-      elements.accountUpgradeBtn.addEventListener('click', () => {
-        if (elements.licenseCode) {
-          elements.licenseCode.scrollIntoView({
-            behavior: 'smooth',
-            block: 'center'
-          });
-          elements.licenseCode.focus();
-        }
-      });
-    }
     elements.exportMdBtn.addEventListener('click', () => void exportConversation('markdown'));
     elements.exportJsonBtn.addEventListener('click', () => void exportConversation('json'));
     elements.clearDataBtn.addEventListener('click', handleClearData);
@@ -796,16 +777,9 @@
     elements.telemetryClear.addEventListener('click', () => {
       void handleTelemetryClear();
     });
-    elements.licenseActivate.addEventListener('click', () => void activateLicense());
-    elements.licenseDeactivate.addEventListener('click', () =>
-      void deactivateLicense()
-    );
-    elements.paymentBuyYearly.addEventListener('click', () =>
-      void sandboxPurchase('yearly')
-    );
-    elements.paymentBuyLifetime.addEventListener('click', () =>
-      void sandboxPurchase('lifetime')
-    );
+    if (elements.reviewOnboardingBtn) {
+      elements.reviewOnboardingBtn.addEventListener('click', showOnboarding);
+    }
     elements.complianceAccept.addEventListener('click', () =>
       void acceptCompliance()
     );
@@ -3232,191 +3206,8 @@
       elements.licenseFeatureTodo.hidden = !paid;
     }
 
-    // 激活/注销入口
-    if (elements.licenseDeactivate) {
-      elements.licenseDeactivate.hidden = !(paid && status === 'active');
-    }
-
     updateTtsVoicePackControls(); // 免费版锁定高级神经语音
     updateWidgetVisibility(); // T-44：待办按付费档显示，喝水提醒随设置
-  }
-
-  /** 激活码/订单号激活（T-41 前为本地 mock 校验） */
-  async function activateLicense() {
-    const t = window.PetLocales.createTranslator(currentLocale);
-    const api =
-      window.petAPI &&
-      window.petAPI.license &&
-      window.petAPI.license.activate;
-    if (typeof api !== 'function') {
-      showLicenseMessage(
-        t('license.activateError', { error: t('data.apiUnavailable') }),
-        'error'
-      );
-      return;
-    }
-    const code = elements.licenseCode.value.trim();
-    if (!code) {
-      showLicenseMessage(t('license.activateError', { error: 'empty' }), 'error');
-      return;
-    }
-    elements.licenseActivate.disabled = true;
-    showLicenseMessage(t('license.activating'), 'ok');
-    try {
-      const result = await api(code);
-      if (result && result.ok) {
-        licenseState = result.status || null;
-        applyLicenseUi();
-        showLicenseMessage(
-          t('license.activated', {
-            tier: tierLabel(t, licenseState ? licenseState.tier : 'free')
-          }),
-          'ok'
-        );
-      } else {
-        showLicenseMessage(
-          t('license.activateError', {
-            error: result && result.error ? result.error : t('data.apiUnavailable')
-          }),
-          'error'
-        );
-      }
-    } catch (error) {
-      showLicenseMessage(
-        t('license.activateError', {
-          error: error && error.message ? error.message : String(error)
-        }),
-        'error'
-      );
-    } finally {
-      elements.licenseActivate.disabled = false;
-    }
-  }
-
-  /** 注销激活：回到免费版 */
-  async function deactivateLicense() {
-    const api =
-      window.petAPI &&
-      window.petAPI.license &&
-      window.petAPI.license.deactivate;
-    const t = window.PetLocales.createTranslator(currentLocale);
-    if (typeof api !== 'function') {
-      showLicenseMessage(
-        t('license.deactivateError', { error: t('data.apiUnavailable') }),
-        'error'
-      );
-      return;
-    }
-    elements.licenseDeactivate.disabled = true;
-    try {
-      const result = await api();
-      if (result && result.ok) {
-        licenseState = result.status || null;
-        applyLicenseUi();
-        showLicenseMessage(t('license.deactivated'), 'ok');
-      } else {
-        showLicenseMessage(
-          t('license.deactivateError', {
-            error: result && result.error ? result.error : t('data.apiUnavailable')
-          }),
-          'error'
-        );
-      }
-    } catch (error) {
-      showLicenseMessage(
-        t('license.deactivateError', {
-          error: error && error.message ? error.message : String(error)
-        }),
-        'error'
-      );
-    } finally {
-      elements.licenseDeactivate.disabled = false;
-    }
-  }
-
-  /* ---------------- T-41：沙箱支付（下单 → 模拟回调 → 升档 → 刷新 UI） ---------------- */
-
-  function hasPaymentApi() {
-    return Boolean(
-      window.petAPI &&
-        window.petAPI.payment &&
-        typeof window.petAPI.payment.createOrder === 'function' &&
-        typeof window.petAPI.payment.mockCallback === 'function'
-    );
-  }
-
-  /** 沙箱购买：创建订单并模拟支付成功回调，成功后刷新许可证 UI */
-  async function sandboxPurchase(tier) {
-    const t = window.PetLocales.createTranslator(currentLocale);
-    if (!hasPaymentApi()) {
-      showPaymentMessage(t('payment.unavailable'), 'error');
-      return;
-    }
-    if (tier !== 'yearly' && tier !== 'lifetime') {
-      showPaymentMessage(t('payment.invalidTier'), 'error');
-      return;
-    }
-    const button =
-      tier === 'yearly'
-        ? elements.paymentBuyYearly
-        : elements.paymentBuyLifetime;
-    button.disabled = true;
-    showPaymentMessage(t('payment.creating'), 'ok');
-    try {
-      const orderResult = await window.petAPI.payment.createOrder({
-        tier,
-        channel: 'alipay'
-      });
-      if (!orderResult || !orderResult.ok) {
-        showPaymentMessage(
-          t('payment.createFailed', {
-            error: orderResult && orderResult.error ? orderResult.error : ''
-          }),
-          'error'
-        );
-        return;
-      }
-      showPaymentMessage(t('payment.callbackSimulating'), 'ok');
-      const callbackResult = await window.petAPI.payment.mockCallback({
-        orderId: orderResult.order.orderId,
-        channel: 'alipay'
-      });
-      if (!callbackResult || !callbackResult.ok) {
-        showPaymentMessage(
-          t('payment.callbackFailed', {
-            error:
-              callbackResult && callbackResult.error
-                ? callbackResult.error
-                : ''
-          }),
-          'error'
-        );
-        return;
-      }
-      licenseState =
-        (callbackResult.licenseStatus &&
-          typeof callbackResult.licenseStatus === 'object' &&
-          callbackResult.licenseStatus) ||
-        (await window.petAPI.license.get());
-      applyLicenseUi();
-      showPaymentMessage(
-        callbackResult.duplicate
-          ? t('payment.alreadyActivated')
-          : t('payment.activated', {
-              tier: tierLabel(t, callbackResult.licenseStatus ? callbackResult.licenseStatus.tier : tier)
-            }),
-        'ok'
-      );
-    } catch (error) {
-      showPaymentMessage(
-        t('payment.callbackFailed', {
-          error: error && error.message ? error.message : String(error)
-        }),
-        'error'
-      );
-    } finally {
-      button.disabled = false;
-    }
   }
 
   /** 合规弹窗：未同意时展示；同意后永久隐藏；拒绝后锁定 AI 对话 */
@@ -4470,8 +4261,6 @@
   let showClearStatus = () => {};
   let showTelemetryStatus = () => {};
   let showSkinStatus = () => {}; // T-43
-  let showLicenseMessage = () => {};
-  let showPaymentMessage = () => {}; // T-41
 
   window.ChatUI = {
     init,
@@ -4479,7 +4268,6 @@
     refreshSkins, // T-43：皮肤列表刷新（测试/手动入口）
     getSkinItems: () => skinItems, // T-43
     applySkin, // T-43
-    sandboxPurchase, // T-41：沙箱购买流程（测试/手动入口）
     sanitizeShareText, // T-45：脱敏（测试/手动入口）
     generateShareCard, // T-45：生成对话卡片 PNG
     saveShareCard, // T-45：保存卡片

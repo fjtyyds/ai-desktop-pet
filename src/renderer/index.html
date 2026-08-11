@@ -291,7 +291,7 @@
             <h2 class="settings-title" data-i18n="settings.title">设置</h2>
           </div>
           <div class="settings-body">
-            <!-- T-50：账户与订阅作为第一组（与其他设置分组同结构，全部 license/payment id 保留） -->
+            <!-- T-50：账户与订阅作为第一组（T-54：支付与激活测试桩 UI 已移除，保留真实许可证状态展示） -->
             <div class="settings-groups" id="settings-groups">
             <section class="settings-group" id="account-section">
               <button
@@ -309,12 +309,6 @@
                 <span class="settings-group-arrow" aria-hidden="true">›</span>
               </button>
               <div class="settings-group-panel" id="settings-group-panel-account" hidden>
-                <button
-                  id="account-upgrade-btn"
-                  class="primary-btn account-upgrade-btn"
-                  type="button"
-                  data-i18n="settings.upgradeActivate"
-                >升级 / 激活</button>
                 <div class="license-row">
                   <span class="field-hint" data-i18n="license.tierLabel">当前版本</span>
                   <span id="license-tier" class="license-value">免费版</span>
@@ -348,79 +342,21 @@
                     data-i18n="license.featureTodos"
                   >待办事项</span>
                 </div>
-                <!-- T-41：沙箱支付（价格来自商业化方案 §7.1；仅模拟，不产生真实扣款） -->
-                <div id="payment-plans" class="payment-plans">
-                  <span class="field-label" data-i18n="payment.plansTitle"
-                    >沙箱支付（未接入真实网关）</span
+                <!-- T-54：干净占位（替换支付/激活测试桩；真实付费功能上线后再接 UI） -->
+                <div id="pro-coming-soon" class="pro-coming-soon">
+                  <span class="field-label" data-i18n="license.comingSoonTitle"
+                    >Pro 会员即将上线</span
                   >
-                  <div class="payment-plan" data-tier="yearly">
-                    <span
-                      class="payment-plan-name"
-                      data-i18n="payment.planYearly"
-                    >Pro 订阅</span>
-                    <span
-                      class="payment-plan-price"
-                      data-i18n="payment.priceYearly"
-                    >¥128/年</span>
-                    <button
-                      id="payment-buy-yearly"
-                      class="payment-buy-btn primary-btn"
-                      type="button"
-                      data-i18n="payment.sandboxBuy"
-                    >沙箱购买</button>
-                  </div>
-                  <div class="payment-plan" data-tier="lifetime">
-                    <span
-                      class="payment-plan-name"
-                      data-i18n="payment.planLifetime"
-                    >永久买断</span>
-                    <span
-                      class="payment-plan-price"
-                      data-i18n="payment.priceLifetime"
-                    >¥68</span>
-                    <button
-                      id="payment-buy-lifetime"
-                      class="payment-buy-btn primary-btn"
-                      type="button"
-                      data-i18n="payment.sandboxBuy"
-                    >沙箱购买</button>
-                  </div>
-                  <p class="payment-notice" data-i18n="payment.sandboxNotice"
-                    >仅模拟支付流程，不产生真实扣款，也不会发送任何网络请求。</p
+                  <p class="field-hint" data-i18n="license.comingSoonHint"
+                    >敬请期待：正式上线后即可升级解锁 Pro 专属功能。</p
                   >
-                  <p id="payment-message" class="settings-status" role="status" hidden></p>
                 </div>
-                <label class="field">
-                  <span class="field-label" data-i18n="license.activateLabel"
-                    >激活码 / 订单号</span
-                  >
-                  <input
-                    id="license-code"
-                    class="field-input"
-                    type="text"
-                    maxlength="128"
-                    autocomplete="off"
-                    spellcheck="false"
-                    placeholder="PRO-YEARLY-… / PRO-LIFETIME-… / ORDER-…"
-                    data-i18n-placeholder="license.activatePlaceholder"
-                  />
-                </label>
-                <div class="license-actions">
-                  <button
-                    id="license-activate"
-                    class="primary-btn"
-                    type="button"
-                    data-i18n="license.activateButton"
-                  >激活</button>
-                  <button
-                    id="license-deactivate"
-                    class="secondary-btn"
-                    type="button"
-                    data-i18n="license.deactivateButton"
-                    hidden
-                  >注销激活</button>
-                </div>
-                <p id="license-message" class="settings-status" role="status" hidden></p>
+                <button
+                  id="review-onboarding-btn"
+                  class="secondary-btn"
+                  type="button"
+                  data-i18n="settings.reviewOnboarding"
+                >重新查看新手引导</button>
               </div>
             </section>
 
