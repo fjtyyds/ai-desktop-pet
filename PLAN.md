@@ -159,6 +159,7 @@
 - [x] `docs/tasks/T-44.md` — UI 大改 M3.6（玻璃拟态/角色表现）（codex/m4-ui）
 - [x] `docs/tasks/T-45.md` — 官网落地页与分享传播（codex/m4-marketing）
 - [x] `docs/tasks/T-46.md` — 商店发布准备与云同步评估（codex/m4-store）
+- [x] `docs/tasks/T-47.md` — MSIX 打包与商店沙箱技术验证（codex/m4-msix）
 
 30 天节奏：W1（8/11-8/17）T-40/T-41/T-42 → W2（8/18-8/24）T-43/T-44 → W3（8/25-8/31）T-45/T-46 + 集成 → 09-01 v1.0 发布。
 
@@ -218,6 +219,7 @@
 - 2026-08-11：T-46 商店发布准备与云同步评估验收合并（74e8a30 fast-forward）：Steam/MS Store 素材包与提审待办、签名评估（OV/EV/Azure，只报告不采购）、本地 Release 演练脚本（latest.yml 一致性 PASS、零远程副作用）、云同步评估与 ADR-035 草案（v1.0 不实施）；check/smoke 全绿；M4.5 商业化任务全部完成，进入 v1.0 发布准备（发布/商店/资金事项待用户确认）。
 - 2026-08-11：v0.1.0 GitHub Release 已发布（用户授权自动执行）：main 推送 + tag v0.1.0 → CI check/smoke/dist/release 全绿，exe/blockmap/latest.yml 资产上线；自动更新源首次生效，真实更新链路待 v0.1.1/v1.0 验证。
 - 2026-08-11：T-47（MSIX 打包与商店沙箱技术验证）已建卡并派发（codex/m4-msix），执行中。
+- 2026-08-11：T-47 验收合并（a723513 merge）：验证报告覆盖 electron-builder MSIX beta 支持现状、工具链、8 项沙箱风险（自动更新高风险）与 MSIX+NSIS 并存推荐（3.5~5.5 人日）；check/smoke 全绿；实施需批准依赖升级，Store 提审待用户账号/预算。
 
 ## Surprises & Discoveries
 

@@ -1,11 +1,11 @@
 # 项目状态
 
 - 更新时间：2026-08-11
-- 当前阶段：v0.1.0 GitHub Release 已发布；T-47（MSIX 技术验证）执行中；v1.0（2026-09-01）发布准备
-- 当前任务：验收 T-47；商店注册与预算、签名采购待用户提供资质/确认
-- 最近完成：T-41~T-46 验收合并；v0.1.0 Release（GitHub，exe+blockmap+latest.yml，CI 全绿）
-- 下一步：T-47 验收后进入 v1.0 发布；真实自动更新链路需 v0.1.1/v1.0 发布后验证
-- 阻塞：商店注册与预算（Steam $100/MS Store/Azure）、签名采购、归档目录物理删除、TTS 听感复核、T-44 UI 目检均待用户决策/确认
+- 当前阶段：T-40~T-47 全部验收合并；v0.1.0 GitHub Release 已发布；v1.0（2026-09-01）发布准备
+- 当前任务：等待用户提供商店资质/预算（Steam/MS Store/Azure 签名）与 MSIX 实施决策
+- 最近完成：T-47 MSIX 技术验证（a723513）；v0.1.0 Release（GitHub，exe+blockmap+latest.yml，CI 全绿）
+- 下一步：用户确认商店事项后按 T-47 报告拆卡实施（依赖升级需批准）；真实自动更新链路待 v0.1.1/v1.0 发布后验证
+- 阻塞：商店注册与预算（Steam $100/MS Store/Azure）、签名采购、MSIX 依赖升级审批、归档目录物理删除、TTS 听感复核、T-44 UI 目检均待用户决策/确认
 - 交接提示：新会话先读 `AGENTS.md` → `PLAN.md` → `docs/STATUS.md` → `docs/reports/2026-08-10-工作对接方案.md` → 自己的任务卡（docs/tasks/T-xx.md）
 
 ## M1 集成完成记录（2026-08-09）
@@ -260,3 +260,10 @@
 - Release：https://github.com/fjtyyds/ai-desktop-pet/releases/tag/v0.1.0（非草稿、非预发布），资产 ai-desktop-pet-0.1.0-Setup.exe（100,615,906 B）、blockmap（105,784 B）、latest.yml（357 B）。
 - 意义：自动更新源首次生效；真实更新下载/安装链路待 v0.1.1 或 v1.0 发布后端到端验证。
 - 遗留：SmartScreen 首次发布可能提示未知发布者（签名采购待确认）；商店渠道（Steam/MS Store）素材已就绪，注册与提审待用户资质与预算。
+
+## T-47 合并记录（2026-08-11，项目内线程闭环）
+
+- 分支 codex/m4-msix @ 2fea42e（merge 到 a723513）：docs/store/msix-validation.md 新增验证报告（electron-builder MSIX 支持现状、工具链要求、8 项沙箱兼容性风险、推荐 MSIX+NSIS 并存 3.5~5.5 人日、风险清单）；任务卡完成记录。
+- 验证：worker 与协调者 check 全绿；合并后 main check/smoke 全绿。
+- 说明：任务卡 add/add 冲突（main 前进入库 vs 分支完成记录）按分支版本解决；分支未触碰任何禁止文件。
+- 遗留：MSIX 实施需批准 electron-builder 27 alpha 依赖升级；Store 提审需用户账号/预算；托盘/通知需真实安装包验证。
