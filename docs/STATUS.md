@@ -1,10 +1,10 @@
 # 项目状态
 
-- 更新时间：2026-08-10
-- 当前阶段：M4 P0/P1/P3/P4 完成；商业化上线方案执行中（T-40/T-42/T-43 已合并）
-- 当前任务：派发 T-41（支付）/T-44（UI 大改）/T-45（官网与分享）
-- 最近完成：T-40 许可证与付费墙（dece63a）、T-42 匿名遥测（fd0b3a3）、T-43 皮肤市场 MVP（df99fa2）验收合并
-- 下一步：验收 T-41/T-44/T-45 后派发 T-46（商店发布准备）；首次发布并入 v1.0 计划（2026-09-01）
+- 更新时间：2026-08-11
+- 当前阶段：M4 P0/P1/P3/P4 完成；商业化上线方案执行中（T-40~T-45 已全部验收合并）
+- 当前任务：派发 T-46（商店发布准备与云同步评估）
+- 最近完成：T-41 支付沙箱（16753c2）、T-45 分享+官网+社媒（c2d89b8）、T-44 UI 大改 M3.6（c6adbe5）验收合并
+- 下一步：T-46 完成后进入 v1.0（2026-09-01）发布准备；首次发布并入 v1.0 计划（2026-09-01）
 - 阻塞：无（P2 签名/商店预算、大目录/worktree 清理、UI 大改排期、TTS 听感复核仍待用户决策）
 - 交接提示：新会话先读 `AGENTS.md` → `PLAN.md` → `docs/STATUS.md` → `docs/reports/2026-08-10-工作对接方案.md` → 自己的任务卡（docs/tasks/T-xx.md）
 
@@ -227,3 +227,22 @@
 - 分支 codex/m4-license @ 6ac339b（merge 到 dece63a，3 个共享文件冲突已解决）：src/main/license.js 新增；license:* IPC；设置页“账户/订阅”区块、Pro 门控、首次启动年龄+合规弹窗；store 白名单 licenseTier/licenseKey/licenseExpiresAt/deviceId/complianceAccepted。
 - 验证：三态切换持久化、激活码/订单号 mock、过期/吊销/设备绑定、云额度（BYOK 不消耗）、门控与合规弹窗（拒绝后 AI 对话停用）；worker 与协调者 check/smoke 全绿。
 - 遗留：真实支付与订单服务端校验待 T-41；license_state_change 遥测埋点已由 T-42 预留，合并后已可接线。
+
+## T-41 合并记录（2026-08-11，项目内线程闭环）
+
+- 分支 codex/m4-payment @ 16753c2（fast-forward 合并）：src/main/payment.js 新增；license.js 支付升档/降级联动；payment:create-order/payment:mock-callback IPC/preload；订阅页价格展示与“沙箱购买”按钮；双语文案与 check 断言。
+- 安全验证：凭证仅环境变量读取、零硬编码密钥、无真实网关地址/网络请求；非 sandbox 模式拒绝操作；沙箱下单→回调→升档→幂等→验签拒绝→退款降级全链路通过。
+- 验证：worker 与协调者 check/smoke 全绿；与 T-44/T-45 合并后复跑 check/smoke 全绿。
+
+## T-45 合并记录（2026-08-11，项目内线程闭环）
+
+- 分支 codex/m4-marketing @ f05bd9c（merge 到 c2d89b8，chat.js 导出区冲突按功能共存解决）：分享按钮/菜单、消息长按/右键唤起、Canvas 对话卡片（脱敏、PNG 校验、文件名清洗）、website/ 静态落地页、docs/marketing 社媒素材、check 断言。
+- 验证：worker 与协调者 check/smoke 全绿；与 T-41/T-44 合并后复跑 check/smoke 全绿。
+- 说明：main 工作区曾存在本卡未提交版本，已 stash 保护并与合并结果核对一致。
+
+## T-44 合并记录（2026-08-11，项目内线程闭环）
+
+- 分支 codex/m4-ui @ f1baf8f（merge 到 c6adbe5，chat.js 元素引用/导出区冲突按功能共存解决）：深色玻璃拟态+浅色主题持久化、角色呼吸/眨眼/情绪联动微动画、效率小组件（专注统计/喝水提醒/待办）、减弱动效开关、无障碍回归断言。
+- 验证：worker 与协调者 check/smoke 全绿（含 WCAG 对比度断言）；与 T-41/T-45 共存复跑全绿。
+- 说明：T-44 在 main 工作区直接提交（异常，未建独立 worktree），已按交接流程将 T-45 残留改动 stash 保护后合并；stash@{0} 与最终合并结果逐文件核对一致，无内容丢失。
+- 遗留：UI 观感需人工 `npm run dev` 目检。
