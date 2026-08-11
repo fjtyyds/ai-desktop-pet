@@ -1423,26 +1423,7 @@ html.reduce-motion *::after {
   color: var(--t44-error);
 }
 
-/* T-44：效率小组件（专注统计 / 喝水提醒 / 待办） */
-.focus-stats {
-  display: flex;
-  gap: 14px;
-}
-
-.focus-stat {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 4px;
-  font-size: 12px;
-  color: var(--t44-text-secondary);
-}
-
-.focus-stat-value {
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--t44-text-primary);
-  font-variant-numeric: tabular-nums;
-}
+/* T-44：效率小组件（喝水提醒 / 待办） */
 
 .water-status {
   min-height: 15px;

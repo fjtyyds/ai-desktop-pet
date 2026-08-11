@@ -49,7 +49,6 @@
     "proFeaturesTitle": "Pro features",
     "featureNeuralVoice": "Advanced neural voices",
     "featureSkinMarket": "Skin marketplace",
-    "featureFocusStats": "Focus stats",
     "featureTodos": "To-dos",
     "featureLocked": "🔒 {name} (Pro only)",
     "activateLabel": "Activation code / order ID",
@@ -186,13 +185,6 @@
     "memoryNotFound": "Memory not found; it may have been deleted",
     "memoryInvalidId": "Invalid memory ID",
     "memoryUpdatedAt": "Updated {time}"
-  },
-  "focus": {
-    "widgetAriaLabel": "Focus stats",
-    "title": "Focus stats",
-    "countLabel": "{count} sessions today",
-    "minutesLabel": "{minutes} minutes total",
-    "proOnly": "Pro only: upgrade to see today's focus stats"
   },
   "water": {
     "widgetAriaLabel": "Water reminder",

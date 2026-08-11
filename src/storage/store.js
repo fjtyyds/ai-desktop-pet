@@ -91,7 +91,6 @@ const DEFAULT_SETTINGS = {
   telemetryEnabled: false, // T-42：匿名遥测开关（opt-in，默认关闭）
   theme: DEFAULT_THEME, // T-44：主题（dark/light，默认深色玻璃拟态）
   reduceMotion: false, // T-44：减弱动效开关（关闭呼吸/眨眼/过渡动画）
-  focusStats: { date: '', count: 0, minutes: 0 }, // T-44：今日专注统计（跨日由渲染层重置）
   waterReminder: {
     enabled: false,
     intervalMinutes: DEFAULT_WATER_INTERVAL_MINUTES,
@@ -210,29 +209,6 @@ function sanitizeWeatherCity(value, current) {
 /** T-44：主题清洗：仅允许 dark/light，非法值保留当前值 */
 function sanitizeTheme(value, current) {
   return THEMES.includes(value) ? value : current;
-}
-
-/** T-44：专注统计清洗：{ date: 'YYYY-MM-DD', count: >=0, minutes: >=0 } */
-function sanitizeFocusStats(value, current) {
-  const fallback = { date: '', count: 0, minutes: 0 };
-  if (value === null || value === undefined) {
-    return fallback;
-  }
-  if (typeof value !== 'object' || Array.isArray(value)) {
-    return current && typeof current === 'object' ? current : fallback;
-  }
-  const base = current && typeof current === 'object' ? current : fallback;
-  const date =
-    typeof value.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value.date)
-      ? value.date
-      : typeof base.date === 'string'
-        ? base.date.slice(0, 10)
-        : '';
-  return {
-    date,
-    count: sanitizeNonNegativeInteger(value.count, base.count),
-    minutes: sanitizeNonNegativeInteger(value.minutes, base.minutes)
-  };
 }
 
 /** T-44：喝水提醒清洗：enabled 布尔 + 间隔 5~240 分钟 + 最近喝水时间戳 */
@@ -417,6 +393,8 @@ function createStore(baseDir) {
     delete merged.pomodoroMinutes;
     delete merged.pomodoroNotifyAt;
     delete merged.pomodoroNotifyMinutes;
+    // T-51：旧 focusStats 字段按 ADR-039 整体移除，兼容忽略并清理（不迁移、不暴露）
+    delete merged.focusStats;
     merged.onboardingDone = sanitizeBoolean(
       merged.onboardingDone,
       DEFAULT_SETTINGS.onboardingDone
@@ -461,10 +439,6 @@ function createStore(baseDir) {
       merged.reduceMotion,
       DEFAULT_SETTINGS.reduceMotion
     );
-    merged.focusStats = sanitizeFocusStats(
-      merged.focusStats,
-      DEFAULT_SETTINGS.focusStats
-    );
     merged.waterReminder = sanitizeWaterReminder(
       merged.waterReminder,
       DEFAULT_SETTINGS.waterReminder
@@ -498,7 +472,6 @@ function createStore(baseDir) {
       'telemetryEnabled',
       'theme',
       'reduceMotion',
-      'focusStats',
       'waterReminder',
       'todos'
     ];
@@ -645,13 +618,6 @@ function createStore(baseDir) {
           next.reduceMotion = sanitizeBoolean(
             patch.reduceMotion,
             current.reduceMotion
-          );
-          continue;
-        }
-        if (key === 'focusStats') {
-          next.focusStats = sanitizeFocusStats(
-            patch.focusStats,
-            current.focusStats
           );
           continue;
         }

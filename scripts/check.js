@@ -415,7 +415,12 @@ for (const token of [
     fail(`index.html 仍包含番茄钟标记：${token}`);
   }
 }
-pass('index.html 系统状态小部件与番茄钟（面板/设置项）已移除');
+for (const token of ['focus-widget', 'license-feature-focus']) {
+  if (rendererIndexSource.includes(token)) {
+    fail(`index.html 仍包含已移除的专注统计标记：${token}`);
+  }
+}
+pass('index.html 系统状态小部件/番茄钟/专注统计（面板与设置项）已移除');
 
 const forbiddenRenderer = [
   'applySystemStatus',
@@ -1673,7 +1678,6 @@ pass('license 双语文案键齐全（zh-CN/en）');
 const t44IndexIds = [
   'id="theme"',
   'id="reduce-motion"',
-  'id="focus-widget"',
   'id="water-widget"',
   'id="water-enabled"',
   'id="water-interval"',
@@ -1690,8 +1694,6 @@ for (const id of t44IndexIds) {
 for (const token of [
   'applyTheme',
   'reduceMotion',
-  'renderFocusStats',
-  'recordFocusSession',
   'waterReminderSettings',
   'syncWaterWidget',
   'recordWaterDrink',
@@ -1703,6 +1705,19 @@ for (const token of [
 ]) {
   if (!rendererChatSource.includes(token)) {
     fail(`renderer/chat.js 缺少 T-44 逻辑：${token}`);
+  }
+}
+for (const token of [
+  'focusWidget',
+  'focusCount',
+  'focusMinutes',
+  'normalizeFocusStats',
+  'renderFocusStats',
+  'recordFocusSession',
+  'getFocusStats'
+]) {
+  if (rendererChatSource.includes(token)) {
+    fail(`chat.js 仍包含已移除的专注统计代码：${token}`);
   }
 }
 for (const token of [
@@ -1731,7 +1746,6 @@ const t44LocaleKeys = {
     'reduceMotion',
     'reduceMotionHint'
   ],
-  focus: ['widgetAriaLabel', 'title', 'countLabel', 'minutesLabel'],
   water: [
     'widgetAriaLabel',
     'title',
@@ -1846,7 +1860,7 @@ for (const [foreground, background, label] of [
 }
 pass('T-44 主题变量/动效/小组件源码接线与 WCAG 对比度断言通过');
 
-// T-44：store 白名单默认值、读写与清洗（theme/reduceMotion/focusStats/waterReminder/todos）
+// T-44：store 白名单默认值、读写与清洗（theme/reduceMotion/waterReminder/todos）
 const t44CheckDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-pet-t44-'));
 try {
   const t44Store = createStore(t44CheckDir);
@@ -1856,15 +1870,9 @@ try {
   if (DEFAULT_SETTINGS.reduceMotion !== false) {
     fail('DEFAULT_SETTINGS.reduceMotion 应为 false（默认不减弱动效）');
   }
-  const defaultFocus = DEFAULT_SETTINGS.focusStats;
   const defaultWater = DEFAULT_SETTINGS.waterReminder;
-  if (
-    !defaultFocus ||
-    typeof defaultFocus !== 'object' ||
-    defaultFocus.count !== 0 ||
-    defaultFocus.minutes !== 0
-  ) {
-    fail('DEFAULT_SETTINGS.focusStats 默认形状非法');
+  if (Object.prototype.hasOwnProperty.call(DEFAULT_SETTINGS, 'focusStats')) {
+    fail('DEFAULT_SETTINGS 不应再包含 focusStats');
   }
   if (
     !defaultWater ||
@@ -1895,30 +1903,6 @@ try {
   const motionInvalid = t44Store.writeSettings({ reduceMotion: 'yes' });
   if (motionInvalid.reduceMotion !== true) {
     fail('store reduceMotion 非布尔值应丢弃（保留当前值）');
-  }
-
-  // 专注统计（日期校验/负数钳制/读写一致）
-  const focusWritten = t44Store.writeSettings({
-    focusStats: { date: '2026-08-11', count: 3, minutes: 75 }
-  });
-  if (
-    focusWritten.focusStats.date !== '2026-08-11' ||
-    focusWritten.focusStats.count !== 3 ||
-    focusWritten.focusStats.minutes !== 75
-  ) {
-    fail('store focusStats 写入失败');
-  }
-  const focusBadDate = t44Store.writeSettings({
-    focusStats: { date: '11/08/2026', count: 9, minutes: 10 }
-  });
-  if (focusBadDate.focusStats.date !== '2026-08-11' || focusBadDate.focusStats.count !== 9) {
-    fail('store focusStats 非法日期应丢弃、合法数字应保留');
-  }
-  const focusClamped = t44Store.writeSettings({
-    focusStats: { date: '2026-08-11', count: -5, minutes: -1 }
-  });
-  if (focusClamped.focusStats.count !== 0 || focusClamped.focusStats.minutes !== 0) {
-    fail('store focusStats 负数应钳制为 0');
   }
 
   // 喝水提醒（间隔钳制/时间戳清洗）
@@ -1971,9 +1955,48 @@ try {
   if (todosInvalid.todos.length !== 100) {
     fail('store todos 非数组应丢弃（保留当前值）');
   }
-  pass('T-44 store 白名单（theme/reduceMotion/focusStats/waterReminder/todos）读写与清洗通过');
+  pass('T-44 store 白名单（theme/reduceMotion/waterReminder/todos）读写与清洗通过');
 } finally {
   fs.rmSync(t44CheckDir, { recursive: true, force: true });
+}
+
+// T-51：存量 focusStats 设置字段兼容清理（不迁移、不暴露；ADR-039）
+const legacyFocusCheckDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-pet-t51-'));
+try {
+  const legacyFocusStore = createStore(legacyFocusCheckDir);
+  fs.writeFileSync(
+    path.join(legacyFocusCheckDir, 'settings.json'),
+    JSON.stringify({ petName: 'legacy-focus' }, null, 2),
+    'utf8'
+  );
+  const legacyFocusRaw = JSON.parse(
+    fs.readFileSync(path.join(legacyFocusCheckDir, 'settings.json'), 'utf8')
+  );
+  legacyFocusRaw.focusStats = { date: '2026-08-11', count: 3, minutes: 75 };
+  fs.writeFileSync(
+    path.join(legacyFocusCheckDir, 'settings.json'),
+    JSON.stringify(legacyFocusRaw, null, 2),
+    'utf8'
+  );
+  const legacyFocusRead = legacyFocusStore.readSettings();
+  if (Object.prototype.hasOwnProperty.call(legacyFocusRead, 'focusStats')) {
+    fail('store 仍暴露已移除的 focusStats 字段');
+  }
+  const focusPatch = legacyFocusStore.writeSettings({
+    focusStats: { date: '2026-08-11', count: 5, minutes: 120 }
+  });
+  if (Object.prototype.hasOwnProperty.call(focusPatch, 'focusStats')) {
+    fail('store focusStats 写入应被忽略（白名单已移除）');
+  }
+  const focusRawAfterWrite = JSON.parse(
+    fs.readFileSync(path.join(legacyFocusCheckDir, 'settings.json'), 'utf8')
+  );
+  if (Object.prototype.hasOwnProperty.call(focusRawAfterWrite, 'focusStats')) {
+    fail('settings.json 中 focusStats 字段未被删除');
+  }
+  pass('store focusStats 字段已移除（存量字段兼容清理，不迁移/不暴露）');
+} finally {
+  fs.rmSync(legacyFocusCheckDir, { recursive: true, force: true });
 }
 
 (async () => {
@@ -2002,7 +2025,6 @@ try {
         initial.status !== 'inactive' ||
         initial.entitlements.advancedNeuralVoices !== false ||
         initial.entitlements.skinMarket !== false ||
-        initial.entitlements.focusStats !== false ||
         initial.entitlements.todos !== false ||
         initial.entitlements.byokChat !== true ||
         initial.entitlements.localMemory !== true ||
@@ -2012,6 +2034,9 @@ try {
       }
       if (initial.entitlements.pomodoro !== undefined) {
         fail('license entitlements 不应再包含 pomodoro');
+      }
+      if (initial.entitlements.focusStats !== undefined) {
+        fail('license entitlements 不应再包含 focusStats');
       }
       if (initial.quota.limit !== 10 || initial.quota.period !== 'day') {
         fail('免费版云 AI 额度默认应为 10 次/日');
@@ -2061,7 +2086,6 @@ try {
       if (
         yearlyEntitlements.advancedNeuralVoices !== true ||
         yearlyEntitlements.skinMarket !== true ||
-        yearlyEntitlements.focusStats !== true ||
         yearlyEntitlements.todos !== true ||
         yearly.status.quota.limit !== 200 ||
         yearly.status.quota.period !== 'month'

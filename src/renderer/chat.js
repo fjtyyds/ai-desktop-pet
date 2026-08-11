@@ -40,13 +40,13 @@
  *   作者/版本/内置或导入标识）、应用/导出/移除按钮、zip 或目录导入入口；
  *   标题栏角色形象（pet-avatar）随 settings.skinId 切换默认皮肤资源（T-44 再做动效）
  * - T-40 许可证与付费墙：设置页“账户/订阅”区块（档位/状态/有效期/云 AI 额度/
- *   激活与注销入口）；功能门控（高级神经语音、皮肤市场、专注统计/待办仅
+ *   激活与注销入口）；功能门控（高级神经语音、皮肤市场、待办仅
  *   yearly/lifetime）；首次启动年龄确认 + 内容合规声明弹窗（同意后不再弹，
  *   拒绝后 AI 对话停用）；云额度不足时本地拦截并回显主进程错误
  * - T-44 UI 大改（M3.6）：深色玻璃拟态 + 浅色主题切换（theme 持久化）、
  *   减弱动效开关（reduceMotion，关闭呼吸/眨眼/过渡）、角色呼吸/眨眼/情绪联动
- *   微动画（纯 CSS）、效率小组件增强（专注统计/喝水提醒/待办，本地持久化；
- *   专注统计与待办按 T-40 许可证门控仅 paid 显示）
+ *   微动画（纯 CSS）、效率小组件增强（喝水提醒/待办，本地持久化；
+ *   待办按 T-40 许可证门控仅 paid 显示）
  */
 (function () {
   'use strict';
@@ -513,7 +513,6 @@
       licenseQuota: document.getElementById('license-quota'),
       licenseFeatureNeural: document.getElementById('license-feature-neural'),
       licenseFeatureSkin: document.getElementById('license-feature-skin'),
-      licenseFeatureFocus: document.getElementById('license-feature-focus'),
       licenseFeatureTodo: document.getElementById('license-feature-todo'),
       licenseCode: document.getElementById('license-code'),
       licenseActivate: document.getElementById('license-activate'),
@@ -529,9 +528,6 @@
       reduceMotionCheckbox: document.getElementById('reduce-motion'),
       waterEnabled: document.getElementById('water-enabled'),
       waterInterval: document.getElementById('water-interval'),
-      focusWidget: document.getElementById('focus-widget'),
-      focusCount: document.getElementById('focus-count'),
-      focusMinutes: document.getElementById('focus-minutes'),
       waterWidget: document.getElementById('water-widget'),
       waterStatus: document.getElementById('water-status'),
       waterDrink: document.getElementById('water-drink'),
@@ -1989,92 +1985,6 @@
       });
   }
 
-  /** 本地日期键 YYYY-MM-DD（专注统计跨日重置依据） */
-  function todayKey(now) {
-    const date = now || new Date();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${date.getFullYear()}-${month}-${day}`;
-  }
-
-  /** 专注统计规范化：非今日数据视为新的一天（count/minutes 归零） */
-  function normalizeFocusStats(raw, now) {
-    const key = todayKey(now);
-    const source = raw && typeof raw === 'object' ? raw : {};
-    const date =
-      typeof source.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(source.date)
-        ? source.date
-        : '';
-    if (date !== key) {
-      return { date: key, count: 0, minutes: 0 };
-    }
-    return {
-      date: key,
-      count: Math.max(0, Math.floor(Number(source.count) || 0)),
-      minutes: Math.max(0, Math.floor(Number(source.minutes) || 0))
-    };
-  }
-
-  /** 渲染专注统计；Pro 门控（yearly/lifetime 才显示） */
-  function renderFocusStats(raw) {
-    if (!elements.focusWidget || !elements.focusCount || !elements.focusMinutes) {
-      return;
-    }
-    const stats = normalizeFocusStats(raw, new Date());
-    const t = window.PetLocales.createTranslator(currentLocale);
-    elements.focusCount.textContent = String(stats.count);
-    elements.focusMinutes.textContent = String(stats.minutes);
-    elements.focusWidget.hidden = !licenseTierIsPaid();
-    const countLabel = elements.focusCount.parentElement;
-    const minutesLabel = elements.focusMinutes.parentElement;
-    if (countLabel) {
-      countLabel.setAttribute(
-        'aria-label',
-        t('focus.countLabel', { count: stats.count })
-      );
-    }
-    if (minutesLabel) {
-      minutesLabel.setAttribute(
-        'aria-label',
-        t('focus.minutesLabel', { minutes: stats.minutes })
-      );
-    }
-  }
-
-  /** 番茄钟完成时累计今日专注（次数 +1、时长累加），跨日自动重置 */
-  async function recordFocusSession(minutes) {
-    const stats = normalizeFocusStats(
-      currentSettings && currentSettings.focusStats,
-      new Date()
-    );
-    const duration = Math.max(1, Math.round(Number(minutes) || 0));
-    const next = {
-      date: stats.date,
-      count: stats.count + 1,
-      minutes: stats.minutes + duration
-    };
-    currentSettings = { ...currentSettings, focusStats: next };
-    renderFocusStats(next);
-    const settingsApi =
-      window.petAPI &&
-      window.petAPI.settings &&
-      typeof window.petAPI.settings.set === 'function'
-        ? window.petAPI.settings
-        : null;
-    if (!settingsApi) {
-      return;
-    }
-    try {
-      const saved = await settingsApi.set({ focusStats: next });
-      if (saved && typeof saved === 'object') {
-        currentSettings = { ...currentSettings, focusStats: saved.focusStats };
-        renderFocusStats(currentSettings.focusStats);
-      }
-    } catch (error) {
-      console.warn('保存专注统计失败：', error);
-    }
-  }
-
   /** 喝水提醒设置规范化（enabled / 5~240 分钟 / lastDrinkAt） */
   function waterReminderSettings(settings) {
     const wr =
@@ -2343,9 +2253,8 @@
     void saveTodos(next);
   }
 
-  /** 许可证变化/语言切换/设置恢复后同步三个小组件的可见性与内容 */
+  /** 许可证变化/语言切换/设置恢复后同步小组件（待办/喝水）的可见性与内容 */
   function updateWidgetVisibility() {
-    renderFocusStats(currentSettings && currentSettings.focusStats);
     renderTodos(todosFromSettings(currentSettings));
     syncWaterWidget();
   }
@@ -2948,7 +2857,6 @@
         telemetryEnabled: saved.telemetryEnabled === true,
         theme: saved.theme === 'light' ? 'light' : 'dark',
         reduceMotion: saved.reduceMotion === true,
-        focusStats: saved.focusStats,
         waterReminder: saved.waterReminder,
         todos: saved.todos
       });
@@ -3025,7 +2933,7 @@
     renderTtsVoicePackOptions(); // T-33：语音包选项与禁用态随设置/语言刷新
     applyWeatherSettings(currentSettings); // T-22：天气开关/城市输入 + 可见性 + 刷新
     elements.telemetryEnabled.checked = currentSettings.telemetryEnabled === true;
-    // T-44：主题/减弱动效/喝水/待办/专注统计
+    // T-44：主题/减弱动效/喝水/待办
     theme = currentSettings.theme === 'light' ? 'light' : 'dark';
     reduceMotion = currentSettings.reduceMotion === true;
     elements.themeSelect.value = theme;
@@ -3310,7 +3218,7 @@
       }
     }
 
-    // Pro 专属功能门控：高级神经语音始终可见（锁定态），皮肤/专注/待办仅付费档显示
+    // Pro 专属功能门控：高级神经语音始终可见（锁定态），皮肤/待办仅付费档显示
     if (elements.licenseFeatureNeural) {
       elements.licenseFeatureNeural.textContent = paid
         ? t('license.featureNeuralVoice')
@@ -3319,9 +3227,6 @@
     }
     if (elements.licenseFeatureSkin) {
       elements.licenseFeatureSkin.hidden = !paid;
-    }
-    if (elements.licenseFeatureFocus) {
-      elements.licenseFeatureFocus.hidden = !paid;
     }
     if (elements.licenseFeatureTodo) {
       elements.licenseFeatureTodo.hidden = !paid;
@@ -3333,7 +3238,7 @@
     }
 
     updateTtsVoicePackControls(); // 免费版锁定高级神经语音
-    updateWidgetVisibility(); // T-44：专注统计/待办按付费档显示，喝水提醒随设置
+    updateWidgetVisibility(); // T-44：待办按付费档显示，喝水提醒随设置
   }
 
   /** 激活码/订单号激活（T-41 前为本地 mock 校验） */
@@ -4581,10 +4486,6 @@
     copyShareCard, // T-45：复制卡片
     // T-44：主题/效率小组件（测试与快捷入口）
     applyTheme,
-    getFocusStats: () =>
-      currentSettings && typeof currentSettings.focusStats === 'object'
-        ? currentSettings.focusStats
-        : { date: '', count: 0, minutes: 0 },
     getTodos: () => todosFromSettings(currentSettings),
     addTodo,
     recordWaterDrink
