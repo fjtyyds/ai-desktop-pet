@@ -1503,6 +1503,402 @@ try {
   fs.rmSync(checkDir, { recursive: true, force: true });
 }
 
+// T-40：许可证与付费墙（源码接线/存储白名单/门控/状态机/IPC/双语文案）
+const licenseModulePath = path.join(root, 'src', 'main', 'license.js');
+if (!fs.existsSync(licenseModulePath)) {
+  fail('缺少 src/main/license.js（T-40 许可证状态机）');
+}
+const licenseModule = require(licenseModulePath);
+if (
+  !licenseModule.TIERS ||
+  licenseModule.TIERS.join(',') !== 'free,yearly,lifetime'
+) {
+  fail('license.js TIERS 应为 free/yearly/lifetime 三态');
+}
+if (
+  !licenseModule.CLOUD_QUOTA ||
+  licenseModule.CLOUD_QUOTA.free.limit !== 10 ||
+  licenseModule.CLOUD_QUOTA.free.period !== 'day'
+) {
+  fail('免费版云 AI 额度应为 10 次/日');
+}
+if (
+  !licenseModule.CLOUD_QUOTA.yearly ||
+  licenseModule.CLOUD_QUOTA.yearly.limit !== 200 ||
+  licenseModule.CLOUD_QUOTA.yearly.period !== 'month'
+) {
+  fail('Pro 订阅云 AI 额度应为 200 次/月');
+}
+pass('license.js 三态档位与云额度常量合法');
+
+// 存储白名单：仅允许 5 个 T-40 字段，默认值与清洗规则
+const licenseSettingKeys = Object.keys(DEFAULT_SETTINGS).filter(
+  (key) =>
+    key.startsWith('license') ||
+    key === 'deviceId' ||
+    key === 'complianceAccepted'
+);
+const expectedLicenseKeys = [
+  'licenseTier',
+  'licenseKey',
+  'licenseExpiresAt',
+  'deviceId',
+  'complianceAccepted'
+];
+if (licenseSettingKeys.join(',') !== expectedLicenseKeys.join(',')) {
+  fail(
+    `DEFAULT_SETTINGS 许可证字段超出白名单：${licenseSettingKeys.join(',')}`
+  );
+}
+if (
+  DEFAULT_SETTINGS.licenseTier !== 'free' ||
+  DEFAULT_SETTINGS.licenseKey !== '' ||
+  DEFAULT_SETTINGS.licenseExpiresAt !== 0 ||
+  DEFAULT_SETTINGS.deviceId !== '' ||
+  DEFAULT_SETTINGS.complianceAccepted !== false
+) {
+  fail('DEFAULT_SETTINGS 许可证字段默认值非法');
+}
+pass('store.js 许可证白名单与默认值合法');
+
+// IPC/preload 通道接线
+for (const token of [
+  "licenseGet: 'license:get'",
+  "licenseActivate: 'license:activate'",
+  "licenseDeactivate: 'license:deactivate'",
+  'ipcMain.handle(CHANNELS.licenseGet',
+  'ipcMain.handle(CHANNELS.licenseActivate',
+  'ipcMain.handle(CHANNELS.licenseDeactivate',
+  'consumeCloudQuotaIfNeeded'
+]) {
+  if (!ipcSource.includes(token)) {
+    fail(`ipc.js 缺少许可证接线：${token}`);
+  }
+}
+for (const token of [
+  "licenseGet: 'license:get'",
+  "licenseActivate: 'license:activate'",
+  "licenseDeactivate: 'license:deactivate'",
+  'license: {',
+  'activate: (code) => ipcRenderer.invoke(CHANNELS.licenseActivate',
+  'deactivate: () => ipcRenderer.invoke(CHANNELS.licenseDeactivate'
+]) {
+  if (!preloadSource.includes(token)) {
+    fail(`preload.js 缺少许可证暴露：${token}`);
+  }
+}
+pass('license:get/activate/deactivate IPC 与 preload 接线存在');
+
+// 渲染层门控/合规/额度接线
+for (const token of [
+  'license.get',
+  'license.activate',
+  'license.deactivate',
+  'license-quota-exceeded',
+  'complianceRefused',
+  'syncComplianceVisibility',
+  'applyLicenseUi'
+]) {
+  if (!rendererChatSource.includes(token)) {
+    fail(`renderer/chat.js 缺少许可证/合规接线：${token}`);
+  }
+}
+for (const token of [
+  'id="account-section"',
+  'id="license-activate"',
+  'id="license-deactivate"',
+  'id="compliance-view"',
+  'id="compliance-accept"',
+  'id="compliance-decline"'
+]) {
+  if (!rendererIndexSource.includes(token)) {
+    fail(`renderer/index.html 缺少许可证/合规元素：${token}`);
+  }
+}
+for (const token of ['.account-section', '.license-pro-features', '.compliance-view']) {
+  if (!rendererChatCssSource.includes(token)) {
+    fail(`chat.css 缺少许可证/合规样式：${token}`);
+  }
+}
+pass('渲染层账户/订阅区块、门控与合规弹窗接线存在');
+
+// 双语文案键
+const requiredLicenseKeys = [
+  'accountTitle',
+  'tierFree',
+  'tierYearly',
+  'tierLifetime',
+  'statusActive',
+  'statusExpired',
+  'statusRevoked',
+  'statusInactive',
+  'statusDeviceMismatch',
+  'quotaDay',
+  'quotaMonth',
+  'quotaByok',
+  'quotaExceeded',
+  'activateButton',
+  'deactivateButton',
+  'activateError',
+  'deactivated',
+  'complianceTitle',
+  'complianceAccept',
+  'complianceDecline',
+  'complianceRequired',
+  'complianceRefusedNotice'
+];
+for (const locale of [zhLocales, enLocales]) {
+  for (const key of requiredLicenseKeys) {
+    if (
+      !locale.license ||
+      typeof locale.license[key] !== 'string' ||
+      !locale.license[key]
+    ) {
+      fail(`locales 缺少 license.${key} 文案`);
+    }
+  }
+}
+pass('license 双语文案键齐全（zh-CN/en）');
+
+(async () => {
+  try {
+    // T-40：许可证状态机（三态切换/持久化/过期/吊销/设备绑定/额度/mock 回调）
+    const fixedNow = Date.UTC(2026, 7, 11, 8, 0, 0);
+    const licenseCheckDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'ai-pet-license-')
+    );
+    try {
+      const licenseStoreInstance = createStore(licenseCheckDir);
+      const licenseStore = {
+        readSettings: () => licenseStoreInstance.readSettings(),
+        writeSettings: (patch) => licenseStoreInstance.writeSettings(patch)
+      };
+      const license = licenseModule.createLicenseManager({
+        settings: licenseStore,
+        baseDir: licenseCheckDir,
+        now: () => fixedNow
+      });
+
+      const initial = license.getPublicStatus();
+      if (
+        initial.tier !== 'free' ||
+        initial.effectiveTier !== 'free' ||
+        initial.status !== 'inactive' ||
+        initial.entitlements.advancedNeuralVoices !== false ||
+        initial.entitlements.skinMarket !== false ||
+        initial.entitlements.focusStats !== false ||
+        initial.entitlements.todos !== false ||
+        initial.entitlements.byokChat !== true ||
+        initial.entitlements.localMemory !== true ||
+        initial.entitlements.pomodoro !== true ||
+        initial.entitlements.weather !== true
+      ) {
+        fail('默认许可证应为 free/inactive，Pro 门控锁定、本地功能保留');
+      }
+      if (initial.quota.limit !== 10 || initial.quota.period !== 'day') {
+        fail('免费版云 AI 额度默认应为 10 次/日');
+      }
+
+      // 非法写入清洗
+      const cleanedLicense = licenseStoreInstance.writeSettings({
+        licenseTier: 'gold',
+        licenseKey: 'x'.repeat(300),
+        licenseExpiresAt: -5,
+        deviceId: 123,
+        complianceAccepted: 'yes'
+      });
+      if (
+        cleanedLicense.licenseTier !== 'free' ||
+        cleanedLicense.licenseKey.length !== 128 ||
+        cleanedLicense.licenseExpiresAt !== 0 ||
+        cleanedLicense.deviceId !== initial.deviceId ||
+        cleanedLicense.complianceAccepted !== false
+      ) {
+        fail('store 许可证字段清洗失败（非法值未丢弃/超长未截断）');
+      }
+
+      // 合规同意持久化
+      const accepted = licenseStoreInstance.writeSettings({
+        complianceAccepted: true
+      });
+      if (
+        accepted.complianceAccepted !== true ||
+        licenseStoreInstance.readSettings().complianceAccepted !== true
+      ) {
+        fail('complianceAccepted 持久化失败');
+      }
+
+      // Pro 订阅激活（小写输入应归一化为大写）
+      const yearly = license.activate('pro-yearly-abcdefabcdef0123');
+      if (
+        !yearly.ok ||
+        yearly.status.tier !== 'yearly' ||
+        yearly.status.effectiveTier !== 'yearly' ||
+        yearly.status.expiresAt <= fixedNow ||
+        yearly.status.deviceBound !== true
+      ) {
+        fail('Pro 订阅激活失败或设备绑定未生效');
+      }
+      const yearlyEntitlements = yearly.status.entitlements;
+      if (
+        yearlyEntitlements.advancedNeuralVoices !== true ||
+        yearlyEntitlements.skinMarket !== true ||
+        yearlyEntitlements.focusStats !== true ||
+        yearlyEntitlements.todos !== true ||
+        yearly.status.quota.limit !== 200 ||
+        yearly.status.quota.period !== 'month'
+      ) {
+        fail('Pro 订阅门控/额度错误');
+      }
+      const persistedLicense = licenseStoreInstance.readSettings();
+      if (
+        persistedLicense.licenseTier !== 'yearly' ||
+        persistedLicense.licenseKey !== 'PRO-YEARLY-ABCDEFABCDEF0123' ||
+        !persistedLicense.deviceId
+      ) {
+        fail('许可证未正确持久化到 settings.json');
+      }
+
+      // 云 AI 额度记录与消费
+      for (let i = 0; i < 5; i += 1) {
+        license.recordCloudUsage();
+      }
+      const quotaAfterFive = license.getPublicStatus().quota;
+      if (quotaAfterFive.used !== 5 || quotaAfterFive.remaining !== 195) {
+        fail('Pro 月度额度记录错误');
+      }
+      const consumed = license.consumeCloudQuota();
+      if (!consumed.ok || consumed.usage.used !== 6) {
+        fail('consumeCloudQuota 消费失败');
+      }
+
+      // 过期处理：时间推进一年后降级为 free
+      const expiredLicense = licenseModule.createLicenseManager({
+        settings: licenseStore,
+        baseDir: licenseCheckDir,
+        now: () => fixedNow + 366 * 24 * 60 * 60 * 1000
+      });
+      const expired = expiredLicense.getPublicStatus();
+      if (
+        expired.status !== 'expired' ||
+        expired.effectiveTier !== 'free' ||
+        expired.entitlements.advancedNeuralVoices !== false
+      ) {
+        fail('订阅过期未降级为免费档');
+      }
+
+      // 永久买断激活（买断不含云额度，按免费档 10 次/日）
+      license.deactivate();
+      const lifetime = license.activate('PRO-LIFETIME-abcdefabcdef0123');
+      if (
+        !lifetime.ok ||
+        lifetime.status.tier !== 'lifetime' ||
+        lifetime.status.expiresAt !== 0 ||
+        lifetime.status.quota.limit !== 10 ||
+        lifetime.status.quota.period !== 'day'
+      ) {
+        fail('永久买断激活失败或云额度档位错误');
+      }
+
+      // mock 订单号校验
+      license.deactivate();
+      const orderYearly = license.activate('ORDER-202608110001');
+      if (!orderYearly.ok || orderYearly.status.tier !== 'yearly') {
+        fail('mock 订单号（年订阅）激活失败');
+      }
+      license.deactivate();
+      const orderLifetime = license.activate('ORDER-202608110002');
+      if (!orderLifetime.ok || orderLifetime.status.tier !== 'lifetime') {
+        fail('mock 订单号（买断）激活失败');
+      }
+      license.deactivate();
+      const unknownOrder = license.activate('ORDER-000000000000');
+      if (unknownOrder.ok || unknownOrder.error !== 'license-order-not-found') {
+        fail('未知订单号应返回 license-order-not-found');
+      }
+
+      // 吊销处理
+      const revokedActivation = license.activate('PRO-YEARLY-0000000000000000');
+      if (revokedActivation.ok || revokedActivation.error !== 'license-revoked') {
+        fail('吊销激活码未被拒绝');
+      }
+      const invalidActivation = license.activate('BOGUS-CODE');
+      if (invalidActivation.ok || invalidActivation.error !== 'license-invalid-code') {
+        fail('非法激活码未被拒绝');
+      }
+
+      // 注销激活回免费
+      const deactivated = license.deactivate();
+      if (
+        !deactivated.ok ||
+        deactivated.status.tier !== 'free' ||
+        deactivated.status.status !== 'inactive'
+      ) {
+        fail('注销激活失败');
+      }
+
+      // 支付回调桩（T-41 前仅 mock 订单号）
+      const callbackOk = await license.handlePaymentCallback({
+        orderId: 'ORDER-202608110001'
+      });
+      if (!callbackOk.ok || callbackOk.status.tier !== 'yearly') {
+        fail('支付回调桩（mock 订单）激活失败');
+      }
+      const callbackEmpty = await license.handlePaymentCallback({});
+      if (callbackEmpty.ok || callbackEmpty.error !== 'license-payment-not-implemented') {
+        fail('空支付回调应返回 license-payment-not-implemented');
+      }
+    } finally {
+      fs.rmSync(licenseCheckDir, { recursive: true, force: true });
+    }
+
+    // 设备绑定不一致：换设备后不应获得 Pro 权益
+    const mismatchDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'ai-pet-license-dev-')
+    );
+    try {
+      const mismatchStore = createStore(mismatchDir);
+      const mismatchLicenseStore = {
+        readSettings: () => mismatchStore.readSettings(),
+        writeSettings: (patch) => mismatchStore.writeSettings(patch)
+      };
+      const mismatchLicense = licenseModule.createLicenseManager({
+        settings: mismatchLicenseStore,
+        baseDir: mismatchDir,
+        now: () => fixedNow
+      });
+      mismatchLicense.activate('PRO-YEARLY-abcdefabcdef0123');
+      const rawSettings = JSON.parse(
+        fs.readFileSync(path.join(mismatchDir, 'settings.json'), 'utf8')
+      );
+      rawSettings.deviceId = 'dev-other-device';
+      fs.writeFileSync(
+        path.join(mismatchDir, 'settings.json'),
+        JSON.stringify(rawSettings, null, 2),
+        'utf8'
+      );
+      const otherDevice = licenseModule.createLicenseManager({
+        settings: mismatchLicenseStore,
+        baseDir: mismatchDir,
+        now: () => fixedNow
+      });
+      const mismatched = otherDevice.getPublicStatus();
+      if (
+        mismatched.status !== 'device-mismatch' ||
+        mismatched.effectiveTier !== 'free' ||
+        mismatched.entitlements.advancedNeuralVoices !== false
+      ) {
+        fail('设备绑定不一致未被识别（Pro 权益不应生效）');
+      }
+    } finally {
+      fs.rmSync(mismatchDir, { recursive: true, force: true });
+    }
+    pass('T-40 许可证状态机/三态切换/过期/吊销/设备绑定/额度/mock 回调通过');
+  } catch (error) {
+    fail(`T-40 许可证检查异常: ${error && error.message ? error.message : error}`);
+  }
+})();
+
 (async () => {
   try {
     const { createChatService } = require(path.join(root, 'src', 'llm', 'chat.js'));

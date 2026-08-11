@@ -218,6 +218,81 @@
             <h2 class="settings-title" data-i18n="settings.title">设置</h2>
           </div>
           <div class="settings-body">
+          <!-- T-40：账户/订阅（许可证档位、激活入口、云 AI 额度、Pro 功能门控） -->
+          <div id="account-section" class="account-section">
+            <span class="field-label" data-i18n="license.accountTitle"
+              >账户与订阅</span
+            >
+            <div class="license-row">
+              <span class="field-hint" data-i18n="license.tierLabel">当前版本</span>
+              <span id="license-tier" class="license-value">免费版</span>
+            </div>
+            <div class="license-row" id="license-status-row" hidden>
+              <span class="field-hint" data-i18n="license.statusLabel">状态</span>
+              <span id="license-status" class="license-value"></span>
+            </div>
+            <div class="license-row" id="license-expiry-row" hidden>
+              <span class="field-hint" data-i18n="license.expiryLabel">有效期至</span>
+              <span id="license-expiry" class="license-value"></span>
+            </div>
+            <p id="license-quota" class="license-quota" role="status"></p>
+            <div id="license-pro-features" class="license-pro-features">
+              <span class="field-label" data-i18n="license.proFeaturesTitle"
+                >Pro 专属功能</span
+              >
+              <span
+                id="license-feature-neural"
+                class="license-feature"
+                data-i18n="license.featureNeuralVoice"
+              >高级神经语音音色</span>
+              <span
+                id="license-feature-skin"
+                class="license-feature"
+                data-i18n="license.featureSkinMarket"
+              >皮肤市场</span>
+              <span
+                id="license-feature-focus"
+                class="license-feature"
+                data-i18n="license.featureFocusStats"
+              >专注统计</span>
+              <span
+                id="license-feature-todo"
+                class="license-feature"
+                data-i18n="license.featureTodos"
+              >待办事项</span>
+            </div>
+            <label class="field">
+              <span class="field-label" data-i18n="license.activateLabel"
+                >激活码 / 订单号</span
+              >
+              <input
+                id="license-code"
+                class="field-input"
+                type="text"
+                maxlength="128"
+                autocomplete="off"
+                spellcheck="false"
+                placeholder="PRO-YEARLY-… / PRO-LIFETIME-… / ORDER-…"
+                data-i18n-placeholder="license.activatePlaceholder"
+              />
+            </label>
+            <div class="license-actions">
+              <button
+                id="license-activate"
+                class="primary-btn"
+                type="button"
+                data-i18n="license.activateButton"
+              >激活</button>
+              <button
+                id="license-deactivate"
+                class="secondary-btn"
+                type="button"
+                data-i18n="license.deactivateButton"
+                hidden
+              >注销激活</button>
+            </div>
+            <p id="license-message" class="settings-status" role="status" hidden></p>
+          </div>
           <label class="field">
             <span class="field-label" data-i18n="settings.apiKey">API Key</span>
             <input
@@ -640,6 +715,49 @@
             type="button"
             hidden
           >开始使用</button>
+        </div>
+      </section>
+
+      <!-- T-40：首次启动年龄确认 + 内容合规声明（同意后不再弹出） -->
+      <section
+        id="compliance-view"
+        class="compliance-view"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="compliance-title"
+        hidden
+      >
+        <div class="compliance-body">
+          <h2
+            id="compliance-title"
+            class="compliance-title"
+            data-i18n="license.complianceTitle"
+          >年龄确认与内容合规声明</h2>
+          <p
+            id="compliance-text"
+            class="compliance-text"
+            data-i18n="license.complianceText"
+          >本应用面向 18 岁及以上用户……</p>
+          <p
+            id="compliance-refused"
+            class="compliance-refused"
+            data-i18n="license.complianceRefusedNotice"
+            hidden
+          >未同意内容合规声明，AI 对话已停用。</p>
+        </div>
+        <div class="compliance-actions">
+          <button
+            id="compliance-decline"
+            class="secondary-btn"
+            type="button"
+            data-i18n="license.complianceDecline"
+          >不同意</button>
+          <button
+            id="compliance-accept"
+            class="primary-btn"
+            type="button"
+            data-i18n="license.complianceAccept"
+          >同意并继续</button>
         </div>
       </section>
 

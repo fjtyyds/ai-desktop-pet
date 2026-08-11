@@ -41,6 +41,10 @@
  * - T-43 皮肤与配件（ADR-032）：设置页“皮肤与配件”子页——皮肤列表（预览图/名称/
  *   作者/版本/内置或导入标识）、应用/导出/移除按钮、zip 或目录导入入口；
  *   标题栏角色形象（pet-avatar）随 settings.skinId 切换默认皮肤资源（T-44 再做动效）
+ * - T-40 许可证与付费墙：设置页“账户/订阅”区块（档位/状态/有效期/云 AI 额度/
+ *   激活与注销入口）；功能门控（高级神经语音、皮肤市场、专注统计/待办仅
+ *   yearly/lifetime）；首次启动年龄确认 + 内容合规声明弹窗（同意后不再弹，
+ *   拒绝后 AI 对话停用）；云额度不足时本地拦截并回显主进程错误
  */
 (function () {
   'use strict';
@@ -342,6 +346,9 @@
   let memoryItems = [];
   let currentSettings = {};
   let windowFeatureEls = {};
+  // T-40：许可证状态（license:get 返回）与合规拒绝标记
+  let licenseState = null;
+  let complianceRefused = false;
   // T-20：首次引导当前步骤与选中的预设人格模板 id
   let onboardingStep = 1;
   let selectedOnboardingTemplateId = '';
@@ -382,6 +389,7 @@
     // 先加载两份语言包，确保任何文案渲染不会回退到键名
     await window.PetLocales.ready;
     await restoreSettings();
+    void refreshLicense(); // T-40：加载许可证状态并渲染账户/订阅区块
     ensureWindowFeatureControls(); // T-19: 注入窗口行为开关与提示
     void restoreHistory();
     void initMood();
@@ -488,12 +496,33 @@
       telemetryStatus: document.getElementById('telemetry-status'),
       onboardingTelemetryEnabled: document.getElementById(
         'onboarding-telemetry-enabled'
-      )
+      ),
+      // T-40：账户/订阅区块
+      licenseTier: document.getElementById('license-tier'),
+      licenseStatus: document.getElementById('license-status'),
+      licenseStatusRow: document.getElementById('license-status-row'),
+      licenseExpiry: document.getElementById('license-expiry'),
+      licenseExpiryRow: document.getElementById('license-expiry-row'),
+      licenseQuota: document.getElementById('license-quota'),
+      licenseFeatureNeural: document.getElementById('license-feature-neural'),
+      licenseFeatureSkin: document.getElementById('license-feature-skin'),
+      licenseFeatureFocus: document.getElementById('license-feature-focus'),
+      licenseFeatureTodo: document.getElementById('license-feature-todo'),
+      licenseCode: document.getElementById('license-code'),
+      licenseActivate: document.getElementById('license-activate'),
+      licenseDeactivate: document.getElementById('license-deactivate'),
+      licenseMessage: document.getElementById('license-message'),
+      // T-40：年龄确认 + 内容合规声明弹窗
+      complianceView: document.getElementById('compliance-view'),
+      complianceAccept: document.getElementById('compliance-accept'),
+      complianceDecline: document.getElementById('compliance-decline'),
+      complianceRefused: document.getElementById('compliance-refused')
     };
     showExportStatus = makeStatusShower(elements.exportStatus);
     showClearStatus = makeStatusShower(elements.clearStatus);
     showTelemetryStatus = makeStatusShower(elements.telemetryStatus);
     showSkinStatus = makeStatusShower(elements.skinStatus);
+    showLicenseMessage = makeStatusShower(elements.licenseMessage);
   }
 
   /* ---------------- T-19：窗口行为开关与提示（ADR-022 冻结契约） ---------------- */
@@ -655,6 +684,14 @@
     elements.telemetryClear.addEventListener('click', () => {
       void handleTelemetryClear();
     });
+    elements.licenseActivate.addEventListener('click', () => void activateLicense());
+    elements.licenseDeactivate.addEventListener('click', () =>
+      void deactivateLicense()
+    );
+    elements.complianceAccept.addEventListener('click', () =>
+      void acceptCompliance()
+    );
+    elements.complianceDecline.addEventListener('click', declineCompliance);
 
     // T-25：点击工具栏外关闭导出菜单；Escape 关闭并归还焦点
     document.addEventListener('click', (event) => {
@@ -1030,6 +1067,23 @@
 
   function renderServiceStatus() {
     const t = window.PetLocales.createTranslator(currentLocale);
+    if (complianceRefused) {
+      elements.serviceStatus.textContent = `⚠ ${t('license.complianceRefusedNotice')}`;
+      elements.serviceStatus.hidden = false;
+      elements.chatInput.placeholder = t('license.complianceRefusedNotice');
+      return;
+    }
+    if (
+      elements.complianceView &&
+      !elements.complianceView.hidden &&
+      currentSettings &&
+      currentSettings.complianceAccepted !== true
+    ) {
+      elements.serviceStatus.textContent = `⚠ ${t('license.complianceRequired')}`;
+      elements.serviceStatus.hidden = false;
+      elements.chatInput.placeholder = t('license.complianceRequired');
+      return;
+    }
     if (isChatReady()) {
       elements.serviceStatus.hidden = true;
       elements.chatInput.placeholder = t('chat.inputPlaceholder');
@@ -1044,6 +1098,10 @@
     event.preventDefault();
     if (streaming) {
       void cancelStreaming();
+      return;
+    }
+    if (complianceRefused) {
+      elements.chatInput.focus();
       return;
     }
     pokeActivity();
@@ -1083,10 +1141,24 @@
   async function sendMessage(text) {
     await window.PetLocales.ready;
     const t = window.PetLocales.createTranslator(currentLocale);
+    if (complianceRefused) {
+      appendMessage('assistant', t('license.complianceRefusedNotice'));
+      elements.chatInput.focus();
+      return;
+    }
     if (!isChatReady()) {
       appendMessage('assistant', t('chat.serviceNotReadyReply'));
       elements.chatInput.focus();
       return;
+    }
+    // T-40：免费云 AI 额度本地预检（主进程仍会二次校验，防止并发超用）
+    if (!hasByokApiKey()) {
+      const usage = licenseState && licenseState.quota;
+      if (usage && Number.isFinite(usage.remaining) && usage.remaining <= 0) {
+        appendMessage('assistant', t('license.quotaExceeded'));
+        elements.chatInput.focus();
+        return;
+      }
     }
 
     setStreaming(true);
@@ -1157,6 +1229,10 @@
   }
 
   function formatSendError(result, received, t) {
+    if (result && result.error === 'license-quota-exceeded') {
+      const partial = result && result.reply ? result.reply : received;
+      return partial ? `${partial}\n${t('license.quotaExceeded')}` : t('license.quotaExceeded');
+    }
     const partial = result && result.reply ? result.reply : received;
     const errorText =
       result && result.error
@@ -1431,11 +1507,16 @@
     updateTtsVoicePackControls();
   }
 
-  /** T-33：专属语音包关闭时禁用语音包选择 */
+  /** T-33/T-40：专属语音包关闭或免费版（高级神经语音锁定）时禁用语音包选择 */
   function updateTtsVoicePackControls() {
     const select = elements.ttsVoicePackId;
+    const checkbox = elements.ttsVoicePackEnabled;
+    const paid = licenseTierIsPaid();
+    if (checkbox) {
+      checkbox.disabled = !paid;
+    }
     if (select) {
-      select.disabled = !elements.ttsVoicePackEnabled.checked;
+      select.disabled = !paid || !elements.ttsVoicePackEnabled.checked;
     }
   }
 
@@ -2640,7 +2721,10 @@
     updatePomodoroControls(); // T-21：applyStaticText 会重置按钮静态文案，需按状态覆盖
     applyWindowFeatureSettings(currentSettings); // T-19
     updateWindowFeatureText(); // T-19: 语言切换后刷新提示文案
+    applyLicenseUi(); // T-40：许可证档位/门控/额度随设置与语言刷新
+    syncComplianceVisibility(); // T-40：合规弹窗状态
     syncOnboardingVisibility(); // T-20：首次启动引导（完成标志持久化）
+    applyComplianceLock(); // T-40：拒绝合规后锁定 AI 对话
     stopSpeaking(); // T-23: 语言切换后停止当前朗读，并刷新按钮文案
     updateAllSpeakButtons();
     if (elements.memoryPage && !elements.memoryPage.hidden) {
@@ -2764,6 +2848,314 @@
         element.hidden = true;
       }, 5000);
     };
+  }
+
+  /* ---------------- T-40：许可证/订阅区块 + 年龄确认与内容合规弹窗 ---------------- */
+
+  function hasLicenseApi() {
+    return Boolean(
+      window.petAPI &&
+        window.petAPI.license &&
+        typeof window.petAPI.license.get === 'function'
+    );
+  }
+
+  /** 是否使用 BYOK（自备 API Key，不消耗云 AI 额度） */
+  function hasByokApiKey() {
+    return Boolean(
+      currentSettings &&
+        typeof currentSettings.apiKey === 'string' &&
+        currentSettings.apiKey.trim()
+    );
+  }
+
+  /** 当前生效档位：优先主进程状态，其次本地设置回退 */
+  function currentEffectiveTier() {
+    if (licenseState && typeof licenseState.effectiveTier === 'string') {
+      return licenseState.effectiveTier;
+    }
+    if (currentSettings && typeof currentSettings.licenseTier === 'string') {
+      return currentSettings.licenseTier;
+    }
+    return 'free';
+  }
+
+  /** Pro 专属门控：yearly / lifetime 为付费档 */
+  function licenseTierIsPaid() {
+    const tier = currentEffectiveTier();
+    return tier === 'yearly' || tier === 'lifetime';
+  }
+
+  function tierLabel(t, tier) {
+    const key = `license.tier${String(tier || 'free')[0].toUpperCase()}${String(
+      tier || 'free'
+    ).slice(1)}`;
+    return t(key);
+  }
+
+  function statusLabel(t, status) {
+    const map = {
+      active: 'statusActive',
+      expired: 'statusExpired',
+      revoked: 'statusRevoked',
+      inactive: 'statusInactive',
+      'device-mismatch': 'statusDeviceMismatch'
+    };
+    return t(`license.${map[status] || 'statusInactive'}`);
+  }
+
+  /** 拉取主进程许可证状态并渲染账户/订阅区块 */
+  async function refreshLicense() {
+    if (!hasLicenseApi()) {
+      licenseState = null;
+      applyLicenseUi();
+      syncComplianceVisibility();
+      return;
+    }
+    try {
+      const state = await window.petAPI.license.get();
+      licenseState = state && typeof state === 'object' ? state : null;
+    } catch (error) {
+      console.warn('读取许可证状态失败：', error);
+      licenseState = null;
+    }
+    applyLicenseUi();
+    syncComplianceVisibility();
+  }
+
+  /** 渲染档位/状态/有效期/额度/门控（语言切换与设置变化时均调用） */
+  function applyLicenseUi() {
+    if (!elements.licenseTier) {
+      return;
+    }
+    const t = window.PetLocales.createTranslator(currentLocale);
+    const state = licenseState || {};
+    const tier = currentEffectiveTier();
+    const status =
+      typeof state.status === 'string' ? state.status : 'inactive';
+    const paid = licenseTierIsPaid();
+
+    elements.licenseTier.textContent = tierLabel(t, tier);
+
+    const showStatus = status !== 'inactive';
+    elements.licenseStatusRow.hidden = !showStatus;
+    if (showStatus && elements.licenseStatus) {
+      elements.licenseStatus.textContent = statusLabel(t, status);
+    }
+
+    const expiresAt = Number(state.expiresAt) || 0;
+    elements.licenseExpiryRow.hidden = expiresAt <= 0;
+    if (elements.licenseExpiry) {
+      elements.licenseExpiry.textContent =
+        expiresAt > 0
+          ? new Date(expiresAt).toLocaleDateString(currentLocale === 'en' ? 'en-US' : 'zh-CN')
+          : t('license.perpetual');
+    }
+
+    // 云 AI 额度（BYOK 不消耗）
+    if (elements.licenseQuota) {
+      if (hasByokApiKey()) {
+        elements.licenseQuota.textContent = t('license.quotaByok');
+      } else if (state.quota) {
+        elements.licenseQuota.textContent = t(
+          state.quota.period === 'day' ? 'license.quotaDay' : 'license.quotaMonth',
+          {
+            remaining: state.quota.remaining,
+            limit: state.quota.limit
+          }
+        );
+      } else {
+        elements.licenseQuota.textContent = '';
+      }
+    }
+
+    // Pro 专属功能门控：高级神经语音始终可见（锁定态），皮肤/专注/待办仅付费档显示
+    if (elements.licenseFeatureNeural) {
+      elements.licenseFeatureNeural.textContent = paid
+        ? t('license.featureNeuralVoice')
+        : t('license.featureLocked', { name: t('license.featureNeuralVoice') });
+      elements.licenseFeatureNeural.classList.toggle('locked', !paid);
+    }
+    if (elements.licenseFeatureSkin) {
+      elements.licenseFeatureSkin.hidden = !paid;
+    }
+    if (elements.licenseFeatureFocus) {
+      elements.licenseFeatureFocus.hidden = !paid;
+    }
+    if (elements.licenseFeatureTodo) {
+      elements.licenseFeatureTodo.hidden = !paid;
+    }
+
+    // 激活/注销入口
+    if (elements.licenseDeactivate) {
+      elements.licenseDeactivate.hidden = !(paid && status === 'active');
+    }
+
+    updateTtsVoicePackControls(); // 免费版锁定高级神经语音
+  }
+
+  /** 激活码/订单号激活（T-41 前为本地 mock 校验） */
+  async function activateLicense() {
+    const t = window.PetLocales.createTranslator(currentLocale);
+    const api =
+      window.petAPI &&
+      window.petAPI.license &&
+      window.petAPI.license.activate;
+    if (typeof api !== 'function') {
+      showLicenseMessage(
+        t('license.activateError', { error: t('data.apiUnavailable') }),
+        'error'
+      );
+      return;
+    }
+    const code = elements.licenseCode.value.trim();
+    if (!code) {
+      showLicenseMessage(t('license.activateError', { error: 'empty' }), 'error');
+      return;
+    }
+    elements.licenseActivate.disabled = true;
+    showLicenseMessage(t('license.activating'), 'ok');
+    try {
+      const result = await api(code);
+      if (result && result.ok) {
+        licenseState = result.status || null;
+        applyLicenseUi();
+        showLicenseMessage(
+          t('license.activated', {
+            tier: tierLabel(t, licenseState ? licenseState.tier : 'free')
+          }),
+          'ok'
+        );
+      } else {
+        showLicenseMessage(
+          t('license.activateError', {
+            error: result && result.error ? result.error : t('data.apiUnavailable')
+          }),
+          'error'
+        );
+      }
+    } catch (error) {
+      showLicenseMessage(
+        t('license.activateError', {
+          error: error && error.message ? error.message : String(error)
+        }),
+        'error'
+      );
+    } finally {
+      elements.licenseActivate.disabled = false;
+    }
+  }
+
+  /** 注销激活：回到免费版 */
+  async function deactivateLicense() {
+    const api =
+      window.petAPI &&
+      window.petAPI.license &&
+      window.petAPI.license.deactivate;
+    const t = window.PetLocales.createTranslator(currentLocale);
+    if (typeof api !== 'function') {
+      showLicenseMessage(
+        t('license.deactivateError', { error: t('data.apiUnavailable') }),
+        'error'
+      );
+      return;
+    }
+    elements.licenseDeactivate.disabled = true;
+    try {
+      const result = await api();
+      if (result && result.ok) {
+        licenseState = result.status || null;
+        applyLicenseUi();
+        showLicenseMessage(t('license.deactivated'), 'ok');
+      } else {
+        showLicenseMessage(
+          t('license.deactivateError', {
+            error: result && result.error ? result.error : t('data.apiUnavailable')
+          }),
+          'error'
+        );
+      }
+    } catch (error) {
+      showLicenseMessage(
+        t('license.deactivateError', {
+          error: error && error.message ? error.message : String(error)
+        }),
+        'error'
+      );
+    } finally {
+      elements.licenseDeactivate.disabled = false;
+    }
+  }
+
+  /** 合规弹窗：未同意时展示；同意后永久隐藏；拒绝后锁定 AI 对话 */
+  function syncComplianceVisibility() {
+    if (!elements.complianceView) {
+      return;
+    }
+    const accepted =
+      currentSettings && currentSettings.complianceAccepted === true;
+    const show = !accepted && !complianceRefused;
+    elements.complianceView.hidden = !show;
+    if (show && elements.complianceRefused) {
+      elements.complianceRefused.hidden = true;
+    }
+    applyComplianceLock();
+  }
+
+  /** 拒绝合规：AI 对话停用，本地功能（记忆/番茄钟/天气等）保留 */
+  function declineCompliance() {
+    complianceRefused = true;
+    if (elements.complianceView) {
+      elements.complianceView.hidden = true;
+    }
+    applyComplianceLock();
+  }
+
+  /** 同意合规：持久化 complianceAccepted=true，之后不再弹窗 */
+  async function acceptCompliance() {
+    complianceRefused = false;
+    const settingsApi =
+      window.petAPI &&
+      window.petAPI.settings &&
+      typeof window.petAPI.settings.set === 'function';
+    try {
+      if (settingsApi) {
+        const saved = await window.petAPI.settings.set({
+          complianceAccepted: true
+        });
+        applySettings(saved || { ...currentSettings, complianceAccepted: true });
+      } else {
+        applySettings({ ...currentSettings, complianceAccepted: true });
+      }
+    } catch (error) {
+      console.warn('保存合规同意失败：', error);
+      // 持久化失败时本次会话视为已同意，下次启动重新提示
+      applySettings({ ...currentSettings, complianceAccepted: true });
+    }
+    if (elements.complianceView) {
+      elements.complianceView.hidden = true;
+    }
+    applyComplianceLock();
+    elements.chatInput.focus();
+  }
+
+  /** 锁定/解锁 AI 对话输入（拒绝合规或尚未完成声明时禁用） */
+  function applyComplianceLock() {
+    const locked =
+      complianceRefused ||
+      Boolean(
+        elements.complianceView &&
+          !elements.complianceView.hidden &&
+          currentSettings &&
+          currentSettings.complianceAccepted !== true
+      );
+    if (elements.chatInput) {
+      elements.chatInput.disabled = locked;
+    }
+    if (elements.sendBtn) {
+      elements.sendBtn.disabled = locked;
+    }
+    renderServiceStatus();
   }
 
   /* ---------------- T-20：预设人格模板（设置页一键切换 + 首次引导） ---------------- */
@@ -3354,6 +3746,7 @@
   let showClearStatus = () => {};
   let showTelemetryStatus = () => {};
   let showSkinStatus = () => {}; // T-43
+  let showLicenseMessage = () => {};
 
   window.ChatUI = {
     init,

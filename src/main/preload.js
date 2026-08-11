@@ -29,7 +29,10 @@ const CHANNELS = {
   skinImport: 'skin:import', // T-43：导入皮肤包
   skinExport: 'skin:export', // T-43：导出皮肤包
   skinApply: 'skin:apply', // T-43：应用皮肤
-  skinRemove: 'skin:remove' // T-43：卸载皮肤
+  skinRemove: 'skin:remove', // T-43：卸载皮肤
+  licenseGet: 'license:get', // T-40：许可证状态
+  licenseActivate: 'license:activate', // T-40：激活
+  licenseDeactivate: 'license:deactivate' // T-40：注销激活
 };
 
 contextBridge.exposeInMainWorld('petAPI', {
@@ -104,5 +107,10 @@ contextBridge.exposeInMainWorld('petAPI', {
     export: (payload) => ipcRenderer.invoke(CHANNELS.skinExport, payload), // T-43
     apply: (payload) => ipcRenderer.invoke(CHANNELS.skinApply, payload), // T-43
     remove: (payload) => ipcRenderer.invoke(CHANNELS.skinRemove, payload) // T-43
+  },
+  license: {
+    get: () => ipcRenderer.invoke(CHANNELS.licenseGet), // T-40
+    activate: (code) => ipcRenderer.invoke(CHANNELS.licenseActivate, { code }), // T-40
+    deactivate: () => ipcRenderer.invoke(CHANNELS.licenseDeactivate) // T-40
   }
 });

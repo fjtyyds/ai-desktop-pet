@@ -1260,3 +1260,135 @@
     padding: 4px 8px;
   }
 }
+
+/* T-40：设置页“账户/订阅”区块与许可证门控 */
+.account-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.license-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.license-row[hidden] {
+  display: none;
+}
+
+.license-value {
+  font-size: 12px;
+  font-weight: 600;
+  color: #c5d0ff;
+  user-select: text;
+}
+
+.license-quota {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.5;
+  opacity: 0.85;
+}
+
+.license-pro-features {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 9px 10px;
+  border: 1px dashed rgba(255, 255, 255, 0.16);
+  border-radius: 10px;
+}
+
+.license-feature {
+  font-size: 11px;
+  line-height: 1.5;
+  opacity: 0.78;
+}
+
+.license-feature.locked {
+  opacity: 0.55;
+}
+
+.license-feature[hidden] {
+  display: none;
+}
+
+.license-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.license-actions .primary-btn,
+.license-actions .secondary-btn {
+  flex: 1;
+}
+
+/* T-40：首次启动年龄确认 + 内容合规声明弹窗 */
+.compliance-view {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  padding: 18px 14px 14px;
+  border-radius: 18px;
+  background: linear-gradient(160deg, #232741, #12141f);
+  overflow: hidden;
+}
+
+.compliance-view[hidden] {
+  display: none;
+}
+
+.compliance-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.compliance-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.compliance-text {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.7;
+  opacity: 0.88;
+}
+
+.compliance-refused {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #ef9a9a;
+}
+
+.compliance-refused[hidden] {
+  display: none;
+}
+
+.compliance-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.compliance-actions .primary-btn,
+.compliance-actions .secondary-btn {
+  flex: 1;
+  max-width: 150px;
+}
