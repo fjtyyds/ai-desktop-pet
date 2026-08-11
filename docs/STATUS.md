@@ -2,9 +2,9 @@
 
 - 更新时间：2026-08-11
 - 当前阶段：T-40~T-47 全部验收合并；v0.1.0 GitHub Release 已发布；v1.0（2026-09-01）发布准备
-- 当前任务：T-52 MSIX 实施已验收合并；下一张卡 T-53 修复 stopDockPolling 未定义（最小化窗口报错）
+- 当前任务：T-53 stopDockPolling 修复已验收合并；待办清单可自主项已全部完成
 - 最近完成：T-50 账户区并入分组 + 移除番茄钟（714b706）；T-48/T-49 验收合并；v0.1.0 Release（GitHub，exe+blockmap+latest.yml，CI 全绿）
-- 下一步：T-53 修复卡闭环 → 外部账号与资金事项（Steam 注册、签名采购、商店提审）仍待用户；归档物理删除被环境策略拦截待手动；TTS 试听与 UI 截图已产出待用户复核
+- 下一步：外部账号与资金事项（Steam 注册、签名采购、商店提审）仍待用户；归档物理删除被环境策略拦截待手动；TTS 试听与 UI 截图已产出待用户复核
 - 阻塞：商店注册与预算（Steam $100/MS Store/Azure）、签名采购、MSIX 依赖升级审批、归档目录物理删除、TTS 听感复核、T-44 UI 目检均待用户决策/确认
 - 交接提示：新会话先读 `AGENTS.md` → `PLAN.md` → `docs/STATUS.md` → `docs/reports/2026-08-10-工作对接方案.md` → 自己的任务卡（docs/tasks/T-xx.md）
 
@@ -328,3 +328,9 @@
 
 - 来源：其他项目线程排查音频时发现本应用日志报 `stopDockPolling is not defined`（最小化窗口时触发）；协调者核实 src/main/main.js:497 调用但全仓无定义（T-25 遗留，T-31 改为 move 防抖后无轮询机制）。
 - 修复方向：minimize 处理器清理 dockMoveDebounceTimer（定义 stopDockPolling 或直接 clearTimeout），check.js 增加“调用存在定义”断言。
+
+## T-53 合并记录（2026-08-11，项目内线程闭环）
+
+- worker 完成并回报（分支 codex/m4-dock-fix @ 70a5b75，基线 main 23a6e3d）：方案 a 定义 `stopDockPolling()`（clearTimeout(dockMoveDebounceTimer)，保留 T-25 最小化语义与注释）；check.js 新增递归扫描防回归断言（调用必须有函数声明/定义）。
+- 验证：worker 与协调者 check/smoke 全绿；fast-forward 合并入 main（70a5b75），worktree 已清理，分支保留。
+- 遗留：无；最小化窗口 ReferenceError 已消除。
