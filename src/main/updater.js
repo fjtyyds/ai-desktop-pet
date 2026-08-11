@@ -8,6 +8,8 @@
  *   下载进度与错误日志（console + 主进程现有 writeLog 日志体系）。
  * - 仅打包环境可检查：main.js 初始化处与 checkForUpdates 内双重
  *   app.isPackaged 守卫，开发模式（未打包）绝不检查。
+ * - 商店版（MSIX，process.windowsStore）不初始化 electron-updater：
+ *   更新由 Microsoft Store 负责（T-52/ADR-040），绝不发起 GitHub 更新请求。
  * - 启动后自动检查静默失败/无更新；托盘手动检查用原生 dialog 反馈。
  * - 发现更新：原生 dialog 确认 → 下载 → 下载完成 dialog 提示重启安装；
  *   用户确认后在 main.js before-quit 中调用 quitAndInstall。
@@ -48,6 +50,19 @@ function describeError(value) {
  * @returns {{ checkForUpdates: Function, handleBeforeQuit: Function, dispose: Function }}
  */
 function initUpdater(options = {}) {
+  // T-52（ADR-040）：electron-updater 不支持 MSIX；商店版必须走 Microsoft Store 更新。
+  // 守卫放在最前面：不注册任何 autoUpdater 事件、不触发任何 GitHub 更新请求。
+  if (process.windowsStore) {
+    const logger = options.logger || console;
+    const warn = typeof logger.warn === 'function' ? logger.warn : console.warn;
+    warn('[updater] 商店版（MSIX）跳过 electron-updater 初始化：更新由 Microsoft Store 负责');
+    return {
+      checkForUpdates: async () => null,
+      handleBeforeQuit: () => {},
+      dispose: () => {}
+    };
+  }
+
   const {
     getMainWindow = () => null,
     getTranslator = () => createTranslator('zh-CN'),

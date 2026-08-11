@@ -812,6 +812,8 @@ const updaterLocaleKeys = [
   'restartLater',
   'errorTitle',
   'error',
+  'storeUpdateTitle',
+  'storeUpdateBody',
   'ok'
 ];
 for (const localeFile of ['zh-CN', 'en']) {
@@ -882,7 +884,8 @@ if (fs.existsSync(distDir)) {
     const latestYmlSource = fs.readFileSync(latestYmlPath, 'utf8');
     const refs = [];
     for (const line of latestYmlSource.split(/\r?\n/)) {
-      const refMatch = line.match(/^\s*(?:url|path):\s*(.+?)\s*$/);
+      // electron-builder 27 alpha 起 latest.yml 以 "- url: xxx" 列表项输出（26.x 为顶层 url/path）
+      const refMatch = line.match(/^\s*(?:-\s*)?(?:url|path):\s*(.+?)\s*$/);
       if (refMatch) {
         const value = refMatch[1].replace(/^["']|["']$/g, '');
         if (value) {
@@ -940,6 +943,109 @@ if (fs.existsSync(distDir)) {
   pass('T-39 win-unpacked app-update.yml 存在且指向 github/fjtyyds/ai-desktop-pet');
 } else {
   pass('T-39 dist 不存在，app-update.yml 断言跳过（打包后运行 check 将断言）');
+}
+
+// T-52：MSIX 打包实施与商店版更新守卫（ADR-040）
+const msixSection = builderConfigSource.slice(builderConfigSource.indexOf('msix:'));
+for (const token of [
+  'target: msix',
+  'identityName:',
+  'publisher:',
+  'publisherDisplayName:',
+  'languages:',
+  'setBuildNumber: true',
+  'createMsixupload: true'
+]) {
+  if (!builderConfigSource.includes(token)) {
+    fail(`electron-builder.yml 缺少 T-52 MSIX 配置项：${token}`);
+  }
+}
+const msixArtifactNameMatch = msixSection.match(/^\s*artifactName:\s*([^\r\n#]+)/m);
+if (
+  !msixArtifactNameMatch ||
+  msixArtifactNameMatch[1].trim() !== 'ai-desktop-pet-${version}-${arch}.${ext}'
+) {
+  fail('msix.artifactName 必须为约定的 ASCII 命名 ai-desktop-pet-${version}-${arch}.${ext}');
+}
+pass('electron-builder.yml MSIX target/身份/语言/四段版本/产物命名配置齐全');
+
+if (!updaterSource.includes('if (process.windowsStore)')) {
+  fail('updater.js 缺少 process.windowsStore 商店版守卫');
+}
+if (updaterSource.indexOf('process.windowsStore') > updaterSource.indexOf('autoUpdater.on(')) {
+  fail('updater.js 的 process.windowsStore 守卫必须位于 autoUpdater 事件注册之前');
+}
+if (!updaterSource.includes('checkForUpdates: async () => null')) {
+  fail('updater.js 商店版守卫应返回无操作 API（checkForUpdates 不发起请求）');
+}
+pass('updater.js process.windowsStore 守卫前置且商店版不初始化 electron-updater');
+
+if (!traySource.includes('process.windowsStore')) {
+  fail('tray.js 缺少商店版“检查更新”处理');
+}
+if (
+  !traySource.includes("t('updater.storeUpdateTitle')") ||
+  !traySource.includes("t('updater.storeUpdateBody')")
+) {
+  fail('tray.js 商店版提示缺少 storeUpdateTitle/storeUpdateBody 文案引用');
+}
+pass('tray.js 商店版检查更新提示走 Microsoft Store');
+
+const appxLogoDir = path.join(root, 'assets', 'appx');
+const expectedAppxLogos = {
+  'StoreLogo.png': [50, 50],
+  'Square150x150Logo.png': [150, 150],
+  'Square44x44Logo.png': [44, 44],
+  'Wide310x150Logo.png': [310, 150]
+};
+function readPngSize(filePath) {
+  const buf = fs.readFileSync(filePath);
+  if (buf.length < 24 || buf.readUInt32BE(0) !== 0x89504e47) {
+    fail(`${path.relative(root, filePath)} 不是合法 PNG`);
+  }
+  return [buf.readUInt32BE(16), buf.readUInt32BE(20)];
+}
+for (const [name, expected] of Object.entries(expectedAppxLogos)) {
+  const logoPath = path.join(appxLogoDir, name);
+  if (!fs.existsSync(logoPath)) {
+    fail(`assets/appx 缺少必选 logo：${name}`);
+  }
+  const actual = readPngSize(logoPath);
+  if (actual[0] !== expected[0] || actual[1] !== expected[1]) {
+    fail(
+      `assets/appx/${name} 尺寸应为 ${expected[0]}x${expected[1]}（实际 ${actual[0]}x${actual[1]}）`
+    );
+  }
+}
+pass('assets/appx 四个必选 MSIX logo 存在且尺寸正确');
+
+if (fs.existsSync(distDir)) {
+  const msixArtifacts = fs
+    .readdirSync(distDir)
+    .filter((file) => /\.(msix|msixbundle|msixupload)$/i.test(file));
+  if (msixArtifacts.length === 0) {
+    fail('dist 缺少 MSIX 产物（.msix/.msixbundle/.msixupload）');
+  }
+  for (const file of msixArtifacts) {
+    if (!/^[\x21-\x7E]+$/.test(file)) {
+      fail(`MSIX 产物文件名必须为纯 ASCII（当前: ${file}）`);
+    }
+  }
+  const latestYmlPath = path.join(distDir, 'latest.yml');
+  if (fs.existsSync(latestYmlPath)) {
+    const latestYmlSource = fs.readFileSync(latestYmlPath, 'utf8');
+    for (const line of latestYmlSource.split(/\r?\n/)) {
+      const refMatch = line.match(/^\s*(?:-\s*)?(?:url|path):\s*(.+?)\s*$/);
+      if (refMatch && /\.(msix|msixbundle|msixupload)$/i.test(refMatch[1])) {
+        fail(
+          `latest.yml 不应引用 MSIX 产物（electron-updater 不支持 MSIX）: ${refMatch[1]}`
+        );
+      }
+    }
+  }
+  pass(`T-52 dist MSIX 产物存在且命名 ASCII（${msixArtifacts.join(', ')}）`);
+} else {
+  pass('T-52 dist 不存在，MSIX 产物断言跳过（打包后运行 check 将断言）');
 }
 
 // T-42：匿名遥测——模块/端点默认空/IPC/preload/渲染层接线静态断言

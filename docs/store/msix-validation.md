@@ -177,3 +177,20 @@
 - 本任务只新增 `docs/store/msix-validation.md` 与更新 `docs/tasks/T-47.md`；未触碰 package.json、package-lock.json、electron-builder.yml、.github/**、src/**、scripts/orchestrator/** 及其余 docs/**。
 - 本地实验仅：npm pack 到 %TEMP% 解包检查（app-builder-lib@26.15.7 / 27.0.0-alpha.6）、读取 node_modules 与官方/社区文档；未安装 MSIX、未执行真实打包（受“不改依赖/配置”边界约束）、未注册账号、未购买、未提交商店。
 - 无密钥/token 写入；无外部副作用。
+
+## 8. T-52 实施记录（2026-08-11，worker 补充）
+
+> 本节为实施补充记录，不改动上文既有结论；T-52 状态“已完成（待协调者验收）”。
+
+- 配置落地（electron-builder.yml，依赖升级 27.0.0-alpha.6 由协调者执行）：
+  - win.target 追加 `msix`（x64），保留 `nsis`；msix 块：artifactName `ai-desktop-pet-${version}-${arch}.${ext}`、identityName `AIDesktopPet.AiDesktopPet`、publisher `CN=Placeholder-Publisher`、publisherDisplayName “AI 桌宠项目组”、languages `[zh-CN, en-US]`、setBuildNumber true（产物版本 0.1.0.0）、createMsixupload true。
+  - 注意：identityName 不能含连字符（applicationId 由其派生且只允许字母数字分段），占位值待 Partner Center 保留名称后回填；runFullTrust 由默认 capabilities 自动注入（manifest 已核验）。
+- 资源：`assets/appx/` 新增 4 个必选 logo（StoreLogo 50×50、Square150x150Logo 150×150、Square44x44Logo 44×44、Wide310x150Logo 310×150），当前为程序生成占位图，README 标注“待品牌素材替换”。
+- 更新守卫：`updater.js` 在 initUpdater 最前面 `if (process.windowsStore)` 短路并返回 no-op API；托盘“检查更新”在商店版弹提示走 Microsoft Store；zh-CN/en 双语文案补充。
+- 验证（2026-08-11 实测）：
+  - `npm run check` 全绿（含 T-52 新断言；T-38 解析已兼容 electron-builder 27 的 latest.yml “- url:” 格式）；`npm run smoke` 全绿。
+  - `npm run dist -- --publish never`：`ai-desktop-pet-0.1.0-x64.msix`（150,468,253 B，未签名）与 `ai-desktop-pet-0.1.0-x64.msixupload`（150,267,768 B）；NSIS Setup.exe（108,736,270 B）+ blockmap + latest.yml 一致；app-update.yml 仍指向 github/fjtyyds/ai-desktop-pet。
+  - 包内 AppxManifest.xml：Identity/Publisher/Version 0.1.0.0/zh-CN+en-US/runFullTrust/4 logo 全部核验通过。
+  - 守卫 stub 模拟：商店版不注册 autoUpdater 事件、不发检查请求、checkForUpdates 返回 null；普通版注册 5 事件且检查正常。
+  - 工具链：首次构建自动下载 `windows-kits-bundle-10_0_26100_0.zip` 至用户态缓存（`%LOCALAPPDATA%\electron-builder\Cache\win-codesign@1.3.0\`），未安装系统级组件、未配置 `ELECTRON_BUILDER_WINDOWS_KITS_PATH`。
+- 遗留：beta 工具链升级需重测；占位身份待商店账号回填；未做真机 MSIX 安装验证；正式签名属 T-46 范围。

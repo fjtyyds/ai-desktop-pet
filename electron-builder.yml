@@ -22,6 +22,9 @@ win:
     - target: nsis
       arch:
         - x64
+    - target: msix
+      arch:
+        - x64
 
 nsis:
   oneClick: false
@@ -34,6 +37,20 @@ nsis:
   uninstallerIcon: assets/icon.ico
   installerHeaderIcon: assets/icon.ico
   artifactName: ai-desktop-pet-${version}-Setup.${ext}
+
+# T-52（ADR-040）：MSIX 打包（Microsoft Store 渠道；electron-builder 27 alpha 的 beta 能力）
+# identityName/publisher 为占位值，待商店账号注册并在 Partner Center 保留名称后回填；
+# runFullTrust 由默认 capabilities 自动注入（Electron 应用必需，不可移除）。
+msix:
+  artifactName: ai-desktop-pet-${version}-${arch}.${ext}
+  identityName: AIDesktopPet.AiDesktopPet
+  publisher: CN=Placeholder-Publisher
+  publisherDisplayName: AI 桌宠项目组
+  languages:
+    - zh-CN
+    - en-US
+  setBuildNumber: true
+  createMsixupload: true
 
 # ADR-031：自动更新源（electron-updater + GitHub Releases；CI 用 --publish never，Release 由 Actions 上传）
 publish:

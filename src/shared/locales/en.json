@@ -312,6 +312,8 @@
     "restartLater": "Later",
     "errorTitle": "Update check failed",
     "error": "Failed to check for updates: {error}",
+    "storeUpdateTitle": "Update via Microsoft Store",
+    "storeUpdateBody": "Updates for the Microsoft Store (MSIX) version are handled by the Microsoft Store. Please open Microsoft Store to check for updates.",
     "ok": "OK"
   },
   "tray": {

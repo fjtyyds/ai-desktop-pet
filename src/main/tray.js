@@ -2,7 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { Tray, Menu, nativeImage, app } = require('electron');
+const { Tray, Menu, nativeImage, app, dialog } = require('electron');
 const { resolveLocale, createTranslator } = require('../shared/locales');
 const { createDefaultStore, resolveBaseDir } = require('../storage');
 
@@ -90,7 +90,27 @@ function createTray({
           click: toggleMainWindow
         },
         { type: 'separator' },
-        { label: t('updater.checkForUpdates'), click: () => checkForUpdates?.() },
+        {
+          label: t('updater.checkForUpdates'),
+          click: () => {
+            // T-52（ADR-040）：商店版（MSIX）无 electron-updater，点击提示走 Microsoft Store
+            if (process.windowsStore) {
+              const win = getMainWindow();
+              const target = win && !win.isDestroyed() ? win : undefined;
+              dialog
+                .showMessageBox(target, {
+                  type: 'info',
+                  title: t('updater.storeUpdateTitle'),
+                  message: t('updater.storeUpdateBody'),
+                  buttons: [t('updater.ok')],
+                  noLink: true
+                })
+                .catch(() => {});
+              return;
+            }
+            checkForUpdates?.();
+          }
+        },
         { type: 'separator' },
         { label: t('tray.quit'), click: quitApp }
       ])
