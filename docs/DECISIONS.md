@@ -370,3 +370,15 @@
   3. 每次 main 合并验收后，由协调者运行该脚本作为闭环收尾步骤（已写入 AGENTS.md 常用命令与验收要求）。
   4. 脚本保持纯 ASCII（Windows PowerShell 5.1 对无 BOM 的 .ps1 按 ANSI/GBK 解析），中文目标路径用 Unicode 码点构造；首次运行误建的乱码目录已重命名保留于 `E:\codex\_stale-sync-mojibake-20260811`（删除被环境策略拦截，待用户手动）。
 - 后果：`E:\codex\AI桌宠最新版` 始终反映 main 最新构建，安装包/商店产物可从该目录直接复制分发；脚本故障仅影响同步，不影响构建产物本身。
+
+## ADR-043：新用户版本收口（2026-08-11）
+
+- 状态：Accepted
+- 背景：生产 UI 残留开发/测试痕迹：设置页“沙箱支付（未接入真实网关）”区块与本地 mock 激活码/订单号激活区（license.js 为无后端开发桩）；首次引导（T-20）仅对全新 userData 可见，覆盖安装的已有用户无法回看；check.js 仍要求 UI“必须包含”这些测试桩 token。
+- 决策：
+  1. 新卡 T-54（codex/m4-newuser）收口：设置页沙箱支付区块整体移除，替换为“Pro 会员即将上线”干净占位；mock 激活/停用 UI 一并替换，renderer 删除 sandboxPurchase/activateLicense/deactivateLicense 流程与绑定。
+  2. 主进程 src/main/payment.js、src/main/license.js、IPC/preload 内部桩保留（不暴露 UI），供未来真实支付/许可证后端接入。
+  3. 设置页新增“重新查看新手引导”入口，复用 showOnboarding 覆盖层，不重置语言/API Key/人格等已有设置，完成时照常持久化 onboardingDone=true。
+  4. scripts/check.js 由“必须包含”改为“不得包含”防回归断言；scripts/smoke.js 新增全新 userData 首启引导可见断言。
+  5. 验收通过后由协调者合并 main，并运行 scripts/sync-latest.ps1 更新 E:\codex\AI桌宠最新版。
+- 后果：生产安装包不再暴露支付/激活测试桩；全新安装与已有用户均可完整看到三步引导；主进程支付/许可证桩保留，未来接真实网关时复用。

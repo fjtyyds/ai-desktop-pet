@@ -2,11 +2,11 @@
 
 - 更新时间：2026-08-11
 - 当前阶段：M4.5 商业化功能全部完成；v0.1.0 GitHub Release 已发布；v1.0（2026-09-01）发布准备——商店/签名因资金暂缺冻结（ADR-041）
-- 当前任务：待办清单全部收口（用户 2026-08-11 15:07 决策）；无自主可派发卡，等待资金/新需求
-- 最近完成：T-51/52/53 验收合并推送；用户确认 TTS 维持现状、T-44 UI 目检通过；归档目录保留
+- 当前任务：T-54 新用户版本收口已验收合并（5da29f6）并同步最新版；无自主可派发卡，等待资金/新需求
+- 最近完成：T-54 新用户版本收口验收合并（5da29f6）并同步最新版；T-51/52/53 验收合并推送；用户确认 TTS 维持现状、T-44 UI 目检通过；归档目录保留
 - 下一步：资金到位后恢复商店注册（Steam $100/MS Store）、签名采购与 v1.0 全渠道发布；GitHub Release 路径无需资金，可随时授权
 - 阻塞：商店与签名资金暂缺（Steam $100/MS Store/Azure Artifact Signing 或 OV/EV）；v1.0 商店发布待资金与授权
-- 最新版：`E:\codex\AI桌宠最新版`（scripts/sync-latest.ps1 自动同步，当前 0.1.0 @ f5ffa63，ADR-042）
+- 最新版：`E:\codex\AI桌宠最新版`（scripts/sync-latest.ps1 自动同步，当前 0.1.0 @ 5da29f6，ADR-042/043）
 - 交接提示：新会话先读 `AGENTS.md` → `PLAN.md` → `docs/STATUS.md` → `docs/reports/2026-08-10-工作对接方案.md` → 自己的任务卡（docs/tasks/T-xx.md）
 
 ## M1 集成完成记录（2026-08-09）
@@ -348,3 +348,11 @@
 - 首次执行：main f5ffa63 构建成功（NSIS 103.70MB、MSIX 143.50MB、msixupload 143.31MB），已同步到 E:\codex\AI桌宠最新版；latest.yml 引用与实际产物一致；安装包已含 T-53 修复。
 - 协议：每次 main 合并验收后由协调者运行同步脚本（已写入 AGENTS.md 常用命令与验收要求）。
 - 备注：首次运行因 PS 5.1 按 GBK 解析无 BOM 脚本误建乱码目录，已重命名为 E:\codex\_stale-sync-mojibake-20260811（约 390MB 产物副本，可恢复；物理删除被环境策略拦截，待手动）。
+
+## T-54 建卡与验收合并记录（2026-08-11，ADR-043）
+
+- 背景：生产 UI 残留开发/测试痕迹（设置页沙箱支付区块、mock 激活码/订单号激活区）；首次引导仅对全新 userData 可见，覆盖安装的已有用户无法回看；check.js 仍要求 UI“必须包含”这些测试桩 token。
+- 实施（worker 019ff0ae，codex/m4-newuser）：移除沙箱支付区块与 mock 激活 UI，替换为“Pro 会员即将上线”占位；新增设置页“重新查看新手引导”入口（复用 showOnboarding，不重置语言/API Key/人格）；check.js 改为“不得包含”防回归断言；smoke.js 新增全新档案首启断言。
+- 验收：check/smoke 全绿（协调者复跑）；renderer/locales 无测试桩 token（rg 零命中）；主进程未动；真窗口验证首启可达与重新查看入口生效。
+- 合并与同步：5da29f6 fast-forward；scripts/sync-latest.ps1 已更新 E:\codex\AI桌宠最新版（0.1.0 @ 5da29f6）。
+- 待用户：安装最新版验证（新用户引导 + 设置页重新查看入口 + 无测试痕迹）。
