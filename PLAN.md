@@ -146,6 +146,24 @@
 
 详见 `docs/reports/2026-08-10-M4-分发规划.md`。
 
+**M4.5：商业化上线（2026-08-11 方案已定，待用户确认定价/节奏后实施）**
+
+目标：v1.0 于 2026-09-01 全渠道上线并盈利。定位：AI 对话桌宠 × 桌面效率助手 × 皮肤生态；盈利：Pro 订阅 + 永久买断 + 皮肤市场分成 + 企业授权 + 赞助/联盟。
+
+任务卡：
+
+- `docs/tasks/T-40.md` — 许可证与付费墙（codex/m4-license）
+- `docs/tasks/T-41.md` — 支付通道接入（沙箱）（codex/m4-payment）
+- `docs/tasks/T-42.md` — 匿名遥测与留存漏斗（codex/m4-telemetry）
+- `docs/tasks/T-43.md` — 皮肤与配件市场 MVP（codex/m4-skins）
+- `docs/tasks/T-44.md` — UI 大改 M3.6（玻璃拟态/角色表现）（codex/m4-ui）
+- `docs/tasks/T-45.md` — 官网落地页与分享传播（codex/m4-marketing）
+- `docs/tasks/T-46.md` — 商店发布准备与云同步评估（codex/m4-store）
+
+30 天节奏：W1（8/11-8/17）T-40/T-41/T-42 → W2（8/18-8/24）T-43/T-44 → W3（8/25-8/31）T-45/T-46 + 集成 → 09-01 v1.0 发布。
+
+详见 `docs/reports/2026-08-11-商业化上线方案.md`。
+
 ## Progress
 
 - 2026-08-09：M0 完成（Electron 43.3.0、文档体系、CI）。
@@ -189,6 +207,8 @@
 - 2026-08-10：T-37 自动更新（electron-updater + GitHub Releases）经项目内线程闭环完成并合并（4ec503a fast-forward）：updater.js 封装（isPackaged 双重守卫、事件链路、dialog 确认、before-quit quitAndInstall）、托盘“检查更新”、双语文案与 check 断言；worker 与协调者 check/smoke 全部通过；遗留风险：artifactName 中文导致 latest.yml 引用与实际产物不一致（T-38 修复）。
 - 2026-08-10：T-38 发布产物命名 ASCII 化经项目内线程闭环完成并合并（3315146 fast-forward）：artifactName 改为 `ai-desktop-pet-${version}-Setup.${ext}`，productName 保持 AI桌宠；check 增加 ASCII 断言与 dist/latest.yml 引用静态比对；本地 dist 实测产物与清单完全一致；check/smoke 全部通过；真实更新链路待首次 v 标签发布验证。
 - 2026-08-10：T-39 M4 P4 最终打包与安装冒烟经项目内线程闭环完成并合并（0a8f8bc fast-forward）：dist 产物 ASCII 命名、latest.yml 与产物一致、app-update.yml 指向 github/fjtyyds/ai-desktop-pet、静默安装/卸载冒烟零污染（临时 userData）；check 增加 T-39 断言；check/smoke 全部通过；安装版更新检查实测“No published versions”，证明更新源已生效；真实更新链路待首次 v0.1.0 发布验证。
+- 2026-08-11：目录规范化（ADR-033）：移除 6 个已合并 M3.5 worktree，多线程开发/ 与探针/日志归档至 E:\codex\_archive_20260811（可恢复）；scripts/orchestrator 加入 .gitignore；git 工作区干净。
+- 2026-08-11：商业化上线方案落盘（ADR-032）：市场调研（AI 陪伴 371 亿美元/2025、AI 桌宠细分 CAGR 75%、Wallpaper Engine 约 1.6 亿美元流水等 20+ 数据源）、竞品分析、优势功能、UI 依据、混合盈利模式、财务预测与 30 天计划；任务卡 T-40~T-46 已建。
 
 ## Surprises & Discoveries
 
@@ -240,6 +260,8 @@
 - ADR-029：TTS 改用 Edge 在线神经语音（2026-08-10，T-34）。
 - ADR-030：专属语音克隆接入暂缓，skill 保留复用（2026-08-10）。
 - ADR-031：自动更新采用 electron-updater + GitHub Releases（2026-08-10，T-37）。
+- ADR-032：商业化上线方案（2026-08-11，T-40~T-46）。
+- ADR-033：项目目录规范化与归档（2026-08-11）。
 
 详见 `docs/DECISIONS.md`。
 

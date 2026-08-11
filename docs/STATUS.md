@@ -1,10 +1,10 @@
 # 项目状态
 
 - 更新时间：2026-08-10
-- 当前阶段：M4 P0/P1/P3/P4 完成（T-37~T-39 已合并）；P2（签名/商店）待用户决策；真实更新验证待首次发布
-- 当前任务：等待用户决策/确认（首次发布、P2 预算、TTS 听感复核、清理、UI 大改排期）
-- 最近完成：T-39 M4 P4 最终打包与安装冒烟验收合并（0a8f8bc）；安装/卸载冒烟零污染
-- 下一步：用户确认后执行首次发布（v0.1.0 标签 + GitHub Release）并做真实更新端到端验证；P2 签名/商店需预算与注册类决策
+- 当前阶段：M4 P0/P1/P3/P4 完成；商业化上线方案已定（ADR-032，T-40~T-46 已建卡）；P2（签名/商店）并入上线任务
+- 当前任务：按上线方案派发 T-40/T-42/T-43（许可证/遥测/皮肤市场 MVP）
+- 最近完成：项目目录规范化与归档（ADR-033）；商业化上线方案落盘（docs/reports/2026-08-11-商业化上线方案.md）
+- 下一步：用户确认定价/30 天节奏后派发首批任务；首次发布（v0.1.0 标签 + GitHub Release）并入 v1.0 发布计划
 - 阻塞：无（P2 签名/商店预算、大目录/worktree 清理、UI 大改排期、TTS 听感复核仍待用户决策）
 - 交接提示：新会话先读 `AGENTS.md` → `PLAN.md` → `docs/STATUS.md` → `docs/reports/2026-08-10-工作对接方案.md` → 自己的任务卡（docs/tasks/T-xx.md）
 
@@ -196,3 +196,15 @@
 - 验证：worker 与协调者 `npm run check` 全部通过（含 T-38/T-39 断言）；`npm run smoke` 通过；`npm run dist -- --publish never` 成功，产物 ai-desktop-pet-0.1.0-Setup.exe（100,568,325 B）+ blockmap，latest.yml 引用与实际产物一致；app-update.yml 指向 GitHub；静默安装/卸载退出码 0，安装版以临时 userData 启动正常、真实 %APPDATA%\AI桌宠 零污染；安装版更新检查实测“No published versions”（证明更新源已生效）。
 - 合并：0a8f8bc fast-forward 合并入 main；worktree E:\codex\AI桌宠-m4-final-dist 已清理，分支保留。
 - 遗留风险：真实更新下载/安装链路需首次 v0.1.0 发布（v 标签 + Release，push/tag 属远程操作，待用户确认）；正式代码签名/商店渠道待 M4 P2（SmartScreen 可能提示未知发布者）。
+
+## 目录规范化与归档记录（2026-08-11，ADR-033）
+
+- 移除 6 个已合并 M3.5 worktree（分支保留）：m3x-export/idle/memory-ui/mood-ui/stream/widgets。
+- 归档至 `E:\codex\_archive_20260811\`（可恢复，未物理删除）：多线程开发-20260811（约 5GB，12 个 M1~M3 副本）、AI桌宠-m3x-stream-leftover、AI桌宠-m3x-weather-refresh、AI桌宠测0.1.0、probe-artifacts-20260811（探针/音频）、.orchestrator-logs。
+- scripts/orchestrator/ 保留本地并加入 .gitignore（ADR-028 延续）。
+- 结果：git 工作区干净，worktree 仅剩 main；项目根目录仅源码/文档/配置。
+
+## 商业化上线方案（2026-08-11，ADR-032）
+
+- 调研与方案：`docs/reports/2026-08-11-商业化上线方案.md`（含 20+ 组市场数据来源、竞品分析、优势功能、UI 依据、盈利模式、财务预测与 30 天上线计划）。
+- 任务卡：T-40 许可证、T-41 支付、T-42 遥测、T-43 皮肤市场、T-44 UI 大改、T-45 官网/分享、T-46 商店发布准备。
