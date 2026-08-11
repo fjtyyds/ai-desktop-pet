@@ -15,6 +15,7 @@ const ttsEdge = require('./tts-edge'); // T-34：Edge 在线神经语音（ADR-0
 const telemetry = require('./telemetry'); // T-42：匿名遥测（opt-in、脱敏、批量上报）
 const skinStore = require('./skin-store'); // T-43：皮肤包导入/导出/索引/卸载（ADR-032）
 const { createLicenseManager } = require('./license'); // T-40：许可证与付费墙
+const { createPaymentManager } = require('./payment'); // T-41：支付沙箱/桩
 
 /**
  * T-16：情绪引擎共享单例（ADR-022 mood.get；src/llm/** 只读）。
@@ -64,7 +65,9 @@ const CHANNELS = {
   skinRemove: 'skin:remove', // T-43：卸载导入的皮肤包
   licenseGet: 'license:get', // T-40：读取许可证/门控/额度状态
   licenseActivate: 'license:activate', // T-40：激活码/订单号激活
-  licenseDeactivate: 'license:deactivate' // T-40：注销激活
+  licenseDeactivate: 'license:deactivate', // T-40：注销激活
+  paymentCreateOrder: 'payment:create-order', // T-41：沙箱下单
+  paymentMockCallback: 'payment:mock-callback' // T-41：沙箱模拟回调（仅沙箱可用）
 };
 
 /** history.clear 允许的范围（契约：messages / memories / settings / all） */
@@ -80,6 +83,7 @@ let secureSettings = null;
 let streamAbortController = null;
 let skinStoreInstance = null; // T-43：皮肤存储单例
 let licenseManager = null; // T-40：许可证单例
+let paymentManagerInstance = null; // T-41：支付沙箱/桩单例
 
 // T-15：交互活动订阅（主进程空闲计时据此重置）
 const activityListeners = new Set();
@@ -134,6 +138,19 @@ function getLicenseManager() {
     });
   }
   return licenseManager;
+}
+
+/** T-41：支付沙箱/桩管理器（订单表与幂等记录在 baseDir/payment-state.json） */
+function getPaymentManager() {
+  if (!paymentManagerInstance) {
+    paymentManagerInstance = createPaymentManager({
+      baseDir: resolveBaseDir(),
+      license: getLicenseManager(),
+      now: () => Date.now(),
+      logger: (message) => console.warn(`[payment] ${message}`)
+    });
+  }
+  return paymentManagerInstance;
 }
 
 function getProvider() {
@@ -273,6 +290,16 @@ function handleLicenseActivate(_event, payload) {
 /** T-40：注销激活，回到免费版 */
 function handleLicenseDeactivate() {
   return getLicenseManager().deactivate();
+}
+
+/** T-41：沙箱下单（返回待支付订单；不触网、不收款） */
+function handlePaymentCreateOrder(_event, payload) {
+  return getPaymentManager().createOrder(payload);
+}
+
+/** T-41：沙箱模拟回调（仅沙箱模式可用；驱动验签→升档/降级链路） */
+function handlePaymentMockCallback(_event, payload) {
+  return getPaymentManager().mockCallback(payload);
 }
 
 /**
@@ -490,6 +517,13 @@ function clearData(scope) {
     licenseManager = null;
     try {
       fs.rmSync(path.join(baseDir, 'license-state.json'), { force: true });
+    } catch (_error) {
+      // runtime 状态清理失败不影响主流程
+    }
+    // T-41：清除设置时一并清掉支付沙箱订单/幂等记录
+    paymentManagerInstance = null;
+    try {
+      fs.rmSync(path.join(baseDir, 'payment-state.json'), { force: true });
     } catch (_error) {
       // runtime 状态清理失败不影响主流程
     }
@@ -839,6 +873,8 @@ function registerIpcHandlers() {
   ipcMain.handle(CHANNELS.licenseGet, handleLicenseGet);
   ipcMain.handle(CHANNELS.licenseActivate, handleLicenseActivate);
   ipcMain.handle(CHANNELS.licenseDeactivate, handleLicenseDeactivate);
+  ipcMain.handle(CHANNELS.paymentCreateOrder, handlePaymentCreateOrder);
+  ipcMain.handle(CHANNELS.paymentMockCallback, handlePaymentMockCallback);
 }
 
 // 被 src/main/main.js require 后自动注册（M1 集成时由协调者加入 require('./ipc')）
@@ -851,6 +887,7 @@ module.exports = {
   CHANNELS,
   getSettings,
   getLicenseManager,
+  getPaymentManager,
   consumePomodoroNotificationSignal,
   onActivity,
   notifyActivity,

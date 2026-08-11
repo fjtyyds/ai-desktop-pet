@@ -424,6 +424,55 @@ function createLicenseManager(options) {
   }
 
   /**
+   * 支付回调联动（T-41）：按支付订单激活对应档位（yearly/lifetime）。
+   * 由 payment.js 在验签与幂等通过后调用；许可证键为 PAY-<orderId>。
+   */
+  function activateByPayment(orderId, tier) {
+    const normalizedTier = normalizeTier(tier);
+    if (normalizedTier !== 'yearly' && normalizedTier !== 'lifetime') {
+      return { ok: false, error: 'license-invalid-tier' };
+    }
+    const normalizedOrderId =
+      typeof orderId === 'string' ? orderId.trim() : '';
+    if (!normalizedOrderId || normalizedOrderId.length > 96) {
+      return { ok: false, error: 'license-invalid-order-id' };
+    }
+    const deviceId = getDeviceId();
+    const expiresAt = normalizedTier === 'yearly' ? nowFn() + YEAR_MS : 0;
+    try {
+      writeSettings({
+        licenseTier: normalizedTier,
+        licenseKey: `PAY-${normalizedOrderId}`,
+        licenseExpiresAt: expiresAt,
+        deviceId
+      });
+    } catch (error) {
+      logger(
+        `支付升档持久化失败：${error && error.message ? error.message : error}`
+      );
+      return { ok: false, error: 'license-persist-failed' };
+    }
+    return { ok: true, status: getPublicStatus() };
+  }
+
+  /**
+   * 支付退款/取消联动（T-41）：仅当当前许可证由该订单激活时降级为免费，
+   * 避免误伤其他订单/激活码激活的许可证。
+   */
+  function downgradeByPayment(orderId) {
+    const normalizedOrderId =
+      typeof orderId === 'string' ? orderId.trim() : '';
+    const current = readSettings();
+    const licenseKey =
+      typeof current.licenseKey === 'string' ? current.licenseKey.trim() : '';
+    if (!normalizedOrderId || licenseKey !== `PAY-${normalizedOrderId}`) {
+      return { ok: true, status: getPublicStatus(), untouched: true };
+    }
+    const result = deactivate();
+    return { ...result, untouched: false };
+  }
+
+  /**
    * 支付回调桩（T-41 接入真实支付）。
    * 当前仅支持本地 mock 订单号激活：不触网、不收款、不写任何密钥。
    */
@@ -447,6 +496,8 @@ function createLicenseManager(options) {
     getDeviceId,
     activate,
     deactivate,
+    activateByPayment,
+    downgradeByPayment,
     getCloudUsage,
     recordCloudUsage,
     consumeCloudQuota,

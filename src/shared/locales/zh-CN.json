@@ -68,6 +68,23 @@
     "complianceRequired": "请先完成年龄确认与内容合规声明。",
     "complianceRefusedNotice": "未同意内容合规声明，AI 对话已停用。您仍可使用本地记忆、番茄钟与天气等功能。"
   },
+  "payment": {
+    "plansTitle": "沙箱支付（未接入真实网关）",
+    "planYearly": "Pro 订阅",
+    "planLifetime": "永久买断",
+    "priceYearly": "¥128/年",
+    "priceLifetime": "¥68",
+    "sandboxBuy": "沙箱购买",
+    "sandboxNotice": "仅模拟支付流程，不产生真实扣款，也不会发送任何网络请求。",
+    "creating": "正在创建沙箱订单…",
+    "callbackSimulating": "正在模拟支付成功回调…",
+    "activated": "沙箱支付成功：{tier} 已激活。",
+    "alreadyActivated": "该订单已处理过，许可证未重复升档。",
+    "createFailed": "下单失败：{error}",
+    "callbackFailed": "模拟回调失败：{error}",
+    "unavailable": "支付接口不可用（当前为沙箱/桩模式）。",
+    "invalidTier": "无效的购买档位。"
+  },
   "pomodoro": {
     "title": "番茄钟",
     "start": "开始",

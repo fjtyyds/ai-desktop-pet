@@ -261,6 +261,48 @@
                 data-i18n="license.featureTodos"
               >待办事项</span>
             </div>
+            <!-- T-41：沙箱支付（价格来自商业化方案 §7.1；仅模拟，不产生真实扣款） -->
+            <div id="payment-plans" class="payment-plans">
+              <span class="field-label" data-i18n="payment.plansTitle"
+                >沙箱支付（未接入真实网关）</span
+              >
+              <div class="payment-plan" data-tier="yearly">
+                <span
+                  class="payment-plan-name"
+                  data-i18n="payment.planYearly"
+                >Pro 订阅</span>
+                <span
+                  class="payment-plan-price"
+                  data-i18n="payment.priceYearly"
+                >¥128/年</span>
+                <button
+                  id="payment-buy-yearly"
+                  class="payment-buy-btn primary-btn"
+                  type="button"
+                  data-i18n="payment.sandboxBuy"
+                >沙箱购买</button>
+              </div>
+              <div class="payment-plan" data-tier="lifetime">
+                <span
+                  class="payment-plan-name"
+                  data-i18n="payment.planLifetime"
+                >永久买断</span>
+                <span
+                  class="payment-plan-price"
+                  data-i18n="payment.priceLifetime"
+                >¥68</span>
+                <button
+                  id="payment-buy-lifetime"
+                  class="payment-buy-btn primary-btn"
+                  type="button"
+                  data-i18n="payment.sandboxBuy"
+                >沙箱购买</button>
+              </div>
+              <p class="payment-notice" data-i18n="payment.sandboxNotice"
+                >仅模拟支付流程，不产生真实扣款，也不会发送任何网络请求。</p
+              >
+              <p id="payment-message" class="settings-status" role="status" hidden></p>
+            </div>
             <label class="field">
               <span class="field-label" data-i18n="license.activateLabel"
                 >激活码 / 订单号</span

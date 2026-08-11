@@ -68,6 +68,23 @@
     "complianceRequired": "Please complete the age confirmation and content compliance statement first.",
     "complianceRefusedNotice": "AI chat is disabled because you declined the compliance statement. Local memory, pomodoro, and weather remain available."
   },
+  "payment": {
+    "plansTitle": "Sandbox payment (no real gateway connected)",
+    "planYearly": "Pro (subscription)",
+    "planLifetime": "Lifetime",
+    "priceYearly": "¥128/year",
+    "priceLifetime": "¥68",
+    "sandboxBuy": "Sandbox buy",
+    "sandboxNotice": "This only simulates the payment flow. No real charge is made and no network request is sent.",
+    "creating": "Creating sandbox order…",
+    "callbackSimulating": "Simulating payment success callback…",
+    "activated": "Sandbox payment succeeded: {tier} activated.",
+    "alreadyActivated": "This order was already processed; the license was not upgraded again.",
+    "createFailed": "Order creation failed: {error}",
+    "callbackFailed": "Simulated callback failed: {error}",
+    "unavailable": "Payment API unavailable (sandbox/stub mode).",
+    "invalidTier": "Invalid purchase tier."
+  },
   "pomodoro": {
     "title": "Pomodoro",
     "start": "Start",

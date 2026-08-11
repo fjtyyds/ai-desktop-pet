@@ -512,6 +512,11 @@
       licenseActivate: document.getElementById('license-activate'),
       licenseDeactivate: document.getElementById('license-deactivate'),
       licenseMessage: document.getElementById('license-message'),
+      // T-41：沙箱支付区块
+      paymentPlans: document.getElementById('payment-plans'),
+      paymentBuyYearly: document.getElementById('payment-buy-yearly'),
+      paymentBuyLifetime: document.getElementById('payment-buy-lifetime'),
+      paymentMessage: document.getElementById('payment-message'),
       // T-40：年龄确认 + 内容合规声明弹窗
       complianceView: document.getElementById('compliance-view'),
       complianceAccept: document.getElementById('compliance-accept'),
@@ -523,6 +528,7 @@
     showTelemetryStatus = makeStatusShower(elements.telemetryStatus);
     showSkinStatus = makeStatusShower(elements.skinStatus);
     showLicenseMessage = makeStatusShower(elements.licenseMessage);
+    showPaymentMessage = makeStatusShower(elements.paymentMessage);
   }
 
   /* ---------------- T-19：窗口行为开关与提示（ADR-022 冻结契约） ---------------- */
@@ -687,6 +693,12 @@
     elements.licenseActivate.addEventListener('click', () => void activateLicense());
     elements.licenseDeactivate.addEventListener('click', () =>
       void deactivateLicense()
+    );
+    elements.paymentBuyYearly.addEventListener('click', () =>
+      void sandboxPurchase('yearly')
+    );
+    elements.paymentBuyLifetime.addEventListener('click', () =>
+      void sandboxPurchase('lifetime')
     );
     elements.complianceAccept.addEventListener('click', () =>
       void acceptCompliance()
@@ -3087,6 +3099,91 @@
     }
   }
 
+  /* ---------------- T-41：沙箱支付（下单 → 模拟回调 → 升档 → 刷新 UI） ---------------- */
+
+  function hasPaymentApi() {
+    return Boolean(
+      window.petAPI &&
+        window.petAPI.payment &&
+        typeof window.petAPI.payment.createOrder === 'function' &&
+        typeof window.petAPI.payment.mockCallback === 'function'
+    );
+  }
+
+  /** 沙箱购买：创建订单并模拟支付成功回调，成功后刷新许可证 UI */
+  async function sandboxPurchase(tier) {
+    const t = window.PetLocales.createTranslator(currentLocale);
+    if (!hasPaymentApi()) {
+      showPaymentMessage(t('payment.unavailable'), 'error');
+      return;
+    }
+    if (tier !== 'yearly' && tier !== 'lifetime') {
+      showPaymentMessage(t('payment.invalidTier'), 'error');
+      return;
+    }
+    const button =
+      tier === 'yearly'
+        ? elements.paymentBuyYearly
+        : elements.paymentBuyLifetime;
+    button.disabled = true;
+    showPaymentMessage(t('payment.creating'), 'ok');
+    try {
+      const orderResult = await window.petAPI.payment.createOrder({
+        tier,
+        channel: 'alipay'
+      });
+      if (!orderResult || !orderResult.ok) {
+        showPaymentMessage(
+          t('payment.createFailed', {
+            error: orderResult && orderResult.error ? orderResult.error : ''
+          }),
+          'error'
+        );
+        return;
+      }
+      showPaymentMessage(t('payment.callbackSimulating'), 'ok');
+      const callbackResult = await window.petAPI.payment.mockCallback({
+        orderId: orderResult.order.orderId,
+        channel: 'alipay'
+      });
+      if (!callbackResult || !callbackResult.ok) {
+        showPaymentMessage(
+          t('payment.callbackFailed', {
+            error:
+              callbackResult && callbackResult.error
+                ? callbackResult.error
+                : ''
+          }),
+          'error'
+        );
+        return;
+      }
+      licenseState =
+        (callbackResult.licenseStatus &&
+          typeof callbackResult.licenseStatus === 'object' &&
+          callbackResult.licenseStatus) ||
+        (await window.petAPI.license.get());
+      applyLicenseUi();
+      showPaymentMessage(
+        callbackResult.duplicate
+          ? t('payment.alreadyActivated')
+          : t('payment.activated', {
+              tier: tierLabel(t, callbackResult.licenseStatus ? callbackResult.licenseStatus.tier : tier)
+            }),
+        'ok'
+      );
+    } catch (error) {
+      showPaymentMessage(
+        t('payment.callbackFailed', {
+          error: error && error.message ? error.message : String(error)
+        }),
+        'error'
+      );
+    } finally {
+      button.disabled = false;
+    }
+  }
+
   /** 合规弹窗：未同意时展示；同意后永久隐藏；拒绝后锁定 AI 对话 */
   function syncComplianceVisibility() {
     if (!elements.complianceView) {
@@ -3747,6 +3844,7 @@
   let showTelemetryStatus = () => {};
   let showSkinStatus = () => {}; // T-43
   let showLicenseMessage = () => {};
+  let showPaymentMessage = () => {}; // T-41
 
   window.ChatUI = {
     init,
@@ -3757,6 +3855,7 @@
     getPomodoroState,
     refreshSkins, // T-43：皮肤列表刷新（测试/手动入口）
     getSkinItems: () => skinItems, // T-43
-    applySkin // T-43
+    applySkin, // T-43
+    sandboxPurchase // T-41：沙箱购买流程（测试/手动入口）
   };
 })();

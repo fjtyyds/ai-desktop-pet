@@ -1899,6 +1899,395 @@ pass('license 双语文案键齐全（zh-CN/en）');
   }
 })();
 
+// T-41：支付通道接入（沙箱/桩；凭证仅环境变量；幂等/验签/回调→升档/降级；禁真实网关）
+const paymentModulePath = path.join(root, 'src', 'main', 'payment.js');
+if (!fs.existsSync(paymentModulePath)) {
+  fail('缺少 src/main/payment.js（T-41 支付沙箱/桩）');
+}
+const paymentModule = require(paymentModulePath);
+const paymentSource = fs.readFileSync(paymentModulePath, 'utf8');
+if (
+  typeof paymentModule.createPaymentManager !== 'function' ||
+  typeof paymentModule.verifyCallbackSignature !== 'function' ||
+  typeof paymentModule.signCallbackPayload !== 'function'
+) {
+  fail('payment.js 缺少 createPaymentManager/verifyCallbackSignature/signCallbackPayload');
+}
+if (
+  !paymentModule.PLANS ||
+  paymentModule.PLANS.yearly.amountMinor !== 12800 ||
+  paymentModule.PLANS.lifetime.amountMinor !== 6800
+) {
+  fail('payment.js 定价档位错误（应 yearly ¥128、lifetime ¥68）');
+}
+if (
+  !paymentModule.CHANNELS ||
+  !paymentModule.EVENT_ACTIONS ||
+  !paymentModule.EVENT_ACTIONS.alipay ||
+  !paymentModule.EVENT_ACTIONS.paddle ||
+  !paymentModule.EVENT_ACTIONS.stripe
+) {
+  fail('payment.js 缺少国内/海外通道结构映射');
+}
+pass('payment.js 模块结构、定价与双通道映射存在');
+
+// 凭证仅环境变量：读取真实 process.env 且引用 AI_PET_PAYMENT_*，无硬编码值
+if (!paymentSource.includes('process.env')) {
+  fail('payment.js 未通过 process.env 读取凭证');
+}
+const paymentEnvRefs = paymentSource.match(/AI_PET_PAYMENT_[A-Z0-9_]+/g) || [];
+if (paymentEnvRefs.length < 2) {
+  fail('payment.js 未引用 AI_PET_PAYMENT_* 环境变量');
+}
+if (/AI_PET_PAYMENT_[A-Z0-9_]+\s*=\s*['"][^'"]+['"]/.test(paymentSource)) {
+  fail('payment.js 出现硬编码 AI_PET_PAYMENT_* 值（凭证必须来自环境变量）');
+}
+// 禁止真实网关地址/网络端点
+if (/https?:\/\//.test(paymentSource)) {
+  fail('payment.js 出现真实网关/网络地址（本卡禁止任何真实网关）');
+}
+pass('payment.js 凭证仅环境变量读取、零硬编码密钥、无真实网关地址');
+
+// IPC/preload 通道接线
+for (const token of [
+  "paymentCreateOrder: 'payment:create-order'",
+  "paymentMockCallback: 'payment:mock-callback'",
+  'ipcMain.handle(CHANNELS.paymentCreateOrder',
+  'ipcMain.handle(CHANNELS.paymentMockCallback',
+  "require('./payment')",
+  'getPaymentManager'
+]) {
+  if (!ipcSource.includes(token)) {
+    fail(`ipc.js 缺少支付接线：${token}`);
+  }
+}
+for (const token of [
+  "paymentCreateOrder: 'payment:create-order'",
+  "paymentMockCallback: 'payment:mock-callback'",
+  'payment: {',
+  'createOrder: (payload)',
+  'mockCallback: (payload)'
+]) {
+  if (!preloadSource.includes(token)) {
+    fail(`preload.js 缺少支付暴露：${token}`);
+  }
+}
+pass('payment:create-order / payment:mock-callback IPC 与 preload 接线存在');
+
+// license.js 回调联动（支付→升档/降级）
+const licenseSourceForPayment = fs.readFileSync(licenseModulePath, 'utf8');
+for (const token of ['activateByPayment', 'downgradeByPayment', 'PAY-${']) {
+  if (!licenseSourceForPayment.includes(token)) {
+    fail(`license.js 缺少支付回调联动：${token}`);
+  }
+}
+pass('license.js 已提供支付升档/降级联动');
+
+// 渲染层订阅页接线
+for (const token of [
+  'payment.createOrder',
+  'payment.mockCallback',
+  'sandboxPurchase',
+  'showPaymentMessage',
+  'payment.activated'
+]) {
+  if (!rendererChatSource.includes(token)) {
+    fail(`renderer/chat.js 缺少支付流程接线：${token}`);
+  }
+}
+for (const token of [
+  'id="payment-plans"',
+  'id="payment-buy-yearly"',
+  'id="payment-buy-lifetime"',
+  'id="payment-message"'
+]) {
+  if (!rendererIndexSource.includes(token)) {
+    fail(`renderer/index.html 缺少沙箱支付元素：${token}`);
+  }
+}
+for (const token of [
+  '.payment-plans',
+  '.payment-plan',
+  '.payment-buy-btn',
+  '.payment-notice'
+]) {
+  if (!rendererChatCssSource.includes(token)) {
+    fail(`chat.css 缺少沙箱支付样式：${token}`);
+  }
+}
+pass('渲染层订阅页价格展示与沙箱购买按钮接线存在');
+
+// 双语文案键
+const requiredPaymentKeys = [
+  'plansTitle',
+  'planYearly',
+  'planLifetime',
+  'priceYearly',
+  'priceLifetime',
+  'sandboxBuy',
+  'sandboxNotice',
+  'activated',
+  'alreadyActivated',
+  'createFailed',
+  'callbackFailed',
+  'unavailable',
+  'invalidTier'
+];
+for (const locale of [zhLocales, enLocales]) {
+  for (const key of requiredPaymentKeys) {
+    if (
+      !locale.payment ||
+      typeof locale.payment[key] !== 'string' ||
+      !locale.payment[key]
+    ) {
+      fail(`locales 缺少 payment.${key} 文案`);
+    }
+  }
+}
+pass('payment 双语文案键齐全（zh-CN/en）');
+
+(async () => {
+  try {
+    const fixedNow = Date.UTC(2026, 7, 11, 8, 0, 0);
+    const paymentCheckDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'ai-pet-payment-')
+    );
+    try {
+      const paymentStoreInstance = createStore(paymentCheckDir);
+      const paymentLicenseStore = {
+        readSettings: () => paymentStoreInstance.readSettings(),
+        writeSettings: (patch) => paymentStoreInstance.writeSettings(patch)
+      };
+      const paymentLicense = licenseModule.createLicenseManager({
+        settings: paymentLicenseStore,
+        baseDir: paymentCheckDir,
+        now: () => fixedNow
+      });
+      const pay = paymentModule.createPaymentManager({
+        baseDir: paymentCheckDir,
+        license: paymentLicense,
+        now: () => fixedNow,
+        env: {}
+      });
+
+      // 沙箱下单（yearly：¥128；状态 pending；订单号 SB- 前缀）
+      const created = pay.createOrder({ tier: 'yearly', channel: 'alipay' });
+      if (
+        !created.ok ||
+        created.order.tier !== 'yearly' ||
+        created.order.amountMinor !== 12800 ||
+        created.order.status !== 'pending' ||
+        !/^SB-/.test(created.order.orderId)
+      ) {
+        fail(`沙箱下单异常: ${JSON.stringify(created)}`);
+      }
+      const invalidTier = pay.createOrder({ tier: 'free' });
+      if (invalidTier.ok || invalidTier.error !== 'payment-invalid-tier') {
+        fail('非法档位下单未被拒绝');
+      }
+      pass('T-41 沙箱下单（yearly/lifetime 定价、待支付状态）通过');
+
+      // 模拟支付成功回调 → 许可证升档
+      const success = pay.mockCallback({
+        orderId: created.order.orderId,
+        channel: 'alipay'
+      });
+      if (
+        !success.ok ||
+        success.duplicate !== false ||
+        success.order.status !== 'paid' ||
+        !success.licenseStatus ||
+        success.licenseStatus.tier !== 'yearly' ||
+        success.licenseStatus.effectiveTier !== 'yearly'
+      ) {
+        fail(`支付成功回调未升档: ${JSON.stringify(success)}`);
+      }
+
+      // 幂等：重复回调不重复升档
+      const duplicate = pay.mockCallback({
+        orderId: created.order.orderId,
+        channel: 'alipay'
+      });
+      if (!duplicate.ok || duplicate.duplicate !== true) {
+        fail(`重复回调未识别为幂等: ${JSON.stringify(duplicate)}`);
+      }
+      if (
+        !duplicate.licenseStatus ||
+        duplicate.licenseStatus.tier !== 'yearly'
+      ) {
+        fail('重复回调导致许可证状态异常');
+      }
+
+      // 验签失败拒绝：无 sandbox 标记且无签名
+      const unsigned = pay.processCallback({
+        channel: 'alipay',
+        eventType: 'payment.success',
+        eventId: 'evt-unsigned',
+        orderId: created.order.orderId,
+        amount: 12800
+      });
+      if (unsigned.ok || unsigned.error !== 'payment-signature-required') {
+        fail(`无签名回调未被拒绝: ${JSON.stringify(unsigned)}`);
+      }
+
+      // 金额不匹配拒绝（失败回滚：订单/许可证保持原状）
+      const amountBad = pay.processCallback({
+        channel: 'alipay',
+        eventType: 'payment.success',
+        eventId: 'evt-amount-bad',
+        orderId: created.order.orderId,
+        amount: 1,
+        sandbox: true
+      });
+      if (amountBad.ok || amountBad.error !== 'payment-amount-mismatch') {
+        fail(`金额不匹配未被拒绝: ${JSON.stringify(amountBad)}`);
+      }
+      const afterAmountBad = pay.getOrder(created.order.orderId);
+      if (afterAmountBad.status !== 'paid') {
+        fail('金额校验失败后订单状态被改动（应保持 paid）');
+      }
+
+      // 退款回调 → 降级（海外通道结构兼容）
+      const refund = pay.mockCallback({
+        orderId: created.order.orderId,
+        channel: 'paddle',
+        eventType: 'payment_refunded'
+      });
+      if (
+        !refund.ok ||
+        refund.order.status !== 'refunded' ||
+        !refund.licenseStatus ||
+        refund.licenseStatus.tier !== 'free' ||
+        refund.licenseStatus.status !== 'inactive'
+      ) {
+        fail(`退款回调未降级: ${JSON.stringify(refund)}`);
+      }
+      const refundDuplicate = pay.mockCallback({
+        orderId: created.order.orderId,
+        channel: 'paddle',
+        eventType: 'payment_refunded'
+      });
+      if (!refundDuplicate.ok || refundDuplicate.duplicate !== true) {
+        fail('退款重复回调未幂等');
+      }
+      pass('T-41 成功升档/重复幂等/验签拒绝/退款降级通过');
+
+      // 海外通道（stripe）成功与取消
+      const lifetime = pay.createOrder({ tier: 'lifetime', channel: 'stripe' });
+      const lifetimeSuccess = pay.mockCallback({
+        orderId: lifetime.order.orderId,
+        channel: 'stripe'
+      });
+      if (
+        !lifetimeSuccess.ok ||
+        !lifetimeSuccess.licenseStatus ||
+        lifetimeSuccess.licenseStatus.tier !== 'lifetime'
+      ) {
+        fail(`海外 stripe 成功回调未升档: ${JSON.stringify(lifetimeSuccess)}`);
+      }
+      const lifetimeCancel = pay.mockCallback({
+        orderId: lifetime.order.orderId,
+        channel: 'stripe',
+        eventType: 'customer.subscription.deleted'
+      });
+      if (
+        !lifetimeCancel.ok ||
+        !lifetimeCancel.licenseStatus ||
+        lifetimeCancel.licenseStatus.tier !== 'free'
+      ) {
+        fail(`海外 stripe 取消回调未降级: ${JSON.stringify(lifetimeCancel)}`);
+      }
+
+      // 未知订单 / 未知事件拒绝
+      const unknownOrder = pay.processCallback({
+        channel: 'paddle',
+        eventType: 'subscription_activated',
+        eventId: 'evt-unknown-order',
+        orderId: 'SB-NOPE',
+        amount: 6800,
+        sandbox: true
+      });
+      if (unknownOrder.ok || unknownOrder.error !== 'payment-order-not-found') {
+        fail('未知订单未被拒绝');
+      }
+      const unknownEvent = pay.processCallback({
+        channel: 'stripe',
+        eventType: 'charge.succeeded',
+        eventId: 'evt-unknown-event',
+        orderId: lifetime.order.orderId,
+        amount: 6800,
+        sandbox: true
+      });
+      if (unknownEvent.ok || unknownEvent.error !== 'payment-unsupported-event') {
+        fail('未知事件未被拒绝');
+      }
+
+      // 环境变量密钥 + HMAC 验签（真实 webhook 形态，无 sandbox 标记）
+      const secretPay = paymentModule.createPaymentManager({
+        baseDir: paymentCheckDir,
+        license: paymentLicense,
+        now: () => fixedNow,
+        env: { AI_PET_PAYMENT_WEBHOOK_SECRET: 'test-secret' }
+      });
+      const secretOrder = secretPay.createOrder({
+        tier: 'yearly',
+        channel: 'stripe'
+      });
+      const signedEvent = {
+        channel: 'stripe',
+        eventType: 'checkout.session.completed',
+        eventId: 'evt-hmac-1',
+        orderId: secretOrder.order.orderId,
+        amount: 12800,
+        currency: 'CNY',
+        tier: 'yearly',
+        timestamp: fixedNow
+      };
+      signedEvent.signature = paymentModule.signCallbackPayload(
+        signedEvent,
+        'test-secret'
+      );
+      const signedOk = secretPay.processCallback(signedEvent);
+      if (
+        !signedOk.ok ||
+        !signedOk.licenseStatus ||
+        signedOk.licenseStatus.tier !== 'yearly'
+      ) {
+        fail(`HMAC 验签成功回调未升档: ${JSON.stringify(signedOk)}`);
+      }
+      const wrongSignature = secretPay.processCallback({
+        ...signedEvent,
+        signature: 'deadbeef'
+      });
+      if (
+        wrongSignature.ok ||
+        wrongSignature.error !== 'payment-signature-invalid'
+      ) {
+        fail('错误 HMAC 签名未被拒绝');
+      }
+      pass('T-41 海外通道/未知拒绝/环境变量 HMAC 验签通过');
+
+      // 非沙箱模式拒绝一切操作（防误配触碰真实网关）
+      const livePay = paymentModule.createPaymentManager({
+        baseDir: paymentCheckDir,
+        license: paymentLicense,
+        now: () => fixedNow,
+        env: { AI_PET_PAYMENT_MODE: 'live' }
+      });
+      const liveOrder = livePay.createOrder({ tier: 'yearly' });
+      if (liveOrder.ok || liveOrder.error !== 'payment-sandbox-only') {
+        fail('非 sandbox 模式未被拒绝');
+      }
+      pass('T-41 非 sandbox 模式拒绝操作通过');
+    } finally {
+      fs.rmSync(paymentCheckDir, { recursive: true, force: true });
+    }
+    pass('T-41 支付沙箱全链路/幂等/验签/升档/降级/海外通道/环境变量密钥通过');
+  } catch (error) {
+    fail(`T-41 支付检查异常: ${error && error.message ? error.message : error}`);
+  }
+})();
+
 (async () => {
   try {
     const { createChatService } = require(path.join(root, 'src', 'llm', 'chat.js'));

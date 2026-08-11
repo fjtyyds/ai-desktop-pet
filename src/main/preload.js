@@ -32,7 +32,9 @@ const CHANNELS = {
   skinRemove: 'skin:remove', // T-43：卸载皮肤
   licenseGet: 'license:get', // T-40：许可证状态
   licenseActivate: 'license:activate', // T-40：激活
-  licenseDeactivate: 'license:deactivate' // T-40：注销激活
+  licenseDeactivate: 'license:deactivate', // T-40：注销激活
+  paymentCreateOrder: 'payment:create-order', // T-41：沙箱下单
+  paymentMockCallback: 'payment:mock-callback' // T-41：沙箱模拟回调（仅沙箱可用）
 };
 
 contextBridge.exposeInMainWorld('petAPI', {
@@ -112,5 +114,11 @@ contextBridge.exposeInMainWorld('petAPI', {
     get: () => ipcRenderer.invoke(CHANNELS.licenseGet), // T-40
     activate: (code) => ipcRenderer.invoke(CHANNELS.licenseActivate, { code }), // T-40
     deactivate: () => ipcRenderer.invoke(CHANNELS.licenseDeactivate) // T-40
+  },
+  payment: {
+    createOrder: (payload) =>
+      ipcRenderer.invoke(CHANNELS.paymentCreateOrder, payload), // T-41
+    mockCallback: (payload) =>
+      ipcRenderer.invoke(CHANNELS.paymentMockCallback, payload) // T-41
   }
 });
