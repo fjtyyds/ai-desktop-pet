@@ -165,6 +165,7 @@
 - [x] `docs/tasks/T-50.md` — 设置页账户区并入分组 + 移除番茄钟（codex/m4-account-pomodoro，714b706 已合并）
 - [x] `docs/tasks/T-51.md` — 整体移除专注统计组件（codex/m4-focus-stats，1e9d73e 已合并）
 - [x] `docs/tasks/T-52.md` — MSIX 打包实施与商店版更新守卫（codex/m4-msix-impl，919d837 已合并）
+- [ ] `docs/tasks/T-53.md` — 修复 stopDockPolling 未定义（codex/m4-dock-fix）
 
 30 天节奏：W1（8/11-8/17）T-40/T-41/T-42 → W2（8/18-8/24）T-43/T-44 → W3（8/25-8/31）T-45/T-46 + 集成 → 09-01 v1.0 发布。
 
