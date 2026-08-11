@@ -337,3 +337,13 @@
   2. 喝水提醒与待办组件保留（数据源独立：喝水由设置定时提醒驱动，待办由用户创建）。
   3. Pro 功能门控列表移除“专注统计”，保留待办。
 - 后果：面板/设置不再出现永不增长的“专注统计”，避免误导用户；后续若需专注数据，需重新引入数据源（如与待办联动）并另行决策；store 白名单缩小。
+
+## ADR-040：MSIX 打包实施（electron-builder 27 alpha 线）（2026-08-11，T-52）
+
+- 状态：Accepted
+- 背景：T-47 验证报告（docs/store/msix-validation.md）结论：MSIX 目标仅存在于 electron-builder 27.0.0-alpha 线，当前锁定 26.15.3 不可用；商店版若直接用 electron-updater 会走错更新链路（最高风险）。用户按待办清单授权 MSIX 依赖升级审批。
+- 决策：
+  1. electron-builder 升级至 27.0.0-alpha.6（精确锁定，NSIS 保留并存）；由协调者执行依赖变更并提交。
+  2. T-52 实施：electron-builder.yml 增加 MSIX 配置（identityName/publisher 占位、zh-CN/en-US、四段版本、appx logo 占位资源）；updater.js 增加 `process.windowsStore` 守卫，商店版禁用 electron-updater（更新走商店）。
+  3. 本地构建验证 MSIX 与 NSIS 双产物；真实商店注册/提审、签名采购需用户账号与预算，另行执行。
+- 后果：打包工具链进入 alpha 线（配置面可能演进），T-52 必须回归 NSIS 产物与自动更新链路；如 alpha 不稳定可回退 26.15.3（分支保留）；MSIX 产物可供后续 MS Store 提审准备。

@@ -164,6 +164,7 @@
 - [x] `docs/tasks/T-49.md` — 小部件紧凑化与情绪中性化（codex/m4-widget-mood，026c1c5 已合并）
 - [x] `docs/tasks/T-50.md` — 设置页账户区并入分组 + 移除番茄钟（codex/m4-account-pomodoro，714b706 已合并）
 - [x] `docs/tasks/T-51.md` — 整体移除专注统计组件（codex/m4-focus-stats，1e9d73e 已合并）
+- [ ] `docs/tasks/T-52.md` — MSIX 打包实施与商店版更新守卫（codex/m4-msix-impl）
 
 30 天节奏：W1（8/11-8/17）T-40/T-41/T-42 → W2（8/18-8/24）T-43/T-44 → W3（8/25-8/31）T-45/T-46 + 集成 → 09-01 v1.0 发布。
 
@@ -232,6 +233,7 @@
 - 2026-08-11：T-50 用户目检确认（14:17，效果可以）；新总工线程 019fef78 上岗，任务卡状态全部收口为“已验收合并”。
 - 2026-08-11：用户授权依次解决待办清单：main 已推送 origin（41cc892）；专注统计去留决策为整体移除（ADR-039），建卡 T-51 并派发（codex/m4-focus-stats）。
 - 2026-08-11：T-51 验收合并（1e9d73e fast-forward）：专注统计全链路移除（面板/逻辑/store/权益/文案/断言），待办与喝水保留；worker 与协调者 check/smoke 全绿；worktree 已清理，分支保留。
+- 2026-08-11：MSIX 前置完成：electron-builder 升级 27.0.0-alpha.6（dd29cc5，ADR-040）；T-52 建卡待派发。
 
 ## Surprises & Discoveries
 
