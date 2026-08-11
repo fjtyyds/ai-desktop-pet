@@ -24,7 +24,12 @@ const CHANNELS = {
   ttsSpeak: 'tts:speak', // T-34：在线神经语音合成（ADR-029）
   telemetryGetStatus: 'telemetry:get-status', // T-42：匿名遥测状态
   telemetrySetEnabled: 'telemetry:set-enabled', // T-42：匿名遥测开关
-  telemetryFlush: 'telemetry:flush' // T-42：匿名遥测批量补发（测试用）
+  telemetryFlush: 'telemetry:flush', // T-42：匿名遥测批量补发（测试用）
+  skinList: 'skin:list', // T-43：皮肤列表
+  skinImport: 'skin:import', // T-43：导入皮肤包
+  skinExport: 'skin:export', // T-43：导出皮肤包
+  skinApply: 'skin:apply', // T-43：应用皮肤
+  skinRemove: 'skin:remove' // T-43：卸载皮肤
 };
 
 contextBridge.exposeInMainWorld('petAPI', {
@@ -92,5 +97,12 @@ contextBridge.exposeInMainWorld('petAPI', {
     getStatus: () => ipcRenderer.invoke(CHANNELS.telemetryGetStatus),
     setEnabled: (payload) => ipcRenderer.invoke(CHANNELS.telemetrySetEnabled, payload),
     flush: () => ipcRenderer.invoke(CHANNELS.telemetryFlush)
+  },
+  skin: {
+    list: () => ipcRenderer.invoke(CHANNELS.skinList), // T-43
+    import: (payload) => ipcRenderer.invoke(CHANNELS.skinImport, payload), // T-43
+    export: (payload) => ipcRenderer.invoke(CHANNELS.skinExport, payload), // T-43
+    apply: (payload) => ipcRenderer.invoke(CHANNELS.skinApply, payload), // T-43
+    remove: (payload) => ipcRenderer.invoke(CHANNELS.skinRemove, payload) // T-43
   }
 });

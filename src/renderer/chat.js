@@ -38,6 +38,9 @@
  * - T-42 匿名遥测：首次引导与设置页提供 opt-in 开关（默认关闭），
  *   设置页可一键“关闭并清除”本地遥测数据（petAPI.telemetry.*）；
  *   事件采集/上报在主进程完成，渲染层不接触消息正文等敏感字段
+ * - T-43 皮肤与配件（ADR-032）：设置页“皮肤与配件”子页——皮肤列表（预览图/名称/
+ *   作者/版本/内置或导入标识）、应用/导出/移除按钮、zip 或目录导入入口；
+ *   标题栏角色形象（pet-avatar）随 settings.skinId 切换默认皮肤资源（T-44 再做动效）
  */
 (function () {
   'use strict';
@@ -357,6 +360,8 @@
   let weatherCollapsed = true; // T-24：天气小部件默认收起（仅保留摘要行）
   let weatherRetryAttempt = 0; // T-26：失败重试次数（指数退避）
   let weatherRetryTimer = null; // T-26：失败自动重试定时器
+  // T-43：皮肤列表缓存（来自 petAPI.skin.list）
+  let skinItems = [];
   // T-21：番茄钟状态
   let pomodoroStatusTimer = null;
   let pomodoroState = {
@@ -380,11 +385,13 @@
     ensureWindowFeatureControls(); // T-19: 注入窗口行为开关与提示
     void restoreHistory();
     void initMood();
+    void initSkins(); // T-43：皮肤列表与当前角色形象
   }
 
   function cacheElements() {
     elements = {
       petCard: document.getElementById('pet-card'),
+      petAvatar: document.getElementById('pet-avatar'),
       chatView: document.getElementById('chat-view'),
       settingsView: document.getElementById('settings-view'),
       moodIndicator: document.getElementById('mood-indicator'),
@@ -392,6 +399,7 @@
       moodLabel: document.getElementById('mood-label'),
       settingsHome: document.getElementById('settings-home'),
       memoryPage: document.getElementById('memory-page'),
+      skinPage: document.getElementById('skin-page'),
       messageList: document.getElementById('message-list'),
       serviceStatus: document.getElementById('service-status'),
       chatForm: document.getElementById('chat-form'),
@@ -406,6 +414,11 @@
       settingsBack: document.getElementById('settings-back'),
       memoryManageBtn: document.getElementById('memory-manage-btn'),
       memoryBack: document.getElementById('memory-back'),
+      skinManageBtn: document.getElementById('skin-manage-btn'),
+      skinBack: document.getElementById('skin-back'),
+      skinList: document.getElementById('skin-list'),
+      skinImportBtn: document.getElementById('skin-import-btn'),
+      skinStatus: document.getElementById('skin-status'),
       memoryStatus: document.getElementById('memory-status'),
       memoryEmpty: document.getElementById('memory-empty'),
       memoryList: document.getElementById('memory-list'),
@@ -480,6 +493,7 @@
     showExportStatus = makeStatusShower(elements.exportStatus);
     showClearStatus = makeStatusShower(elements.clearStatus);
     showTelemetryStatus = makeStatusShower(elements.telemetryStatus);
+    showSkinStatus = makeStatusShower(elements.skinStatus);
   }
 
   /* ---------------- T-19：窗口行为开关与提示（ADR-022 冻结契约） ---------------- */
@@ -608,6 +622,9 @@
     elements.settingsBack.addEventListener('click', showChatView);
     elements.memoryManageBtn.addEventListener('click', openMemoryView);
     elements.memoryBack.addEventListener('click', closeMemoryView);
+    elements.skinManageBtn.addEventListener('click', openSkinView);
+    elements.skinBack.addEventListener('click', closeSkinView);
+    elements.skinImportBtn.addEventListener('click', () => void handleSkinImport());
     elements.settingsSave.addEventListener('click', saveSettings);
     elements.exportMdBtn.addEventListener('click', () => void exportConversation('markdown'));
     elements.exportJsonBtn.addEventListener('click', () => void exportConversation('json'));
@@ -1933,12 +1950,14 @@
     elements.settingsView.hidden = false;
     elements.settingsHome.hidden = false;
     elements.memoryPage.hidden = true;
+    elements.skinPage.hidden = true;
     elements.settingsBack.focus();
   }
 
   function showChatView() {
     elements.settingsView.hidden = true;
     elements.memoryPage.hidden = true;
+    elements.skinPage.hidden = true;
     elements.settingsHome.hidden = false;
     elements.chatView.hidden = false;
     elements.chatInput.focus();
@@ -2174,6 +2193,314 @@
     }, 4000);
   }
 
+  /* ---------------- T-43：皮肤与配件（设置页子页 + 标题栏角色形象） ---------------- */
+
+  function hasSkinApi() {
+    return Boolean(
+      window.petAPI &&
+        window.petAPI.skin &&
+        typeof window.petAPI.skin.list === 'function' &&
+        typeof window.petAPI.skin.apply === 'function'
+    );
+  }
+
+  function appliedSkinId() {
+    return currentSettings && typeof currentSettings.skinId === 'string'
+      ? currentSettings.skinId
+      : 'default';
+  }
+
+  /** 启动时加载皮肤列表并同步标题栏角色形象（petAPI 缺失时静默跳过） */
+  async function initSkins() {
+    if (!hasSkinApi()) {
+      return;
+    }
+    await refreshSkins();
+  }
+
+  /** 刷新皮肤列表缓存；皮肤页打开时重绘列表，并同步标题栏角色形象 */
+  async function refreshSkins() {
+    if (!hasSkinApi()) {
+      return;
+    }
+    try {
+      const result = await window.petAPI.skin.list();
+      if (result && result.ok && Array.isArray(result.skins)) {
+        skinItems = result.skins;
+        const appliedId =
+          result.appliedId && typeof result.appliedId === 'string'
+            ? result.appliedId
+            : 'default';
+        currentSettings = { ...currentSettings, skinId: appliedId };
+      }
+    } catch (error) {
+      console.warn('加载皮肤列表失败：', error);
+    }
+    updatePetAvatar();
+    if (elements.skinPage && !elements.skinPage.hidden) {
+      renderSkinList();
+    }
+  }
+
+  function openSkinView() {
+    elements.settingsHome.hidden = true;
+    elements.memoryPage.hidden = true;
+    elements.skinPage.hidden = false;
+    elements.skinBack.focus();
+    void refreshSkins();
+  }
+
+  function closeSkinView() {
+    elements.skinPage.hidden = true;
+    elements.settingsHome.hidden = false;
+    elements.settingsBack.focus();
+  }
+
+  /** 标题栏角色形象：按 settings.skinId 取 roleAssets.idle（data URL） */
+  function updatePetAvatar() {
+    if (!elements.petAvatar) {
+      return;
+    }
+    const id = appliedSkinId();
+    const skin =
+      skinItems.find((item) => item.id === id) ||
+      skinItems.find((item) => item.id === 'default');
+    const asset = skin && skin.roleAssets && skin.roleAssets.idle;
+    if (asset) {
+      elements.petAvatar.src = asset;
+      elements.petAvatar.alt = skin.name || '';
+      elements.petAvatar.hidden = false;
+    } else {
+      elements.petAvatar.removeAttribute('src');
+      elements.petAvatar.hidden = true;
+    }
+  }
+
+  function renderSkinList() {
+    const t = window.PetLocales.createTranslator(currentLocale);
+    elements.skinList.textContent = '';
+    if (skinItems.length === 0) {
+      const empty = document.createElement('p');
+      empty.className = 'skin-empty';
+      empty.textContent = t('skin.empty');
+      elements.skinList.appendChild(empty);
+      return;
+    }
+    const id = appliedSkinId();
+    for (const skin of skinItems) {
+      const isApplied = skin.id === id;
+      const card = document.createElement('div');
+      card.className = 'skin-card';
+      card.dataset.id = skin.id;
+      if (isApplied) {
+        card.classList.add('is-applied');
+      }
+
+      const preview = document.createElement('div');
+      preview.className = 'skin-preview';
+      if (skin.previewDataUrl) {
+        const img = document.createElement('img');
+        img.src = skin.previewDataUrl;
+        img.alt = skin.name || skin.id;
+        img.loading = 'lazy';
+        preview.appendChild(img);
+      } else {
+        const placeholder = document.createElement('span');
+        placeholder.className = 'skin-preview-empty';
+        placeholder.textContent = t('skin.noPreview');
+        preview.appendChild(placeholder);
+      }
+
+      const info = document.createElement('div');
+      info.className = 'skin-info';
+      const nameRow = document.createElement('div');
+      nameRow.className = 'skin-name-row';
+      const name = document.createElement('span');
+      name.className = 'skin-name';
+      name.textContent = skin.name || skin.id;
+      nameRow.appendChild(name);
+      if (isApplied) {
+        const badge = document.createElement('span');
+        badge.className = 'skin-badge';
+        badge.textContent = t('skin.applied');
+        nameRow.appendChild(badge);
+      }
+      const meta = document.createElement('div');
+      meta.className = 'skin-meta';
+      const tag = skin.builtin ? t('skin.builtin') : t('skin.installed');
+      meta.textContent = `${skin.version || '?'} · ${skin.author || '-'} · ${tag}`;
+
+      const actions = document.createElement('div');
+      actions.className = 'skin-card-actions';
+      const applyBtn = document.createElement('button');
+      applyBtn.type = 'button';
+      applyBtn.className = isApplied ? 'skin-btn' : 'skin-btn skin-btn-primary';
+      applyBtn.textContent = isApplied ? t('skin.applied') : t('skin.apply');
+      applyBtn.disabled = isApplied;
+      applyBtn.addEventListener('click', () => void applySkin(skin.id));
+      const exportBtn = document.createElement('button');
+      exportBtn.type = 'button';
+      exportBtn.className = 'skin-btn';
+      exportBtn.textContent = t('skin.export');
+      exportBtn.addEventListener('click', () => void exportSkin(skin.id));
+      actions.append(applyBtn, exportBtn);
+      if (!skin.builtin) {
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'skin-btn skin-btn-danger';
+        removeBtn.textContent = t('skin.remove');
+        removeBtn.addEventListener('click', () => void removeSkin(skin.id));
+        actions.appendChild(removeBtn);
+      }
+
+      info.append(nameRow, meta, actions);
+      card.append(preview, info);
+      elements.skinList.appendChild(card);
+    }
+  }
+
+  async function applySkin(id) {
+    const t = window.PetLocales.createTranslator(currentLocale);
+    const skin = skinItems.find((item) => item.id === id);
+    const displayName = (skin && skin.name) || id;
+    try {
+      const result = await window.petAPI.skin.apply({ id });
+      if (result && result.ok && result.settings) {
+        currentSettings = result.settings;
+        showSkinStatus(t('skin.applySuccess', { name: displayName }), 'ok');
+        await refreshSkins();
+      } else {
+        showSkinStatus(
+          t('skin.applyError', {
+            error: result && result.error ? result.error : 'unknown'
+          }),
+          'error'
+        );
+      }
+    } catch (error) {
+      showSkinStatus(
+        t('skin.applyError', { error: formatErrorMessage(error) }),
+        'error'
+      );
+    }
+  }
+
+  async function handleSkinImport() {
+    const t = window.PetLocales.createTranslator(currentLocale);
+    const api =
+      window.petAPI &&
+      window.petAPI.skin &&
+      typeof window.petAPI.skin.import === 'function'
+        ? window.petAPI.skin
+        : null;
+    if (!api) {
+      showSkinStatus(t('skin.unavailable'), 'error');
+      return;
+    }
+    elements.skinImportBtn.disabled = true;
+    try {
+      const result = await api.import({});
+      if (result && result.ok && result.skin) {
+        showSkinStatus(
+          t('skin.importSuccess', {
+            name: result.skin.name || result.skin.id
+          }),
+          'ok'
+        );
+        await refreshSkins();
+      } else if (result && result.error === 'cancelled') {
+        showSkinStatus(t('skin.importCancelled'), 'ok');
+      } else {
+        showSkinStatus(
+          t('skin.importError', {
+            error: result && result.error ? result.error : 'unknown'
+          }),
+          'error'
+        );
+      }
+    } catch (error) {
+      showSkinStatus(
+        t('skin.importError', { error: formatErrorMessage(error) }),
+        'error'
+      );
+    } finally {
+      elements.skinImportBtn.disabled = false;
+    }
+  }
+
+  async function exportSkin(id) {
+    const t = window.PetLocales.createTranslator(currentLocale);
+    const api =
+      window.petAPI &&
+      window.petAPI.skin &&
+      typeof window.petAPI.skin.export === 'function'
+        ? window.petAPI.skin
+        : null;
+    if (!api) {
+      showSkinStatus(t('skin.unavailable'), 'error');
+      return;
+    }
+    try {
+      const result = await api.export({ id });
+      if (result && result.ok && result.path) {
+        showSkinStatus(t('skin.exportSuccess', { path: result.path }), 'ok');
+      } else if (result && result.error === 'cancelled') {
+        showSkinStatus(t('skin.exportCancelled'), 'ok');
+      } else {
+        showSkinStatus(
+          t('skin.exportError', {
+            error: result && result.error ? result.error : 'unknown'
+          }),
+          'error'
+        );
+      }
+    } catch (error) {
+      showSkinStatus(
+        t('skin.exportError', { error: formatErrorMessage(error) }),
+        'error'
+      );
+    }
+  }
+
+  async function removeSkin(id) {
+    const t = window.PetLocales.createTranslator(currentLocale);
+    const skin = skinItems.find((item) => item.id === id);
+    const api =
+      window.petAPI &&
+      window.petAPI.skin &&
+      typeof window.petAPI.skin.remove === 'function'
+        ? window.petAPI.skin
+        : null;
+    if (!api) {
+      showSkinStatus(t('skin.unavailable'), 'error');
+      return;
+    }
+    try {
+      const result = await api.remove({ id });
+      if (result && result.ok) {
+        showSkinStatus(
+          t('skin.removeSuccess', {
+            name: (skin && skin.name) || id
+          }),
+          'ok'
+        );
+        await refreshSkins();
+      } else {
+        showSkinStatus(
+          t('skin.removeError', {
+            error: result && result.error ? result.error : 'unknown'
+          }),
+          'error'
+        );
+      }
+    } catch (error) {
+      showSkinStatus(
+        t('skin.removeError', { error: formatErrorMessage(error) }),
+        'error'
+      );
+    }
+  }
+
   /**
    * 启动时读取设置：优先 petAPI.settings.get（主进程 settings.json）；
    * petAPI 缺失时降级读取 localStorage（仅此路径，ADR-013）。
@@ -2304,6 +2631,10 @@
     elements.personaBackstory.value =
       typeof persona.backstory === 'string' ? persona.backstory : '';
     renderPersonaTemplates(); // T-20：刷新设置页模板选中态
+    updatePetAvatar(); // T-43：皮肤 id 变化时同步标题栏角色形象
+    if (elements.skinPage && !elements.skinPage.hidden) {
+      renderSkinList(); // T-43：语言切换时重绘皮肤列表动态文案
+    }
 
     applyStaticText();
     updatePomodoroControls(); // T-21：applyStaticText 会重置按钮静态文案，需按状态覆盖
@@ -3022,6 +3353,7 @@
   let showExportStatus = () => {};
   let showClearStatus = () => {};
   let showTelemetryStatus = () => {};
+  let showSkinStatus = () => {}; // T-43
 
   window.ChatUI = {
     init,
@@ -3029,6 +3361,9 @@
     startPomodoro, // T-21：可传分钟数覆盖（测试/快捷入口）
     resetPomodoro,
     stopPomodoro,
-    getPomodoroState
+    getPomodoroState,
+    refreshSkins, // T-43：皮肤列表刷新（测试/手动入口）
+    getSkinItems: () => skinItems, // T-43
+    applySkin // T-43
   };
 })();

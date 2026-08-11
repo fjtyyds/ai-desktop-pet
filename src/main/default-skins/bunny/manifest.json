@@ -1,0 +1,10 @@
+{
+  "id": "bunny",
+  "name": "云朵粉 Cloud Bunny",
+  "author": "AI 桌宠内置",
+  "version": "1.0.0",
+  "preview": "preview.png",
+  "roleAssets": {
+    "idle": "assets/idle.png"
+  }
+}

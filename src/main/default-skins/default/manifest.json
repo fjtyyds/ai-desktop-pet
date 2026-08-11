@@ -1,0 +1,10 @@
+{
+  "id": "default",
+  "name": "经典蓝 Classic Blue",
+  "author": "AI 桌宠内置",
+  "version": "1.0.0",
+  "preview": "preview.png",
+  "roleAssets": {
+    "idle": "assets/idle.png"
+  }
+}

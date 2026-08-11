@@ -32,6 +32,10 @@ const PERSONA_TEMPLATE_ID_MAX_LENGTH = 40;
 /** TTS 语音包设置（T-33）：语音包 id ≤ 40 字符，空值表示自动跟随当前 personaTemplate */
 const TTS_VOICE_PACK_ID_MAX_LENGTH = 40;
 
+/** 皮肤 id 清洗上限（T-43）：≤ 64 字符，默认 default（内置经典皮肤） */
+const SKIN_ID_MAX_LENGTH = 64;
+const DEFAULT_SKIN_ID = 'default';
+
 /** 天气城市名清洗上限（T-22） */
 const WEATHER_CITY_MAX_LENGTH = 64;
 /** 番茄钟设置（T-21）：默认 25 分钟，允许 1~120 分钟 */
@@ -71,6 +75,7 @@ const DEFAULT_SETTINGS = {
   pomodoroNotifyAt: 0, // T-21/T-27：渲染层→主进程一次性完成信号（时间戳；主进程消费后清零）
   pomodoroNotifyMinutes: 0, // T-21/T-27：信号携带的时长（分钟；0=未设置；随信号一同清零）
   telemetryEnabled: false, // T-42：匿名遥测开关（opt-in，默认关闭）
+  skinId: DEFAULT_SKIN_ID, // T-43：当前启用皮肤 id（≤64；default=内置经典皮肤）
   persona: { ...DEFAULT_PERSONA }
 };
 
@@ -303,6 +308,11 @@ function createStore(baseDir) {
       DEFAULT_SETTINGS.ttsVoicePackId,
       TTS_VOICE_PACK_ID_MAX_LENGTH
     );
+    merged.skinId = sanitizeText(
+      merged.skinId,
+      DEFAULT_SETTINGS.skinId,
+      SKIN_ID_MAX_LENGTH
+    );
     merged.windowBounds = sanitizeWindowBounds(
       merged.windowBounds,
       DEFAULT_SETTINGS.windowBounds
@@ -339,6 +349,7 @@ function createStore(baseDir) {
       'personaTemplate',
       'ttsVoicePackEnabled',
       'ttsVoicePackId',
+      'skinId',
       'weatherEnabled',
       'weatherCity',
       'pomodoroEnabled',
@@ -413,6 +424,14 @@ function createStore(baseDir) {
             patch.ttsVoicePackId,
             current.ttsVoicePackId,
             TTS_VOICE_PACK_ID_MAX_LENGTH
+          );
+          continue;
+        }
+        if (key === 'skinId') {
+          next.skinId = sanitizeText(
+            patch.skinId,
+            current.skinId,
+            SKIN_ID_MAX_LENGTH
           );
           continue;
         }
