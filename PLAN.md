@@ -216,6 +216,8 @@
 - 2026-08-11：T-45 官网落地页与分享传播验收合并（c2d89b8 merge）：对话卡片生成/保存/复制（脱敏+PNG 校验）、website/ 静态站、社媒素材包；chat.js 导出区冲突按功能共存解决；check/smoke 全绿。
 - 2026-08-11：T-44 UI 大改 M3.6 验收合并（c6adbe5 merge）：深色玻璃拟态+浅色主题持久化、角色微动画（呼吸/眨眼/情绪联动）、效率小组件（专注统计/喝水提醒/待办）、减弱动效、无障碍断言；main 工作区 T-45 残留改动已 stash 保护并与合并结果核对一致；check/smoke 全绿。
 - 2026-08-11：T-46 商店发布准备与云同步评估验收合并（74e8a30 fast-forward）：Steam/MS Store 素材包与提审待办、签名评估（OV/EV/Azure，只报告不采购）、本地 Release 演练脚本（latest.yml 一致性 PASS、零远程副作用）、云同步评估与 ADR-035 草案（v1.0 不实施）；check/smoke 全绿；M4.5 商业化任务全部完成，进入 v1.0 发布准备（发布/商店/资金事项待用户确认）。
+- 2026-08-11：v0.1.0 GitHub Release 已发布（用户授权自动执行）：main 推送 + tag v0.1.0 → CI check/smoke/dist/release 全绿，exe/blockmap/latest.yml 资产上线；自动更新源首次生效，真实更新链路待 v0.1.1/v1.0 验证。
+- 2026-08-11：T-47（MSIX 打包与商店沙箱技术验证）已建卡并派发（codex/m4-msix），执行中。
 
 ## Surprises & Discoveries
 

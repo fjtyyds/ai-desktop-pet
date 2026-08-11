@@ -1,11 +1,11 @@
 # 项目状态
 
 - 更新时间：2026-08-11
-- 当前阶段：商业化上线方案 T-40~T-46 已全部验收合并；进入 v1.0（2026-09-01）发布准备
-- 当前任务：等待用户确认发布事项（GitHub Release push/tag、商店注册与预算、MSIX 技术验证）
-- 最近完成：T-41 支付沙箱（16753c2）、T-45 分享+官网+社媒（c2d89b8）、T-44 UI 大改 M3.6（c6adbe5）、T-46 商店发布准备（74e8a30）验收合并
-- 下一步：v1.0 发布准备：Release 演练已通过；商店/签名/资金事项待用户确认后实施
-- 阻塞：P2 签名/商店预算、Steam $100/商店账号、MSIX 技术验证、归档目录物理删除、TTS 听感复核、T-44 UI 目检均待用户决策/确认
+- 当前阶段：v0.1.0 GitHub Release 已发布；T-47（MSIX 技术验证）执行中；v1.0（2026-09-01）发布准备
+- 当前任务：验收 T-47；商店注册与预算、签名采购待用户提供资质/确认
+- 最近完成：T-41~T-46 验收合并；v0.1.0 Release（GitHub，exe+blockmap+latest.yml，CI 全绿）
+- 下一步：T-47 验收后进入 v1.0 发布；真实自动更新链路需 v0.1.1/v1.0 发布后验证
+- 阻塞：商店注册与预算（Steam $100/MS Store/Azure）、签名采购、归档目录物理删除、TTS 听感复核、T-44 UI 目检均待用户决策/确认
 - 交接提示：新会话先读 `AGENTS.md` → `PLAN.md` → `docs/STATUS.md` → `docs/reports/2026-08-10-工作对接方案.md` → 自己的任务卡（docs/tasks/T-xx.md）
 
 ## M1 集成完成记录（2026-08-09）
@@ -253,3 +253,10 @@
 - 验证：worker 与协调者 check/smoke 全绿；Release 演练（完整构建 + -SkipBuild）PASS；合并后 main 复跑全绿。
 - 说明：首次派发线程（019fee79）开工 27 秒后被中断并归档（反馈收集跳过归档线程），已用新线程重新派发完成；本卡为重新派发的产物。
 - 遗留：v1.0 发布（push/tag/Release）、商店注册与预算、MSIX 技术验证、签名采购需用户确认后实施；云同步按 ADR-035 草案 v1.0 不实施。
+
+## v0.1.0 Release 记录（2026-08-11）
+
+- 用户授权“自动执行”发布后：main 推送（fc8a036..935dbb3）→ 创建并推送 tag v0.1.0 → CI（check/smoke/dist/release）全绿。
+- Release：https://github.com/fjtyyds/ai-desktop-pet/releases/tag/v0.1.0（非草稿、非预发布），资产 ai-desktop-pet-0.1.0-Setup.exe（100,615,906 B）、blockmap（105,784 B）、latest.yml（357 B）。
+- 意义：自动更新源首次生效；真实更新下载/安装链路待 v0.1.1 或 v1.0 发布后端到端验证。
+- 遗留：SmartScreen 首次发布可能提示未知发布者（签名采购待确认）；商店渠道（Steam/MS Store）素材已就绪，注册与提审待用户资质与预算。
