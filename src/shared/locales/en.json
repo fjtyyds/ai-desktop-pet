@@ -66,7 +66,7 @@
     "complianceAccept": "I agree and continue",
     "complianceDecline": "I don't agree",
     "complianceRequired": "Please complete the age confirmation and content compliance statement first.",
-    "complianceRefusedNotice": "AI chat is disabled because you declined the compliance statement. Local memory, pomodoro, and weather remain available."
+    "complianceRefusedNotice": "AI chat is disabled because you declined the compliance statement. Local memory and weather remain available."
   },
   "payment": {
     "plansTitle": "Sandbox payment (no real gateway connected)",
@@ -84,18 +84,6 @@
     "callbackFailed": "Simulated callback failed: {error}",
     "unavailable": "Payment API unavailable (sandbox/stub mode).",
     "invalidTier": "Invalid purchase tier."
-  },
-  "pomodoro": {
-    "title": "Pomodoro",
-    "start": "Start",
-    "pause": "Pause",
-    "resume": "Resume",
-    "reset": "Reset",
-    "stop": "Stop",
-    "finished": "Time's up! Take a break 🍅",
-    "remainingAria": "{time} remaining",
-    "notificationTitle": "Pomodoro finished",
-    "notificationBody": "Your {minutes}-minute focus session is done. Take a break!"
   },
   "window": {
     "close": "Close",
@@ -147,10 +135,6 @@
     "ttsVoicePack": "Voice pack",
     "ttsVoicePackAuto": "Follow personality automatically",
     "ttsVoicePackHint": "Leave empty to switch automatically with the active personality template, or pick one fixed voice pack.",
-    "pomodoroEnabled": "Pomodoro reminder",
-    "pomodoroEnabledHint": "Show a system notification when the timer ends; when off, only the in-panel timer is shown.",
-    "pomodoroMinutes": "Pomodoro length (minutes)",
-    "pomodoroMinutesHint": "1–120 minutes, applied after saving.",
     "telemetryEnabled": "Anonymous telemetry",
     "telemetryEnabledHint": "Helps improve the product using aggregate stats only (counts/durations/tiers). Never includes chat content, keys, or file paths.",
     "telemetryPrivacy": "Off by default and can be turned off anytime. \"Turn off & clear\" deletes the local telemetry data immediately. The upload endpoint is empty by default, so nothing is ever uploaded unless configured.",

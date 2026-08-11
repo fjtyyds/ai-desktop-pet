@@ -199,39 +199,6 @@
           <span id="mood-face" class="mood-face" aria-hidden="true">🙂</span>
           <span id="mood-label" class="mood-label">平静</span>
         </div>
-        <!-- T-21：番茄钟小部件（系统状态小部件已按 T-30 移除） -->
-          <div id="pomodoro-widget" class="widget-card">
-            <div class="pomodoro-head">
-              <span class="widget-title" data-i18n="pomodoro.title">番茄钟</span>
-              <div
-                id="pomodoro-time"
-                class="pomodoro-time"
-                role="timer"
-                aria-live="polite"
-              >25:00</div>
-            </div>
-            <div class="pomodoro-controls">
-              <button
-                id="pomodoro-start"
-                class="secondary-btn"
-                type="button"
-                data-i18n="pomodoro.start"
-              >开始</button>
-              <button
-                id="pomodoro-reset"
-                class="secondary-btn"
-                type="button"
-                data-i18n="pomodoro.reset"
-              >重置</button>
-              <button
-                id="pomodoro-stop"
-                class="secondary-btn"
-                type="button"
-                data-i18n="pomodoro.stop"
-              >停止</button>
-            </div>
-            <p id="pomodoro-status" class="widget-status" role="status" hidden></p>
-          </div>
         <!-- T-44：效率小组件增强（专注统计/待办受 Pro 门控，喝水提醒常驻可开关） -->
         <div
           id="focus-widget"
@@ -348,133 +315,144 @@
             <h2 class="settings-title" data-i18n="settings.title">设置</h2>
           </div>
           <div class="settings-body">
-            <!-- T-48：顶部账号卡片（复用 account-section 全部元素，卡片视觉 + 升级/激活入口） -->
-            <div id="account-section" class="account-section account-card">
-              <div class="account-card-head">
-                <span class="field-label account-card-title" data-i18n="license.accountTitle"
+            <!-- T-50：账户与订阅作为第一组（与其他设置分组同结构，全部 license/payment id 保留） -->
+            <div class="settings-groups" id="settings-groups">
+            <section class="settings-group" id="account-section">
+              <button
+                type="button"
+                class="settings-group-toggle"
+                id="settings-group-toggle-account"
+                aria-expanded="false"
+                aria-controls="settings-group-panel-account"
+                data-i18n-title="settings.groupExpandHint"
+              >
+                <span class="settings-group-icon" aria-hidden="true">👤</span>
+                <span class="settings-group-name" data-i18n="license.accountTitle"
                   >账户与订阅</span
                 >
+                <span class="settings-group-arrow" aria-hidden="true">›</span>
+              </button>
+              <div class="settings-group-panel" id="settings-group-panel-account" hidden>
                 <button
                   id="account-upgrade-btn"
                   class="primary-btn account-upgrade-btn"
                   type="button"
                   data-i18n="settings.upgradeActivate"
                 >升级 / 激活</button>
+                <div class="license-row">
+                  <span class="field-hint" data-i18n="license.tierLabel">当前版本</span>
+                  <span id="license-tier" class="license-value">免费版</span>
+                </div>
+                <div class="license-row" id="license-status-row" hidden>
+                  <span class="field-hint" data-i18n="license.statusLabel">状态</span>
+                  <span id="license-status" class="license-value"></span>
+                </div>
+                <div class="license-row" id="license-expiry-row" hidden>
+                  <span class="field-hint" data-i18n="license.expiryLabel">有效期至</span>
+                  <span id="license-expiry" class="license-value"></span>
+                </div>
+                <p id="license-quota" class="license-quota" role="status"></p>
+                <div id="license-pro-features" class="license-pro-features">
+                  <span class="field-label" data-i18n="license.proFeaturesTitle"
+                    >Pro 专属功能</span
+                  >
+                  <span
+                    id="license-feature-neural"
+                    class="license-feature"
+                    data-i18n="license.featureNeuralVoice"
+                  >高级神经语音音色</span>
+                  <span
+                    id="license-feature-skin"
+                    class="license-feature"
+                    data-i18n="license.featureSkinMarket"
+                  >皮肤市场</span>
+                  <span
+                    id="license-feature-focus"
+                    class="license-feature"
+                    data-i18n="license.featureFocusStats"
+                  >专注统计</span>
+                  <span
+                    id="license-feature-todo"
+                    class="license-feature"
+                    data-i18n="license.featureTodos"
+                  >待办事项</span>
+                </div>
+                <!-- T-41：沙箱支付（价格来自商业化方案 §7.1；仅模拟，不产生真实扣款） -->
+                <div id="payment-plans" class="payment-plans">
+                  <span class="field-label" data-i18n="payment.plansTitle"
+                    >沙箱支付（未接入真实网关）</span
+                  >
+                  <div class="payment-plan" data-tier="yearly">
+                    <span
+                      class="payment-plan-name"
+                      data-i18n="payment.planYearly"
+                    >Pro 订阅</span>
+                    <span
+                      class="payment-plan-price"
+                      data-i18n="payment.priceYearly"
+                    >¥128/年</span>
+                    <button
+                      id="payment-buy-yearly"
+                      class="payment-buy-btn primary-btn"
+                      type="button"
+                      data-i18n="payment.sandboxBuy"
+                    >沙箱购买</button>
+                  </div>
+                  <div class="payment-plan" data-tier="lifetime">
+                    <span
+                      class="payment-plan-name"
+                      data-i18n="payment.planLifetime"
+                    >永久买断</span>
+                    <span
+                      class="payment-plan-price"
+                      data-i18n="payment.priceLifetime"
+                    >¥68</span>
+                    <button
+                      id="payment-buy-lifetime"
+                      class="payment-buy-btn primary-btn"
+                      type="button"
+                      data-i18n="payment.sandboxBuy"
+                    >沙箱购买</button>
+                  </div>
+                  <p class="payment-notice" data-i18n="payment.sandboxNotice"
+                    >仅模拟支付流程，不产生真实扣款，也不会发送任何网络请求。</p
+                  >
+                  <p id="payment-message" class="settings-status" role="status" hidden></p>
+                </div>
+                <label class="field">
+                  <span class="field-label" data-i18n="license.activateLabel"
+                    >激活码 / 订单号</span
+                  >
+                  <input
+                    id="license-code"
+                    class="field-input"
+                    type="text"
+                    maxlength="128"
+                    autocomplete="off"
+                    spellcheck="false"
+                    placeholder="PRO-YEARLY-… / PRO-LIFETIME-… / ORDER-…"
+                    data-i18n-placeholder="license.activatePlaceholder"
+                  />
+                </label>
+                <div class="license-actions">
+                  <button
+                    id="license-activate"
+                    class="primary-btn"
+                    type="button"
+                    data-i18n="license.activateButton"
+                  >激活</button>
+                  <button
+                    id="license-deactivate"
+                    class="secondary-btn"
+                    type="button"
+                    data-i18n="license.deactivateButton"
+                    hidden
+                  >注销激活</button>
+                </div>
+                <p id="license-message" class="settings-status" role="status" hidden></p>
               </div>
-            <div class="license-row">
-              <span class="field-hint" data-i18n="license.tierLabel">当前版本</span>
-              <span id="license-tier" class="license-value">免费版</span>
-            </div>
-            <div class="license-row" id="license-status-row" hidden>
-              <span class="field-hint" data-i18n="license.statusLabel">状态</span>
-              <span id="license-status" class="license-value"></span>
-            </div>
-            <div class="license-row" id="license-expiry-row" hidden>
-              <span class="field-hint" data-i18n="license.expiryLabel">有效期至</span>
-              <span id="license-expiry" class="license-value"></span>
-            </div>
-            <p id="license-quota" class="license-quota" role="status"></p>
-            <div id="license-pro-features" class="license-pro-features">
-              <span class="field-label" data-i18n="license.proFeaturesTitle"
-                >Pro 专属功能</span
-              >
-              <span
-                id="license-feature-neural"
-                class="license-feature"
-                data-i18n="license.featureNeuralVoice"
-              >高级神经语音音色</span>
-              <span
-                id="license-feature-skin"
-                class="license-feature"
-                data-i18n="license.featureSkinMarket"
-              >皮肤市场</span>
-              <span
-                id="license-feature-focus"
-                class="license-feature"
-                data-i18n="license.featureFocusStats"
-              >专注统计</span>
-              <span
-                id="license-feature-todo"
-                class="license-feature"
-                data-i18n="license.featureTodos"
-              >待办事项</span>
-            </div>
-            <!-- T-41：沙箱支付（价格来自商业化方案 §7.1；仅模拟，不产生真实扣款） -->
-            <div id="payment-plans" class="payment-plans">
-              <span class="field-label" data-i18n="payment.plansTitle"
-                >沙箱支付（未接入真实网关）</span
-              >
-              <div class="payment-plan" data-tier="yearly">
-                <span
-                  class="payment-plan-name"
-                  data-i18n="payment.planYearly"
-                >Pro 订阅</span>
-                <span
-                  class="payment-plan-price"
-                  data-i18n="payment.priceYearly"
-                >¥128/年</span>
-                <button
-                  id="payment-buy-yearly"
-                  class="payment-buy-btn primary-btn"
-                  type="button"
-                  data-i18n="payment.sandboxBuy"
-                >沙箱购买</button>
-              </div>
-              <div class="payment-plan" data-tier="lifetime">
-                <span
-                  class="payment-plan-name"
-                  data-i18n="payment.planLifetime"
-                >永久买断</span>
-                <span
-                  class="payment-plan-price"
-                  data-i18n="payment.priceLifetime"
-                >¥68</span>
-                <button
-                  id="payment-buy-lifetime"
-                  class="payment-buy-btn primary-btn"
-                  type="button"
-                  data-i18n="payment.sandboxBuy"
-                >沙箱购买</button>
-              </div>
-              <p class="payment-notice" data-i18n="payment.sandboxNotice"
-                >仅模拟支付流程，不产生真实扣款，也不会发送任何网络请求。</p
-              >
-              <p id="payment-message" class="settings-status" role="status" hidden></p>
-            </div>
-            <label class="field">
-              <span class="field-label" data-i18n="license.activateLabel"
-                >激活码 / 订单号</span
-              >
-              <input
-                id="license-code"
-                class="field-input"
-                type="text"
-                maxlength="128"
-                autocomplete="off"
-                spellcheck="false"
-                placeholder="PRO-YEARLY-… / PRO-LIFETIME-… / ORDER-…"
-                data-i18n-placeholder="license.activatePlaceholder"
-              />
-            </label>
-            <div class="license-actions">
-              <button
-                id="license-activate"
-                class="primary-btn"
-                type="button"
-                data-i18n="license.activateButton"
-              >激活</button>
-              <button
-                id="license-deactivate"
-                class="secondary-btn"
-                type="button"
-                data-i18n="license.deactivateButton"
-                hidden
-              >注销激活</button>
-            </div>
-            <p id="license-message" class="settings-status" role="status" hidden></p>
-          </div>
-          <!-- T-48：分组列表（图标 + 组名 + 展开箭头，点击展开/收起组内设置项） -->
-          <div class="settings-groups" id="settings-groups">
+            </section>
+
             <section class="settings-group" id="settings-group-appearance">
               <button
                 type="button"
@@ -731,32 +709,6 @@
                   />
                   <span class="field-hint" data-i18n="water.intervalHint"
                     >5–240 分钟，保存后生效。</span
-                  >
-                </label>
-                <label class="field field-switch">
-                  <span class="field-label" data-i18n="settings.pomodoroEnabled"
-                    >番茄钟提醒</span
-                  >
-                  <input id="pomodoro-enabled" class="field-checkbox" type="checkbox" />
-                  <span class="field-hint" data-i18n="settings.pomodoroEnabledHint"
-                    >计时结束时弹出系统通知；关闭后仅保留界面计时。</span
-                  >
-                </label>
-                <label class="field">
-                  <span class="field-label" data-i18n="settings.pomodoroMinutes"
-                    >番茄钟时长（分钟）</span
-                  >
-                  <input
-                    id="pomodoro-minutes"
-                    class="field-input"
-                    type="number"
-                    min="1"
-                    max="120"
-                    step="1"
-                    inputmode="numeric"
-                  />
-                  <span class="field-hint" data-i18n="settings.pomodoroMinutesHint"
-                    >1–120 分钟，保存后生效。</span
                   >
                 </label>
               </div>

@@ -370,16 +370,23 @@ for (const token of forbiddenMain) {
     fail(`main.js 仍包含已移除的系统状态代码：${token}`);
   }
 }
+if (!mainSource.includes('createIdleMonitor')) {
+  fail('main.js 缺少 idle 空闲互动能力（不应被误删）');
+}
 for (const token of [
-  'createIdleMonitor',
+  'POMODORO_POLL_MS',
+  'DEFAULT_POMODORO_MINUTES',
+  'pomodoroTimer',
+  'showPomodoroNotification',
   'consumePomodoroNotificationRequest',
-  'startPomodoroNotificationPolling'
+  'startPomodoroNotificationPolling',
+  'stopPomodoroNotificationPolling'
 ]) {
-  if (!mainSource.includes(token)) {
-    fail(`main.js 缺少保留能力：${token}`);
+  if (mainSource.includes(token)) {
+    fail(`main.js 仍包含已移除的番茄钟代码：${token}`);
   }
 }
-pass('main.js 系统状态轮询已移除，idle/番茄钟保留');
+pass('main.js 系统状态轮询与番茄钟通知轮询已移除，idle 保留');
 
 const forbiddenIndex = [
   'widgets-panel',
@@ -397,10 +404,18 @@ for (const token of forbiddenIndex) {
     fail(`index.html 仍包含系统状态小部件标记：${token}`);
   }
 }
-if (!rendererIndexSource.includes('pomodoro-widget')) {
-  fail('index.html 缺少番茄钟小部件（不应被误删）');
+for (const token of [
+  'pomodoro-widget',
+  'pomodoro-enabled',
+  'pomodoro-minutes',
+  'pomodoro-time',
+  'pomodoro-start'
+]) {
+  if (rendererIndexSource.includes(token)) {
+    fail(`index.html 仍包含番茄钟标记：${token}`);
+  }
 }
-pass('index.html 系统状态小部件与设置入口已移除，番茄钟保留');
+pass('index.html 系统状态小部件与番茄钟（面板/设置项）已移除');
 
 const forbiddenRenderer = [
   'applySystemStatus',
@@ -943,12 +958,14 @@ for (const eventName of [
   'chat_sent',
   'chat_reply',
   'license_state_change',
-  'pomodoro_complete',
   'weather_refresh'
 ]) {
   if (!telemetrySource.includes(`'${eventName}'`)) {
     fail(`telemetry 事件白名单缺少 ${eventName}`);
   }
+}
+if (telemetrySource.includes('pomodoro_complete')) {
+  fail('telemetry.js 仍包含已移除的 pomodoro_complete 事件');
 }
 if (!telemetrySource.includes('crypto.randomUUID')) {
   fail('telemetry deviceId 应使用随机 UUID 生成');
@@ -961,12 +978,14 @@ if (!ipcSource.includes("telemetryGetStatus: 'telemetry:get-status'") ||
 for (const hook of [
   "track('chat_sent'",
   "track('chat_reply'",
-  "track('pomodoro_complete'",
   "track('weather_refresh'"
 ]) {
   if (!ipcSource.includes(hook)) {
     fail(`ipc.js 缺少事件接线 ${hook}`);
   }
+}
+if (ipcSource.includes("track('pomodoro_complete'")) {
+  fail('ipc.js 仍包含已移除的 pomodoro_complete 事件接线');
 }
 if (!preloadSource.includes('telemetry:get-status') ||
     !preloadSource.includes('telemetry:set-enabled') ||
@@ -1357,41 +1376,31 @@ try {
   }
   pass('store apiKey/model 读写与清洗通过');
 
-  // T-27：pomodoroNotifyAt 信号读写/清零语义 + 普通设置保存不回写陈旧信号
-  const signalAt = 1234567890123;
-  const withSignal = store.writeSettings({
-    pomodoroNotifyAt: signalAt,
-    pomodoroNotifyMinutes: 25
-  });
-  if (
-    withSignal.pomodoroNotifyAt !== signalAt ||
-    withSignal.pomodoroNotifyMinutes !== 25
-  ) {
-    fail('pomodoroNotifyAt 信号写入失败');
+  // T-50：存量 pomodoro 设置字段兼容清理（不迁移、不暴露；ADR-038）
+  const legacyPomodoroRaw = JSON.parse(
+    fs.readFileSync(path.join(checkDir, 'settings.json'), 'utf8')
+  );
+  legacyPomodoroRaw.pomodoroEnabled = true;
+  legacyPomodoroRaw.pomodoroMinutes = 25;
+  legacyPomodoroRaw.pomodoroNotifyAt = 1234567890123;
+  legacyPomodoroRaw.pomodoroNotifyMinutes = 25;
+  fs.writeFileSync(
+    path.join(checkDir, 'settings.json'),
+    JSON.stringify(legacyPomodoroRaw, null, 2),
+    'utf8'
+  );
+  const legacyPomodoroRead = store.readSettings();
+  for (const key of [
+    'pomodoroEnabled',
+    'pomodoroMinutes',
+    'pomodoroNotifyAt',
+    'pomodoroNotifyMinutes'
+  ]) {
+    if (Object.prototype.hasOwnProperty.call(legacyPomodoroRead, key)) {
+      fail(`store 仍暴露已移除的 pomodoro 字段：${key}`);
+    }
   }
-  const normalSaveWithSignal = store.writeSettings({ petName: '信号保留测试' });
-  if (normalSaveWithSignal.pomodoroNotifyAt !== signalAt) {
-    fail('普通设置保存不应清除待消费信号');
-  }
-  const cleared = store.writeSettings({
-    pomodoroNotifyAt: 0,
-    pomodoroNotifyMinutes: 0
-  });
-  if (cleared.pomodoroNotifyAt !== 0 || cleared.pomodoroNotifyMinutes !== 0) {
-    fail('pomodoroNotifyAt 信号清零失败');
-  }
-  const normalSaveAfterClear = store.writeSettings({ petName: '清零后保存测试' });
-  if (
-    normalSaveAfterClear.pomodoroNotifyAt !== 0 ||
-    normalSaveAfterClear.pomodoroNotifyMinutes !== 0
-  ) {
-    fail('普通设置保存回写了已消费的陈旧信号');
-  }
-  const rereadSignal = store.readSettings();
-  if (rereadSignal.pomodoroNotifyAt !== 0) {
-    fail('pomodoroNotifyAt 信号清理后读取不一致');
-  }
-  pass('store pomodoro 信号读写与清理语义通过');
+  pass('store pomodoro 字段已移除（存量字段兼容清理，不迁移/不暴露）');
 
   // T-29：旧 shortcutEnabled 设置字段兼容忽略/清理（不报错、不再暴露）
   const legacySettingsPath = path.join(checkDir, 'settings.json');
@@ -1615,7 +1624,7 @@ for (const token of [
     fail(`renderer/index.html 缺少许可证/合规元素：${token}`);
   }
 }
-for (const token of ['.account-section', '.license-pro-features', '.compliance-view']) {
+for (const token of ['.license-row', '.license-pro-features', '.compliance-view']) {
   if (!rendererChatCssSource.includes(token)) {
     fail(`chat.css 缺少许可证/合规样式：${token}`);
   }
@@ -1997,10 +2006,12 @@ try {
         initial.entitlements.todos !== false ||
         initial.entitlements.byokChat !== true ||
         initial.entitlements.localMemory !== true ||
-        initial.entitlements.pomodoro !== true ||
         initial.entitlements.weather !== true
       ) {
         fail('默认许可证应为 free/inactive，Pro 门控锁定、本地功能保留');
+      }
+      if (initial.entitlements.pomodoro !== undefined) {
+        fail('license entitlements 不应再包含 pomodoro');
       }
       if (initial.quota.limit !== 10 || initial.quota.period !== 'day') {
         fail('免费版云 AI 额度默认应为 10 次/日');
@@ -2384,8 +2395,6 @@ const t48RequiredIds = [
   'id="weather-city"',
   'id="water-enabled"',
   'id="water-interval"',
-  'id="pomodoro-enabled"',
-  'id="pomodoro-minutes"',
   'id="telemetry-enabled"',
   'id="telemetry-clear"',
   'id="pet-name"',
@@ -2401,7 +2410,9 @@ const t48RequiredIds = [
   'id="settings-status"',
   'id="clear-scope"',
   'id="clear-data"',
-  'id="clear-status"'
+  'id="clear-status"',
+  'id="settings-group-toggle-account"',
+  'id="settings-group-panel-account"'
 ];
 for (const token of t48RequiredIds) {
   if (!rendererIndexSource.includes(token)) {
@@ -2411,6 +2422,7 @@ for (const token of t48RequiredIds) {
 for (const token of [
   'settings-group-toggle',
   'aria-controls="settings-group-panel-appearance"',
+  'aria-controls="settings-group-panel-account"',
   'aria-expanded="false"'
 ]) {
   if (!rendererIndexSource.includes(token)) {
@@ -2430,7 +2442,7 @@ for (const token of [
   }
 }
 for (const token of [
-  '.account-card',
+  '.account-upgrade-btn',
   '.settings-groups',
   '.settings-group-toggle',
   '.settings-group-panel',
@@ -2972,10 +2984,9 @@ pass('T-48 设置页三段式布局、既有元素 id 与双语文案断言通�
         version: '0.0.0-test',
         logger: { warn: () => {}, error: () => {} }
       });
-      online.track('pomodoro_complete', { minutes: 25 });
       online.track('chat_reply', { ok: 1, replyChars: 42, latencyMs: 321 });
       const onlineFlush = await online.flush();
-      if (!onlineFlush.ok || onlineFlush.sent !== 2) {
+      if (!onlineFlush.ok || onlineFlush.sent !== 1) {
         fail(`本地端点批量上报失败: ${JSON.stringify(onlineFlush)}`);
       }
       await new Promise((resolve) => setTimeout(resolve, 50));
@@ -2990,14 +3001,13 @@ pass('T-48 设置页三段式布局、既有元素 id 与双语文案断言通�
       ) {
         fail(`上报 batch.deviceId 应为 UUID（实际 ${JSON.stringify(batch)}）`);
       }
-      if (!Array.isArray(batch.events) || batch.events.length !== 2) {
-        fail('上报 batch.events 数量应为 2');
+      if (!Array.isArray(batch.events) || batch.events.length !== 1) {
+        fail('上报 batch.events 数量应为 1');
       }
       const allowedFieldKeys = new Set([
         'ok',
         'replyChars',
         'latencyMs',
-        'minutes',
         'state',
         'tier',
         'chars',

@@ -1265,15 +1265,6 @@ html.reduce-motion *::after {
   background: var(--t44-glass-bg-strong);
 }
 
-/* T-21：番茄钟小部件（系统状态小部件已按 T-30 移除） */
-#pomodoro-widget {
-  flex: 0 0 auto;
-  margin: 0 10px 6px;
-  padding: 5px 8px;
-  gap: 4px;
-  border-radius: 10px;
-}
-
 .widget-card {
   display: flex;
   flex-direction: column;
@@ -1410,38 +1401,6 @@ html.reduce-motion *::after {
   font-weight: 600;
   color: var(--t44-text-secondary);
   letter-spacing: 0.02em;
-}
-
-.pomodoro-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-#pomodoro-widget .widget-title {
-  font-size: 10px;
-}
-
-.pomodoro-time {
-  align-self: auto;
-  font-size: 16px;
-  font-weight: 700;
-  line-height: 1.2;
-  letter-spacing: 0.04em;
-  font-variant-numeric: tabular-nums;
-}
-
-.pomodoro-controls {
-  display: flex;
-  gap: 4px;
-}
-
-.pomodoro-controls .secondary-btn {
-  flex: 1;
-  min-width: 0;
-  padding: 4px 0;
-  font-size: 11px;
 }
 
 .widget-status {
@@ -1651,17 +1610,7 @@ html.reduce-motion *::after {
   }
 }
 
-/* T-40：设置页“账户/订阅”区块与许可证门控 */
-.account-section {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 12px;
-  border: 1px solid var(--t44-glass-border);
-  border-radius: 12px;
-  background: var(--t44-glass-bg);
-}
-
+/* T-40：设置页“账户/订阅”内容（位于 T-50 分组面板内）与许可证门控 */
 .license-row {
   display: flex;
   align-items: baseline;
@@ -1761,32 +1710,10 @@ html.reduce-motion *::after {
   opacity: 0.6;
 }
 
-/* T-48：设置页三段式——账号卡片 + 分组列表 + 版本页脚 */
-.account-card {
-  background: linear-gradient(
-    160deg,
-    rgba(255, 255, 255, 0.09),
-    rgba(255, 255, 255, 0.045)
-  );
-  border-color: var(--t44-glass-border-strong);
-}
-
-.account-card-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 2px;
-}
-
-.account-card-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--t44-text-primary);
-}
-
+/* T-50：账户与订阅并入分组后，“升级 / 激活”入口保留在面板内 */
 .account-upgrade-btn {
   flex: 0 0 auto;
+  align-self: flex-end;
   width: auto;
   padding: 6px 12px;
   font-size: 12px;

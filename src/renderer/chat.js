@@ -25,8 +25,6 @@
  * - T-26 天气自动刷新增强：自动刷新间隔 30→15 分钟、窗口恢复显示即刷新
  *   （受最小间隔保护）、界面清楚展示“上次更新”时间、失败保留缓存并显示错误、
  *   指数退避自动重试
- * - T-21 本地番茄钟：界面计时，完成时写入 settings 通知信号（pomodoroNotifyAt），
- *   由主进程轮询消费并弹系统通知（系统状态小部件已按 T-30 移除）
  * - T-25 工具栏：导出对话从设置页移入聊天工具栏（下拉菜单），新增最小化按钮
  *   （petAPI.window.minimize → IPC window:minimize，ADR-026 冻结契约）
  * - T-33 TTS 专属语音包（按人格）：6 套预设人格各配 voice/pitch/rate，朗读时按当前
@@ -62,8 +60,6 @@
   const WEATHER_MIN_REFRESH_GAP_MS = 30 * 1000; // T-26：自动/恢复刷新节流（手动刷新不受限）
   const WEATHER_RETRY_BASE_MS = 60 * 1000; // T-26：失败后首次自动重试间隔
   const WEATHER_RETRY_MAX_MS = 15 * 60 * 1000; // T-26：重试退避上限（不超过自动刷新间隔）
-  const DEFAULT_POMODORO_MINUTES = 25; // T-21：与 store.js 默认值一致
-  const POMODORO_TICK_MS = 250; // T-21：番茄钟刷新间隔
   const DEFAULT_THEME = 'dark'; // T-44：与 store.js DEFAULT_THEME 一致
   const WATER_CHECK_MS = 30 * 1000; // T-44：喝水提醒检查间隔
   const WATER_INTERVAL_DEFAULT = 60; // T-44：默认 60 分钟
@@ -379,15 +375,6 @@
   let weatherRetryTimer = null; // T-26：失败自动重试定时器
   // T-43：皮肤列表缓存（来自 petAPI.skin.list）
   let skinItems = [];
-  // T-21：番茄钟状态
-  let pomodoroStatusTimer = null;
-  let pomodoroState = {
-    mode: 'idle', // 'idle' | 'running' | 'paused' | 'finished'
-    durationMs: DEFAULT_POMODORO_MINUTES * 60 * 1000,
-    remainingMs: DEFAULT_POMODORO_MINUTES * 60 * 1000,
-    endsAt: 0,
-    timerId: null
-  };
   // T-44：主题/减弱动效/效率小组件状态
   let theme = DEFAULT_THEME;
   let reduceMotion = false;
@@ -511,13 +498,6 @@
       onboardingNext: document.getElementById('onboarding-next'),
       onboardingFinish: document.getElementById('onboarding-finish'),
       onboardingStatus: document.getElementById('onboarding-status'),
-      pomodoroTime: document.getElementById('pomodoro-time'),
-      pomodoroStart: document.getElementById('pomodoro-start'),
-      pomodoroReset: document.getElementById('pomodoro-reset'),
-      pomodoroStop: document.getElementById('pomodoro-stop'),
-      pomodoroStatus: document.getElementById('pomodoro-status'),
-      pomodoroEnabled: document.getElementById('pomodoro-enabled'),
-      pomodoroMinutes: document.getElementById('pomodoro-minutes'),
       telemetryEnabled: document.getElementById('telemetry-enabled'),
       telemetryClear: document.getElementById('telemetry-clear'),
       telemetryStatus: document.getElementById('telemetry-status'),
@@ -782,9 +762,6 @@
       showOnboardingStep(onboardingStep + 1)
     );
     elements.onboardingFinish.addEventListener('click', () => void finishOnboarding());
-    elements.pomodoroStart.addEventListener('click', () => startPomodoro());
-    elements.pomodoroReset.addEventListener('click', resetPomodoro);
-    elements.pomodoroStop.addEventListener('click', stopPomodoro);
     // T-44：主题/减弱动效即时生效并持久化
     elements.themeSelect.addEventListener('change', () => {
       theme = elements.themeSelect.value === 'light' ? 'light' : 'dark';
@@ -945,229 +922,6 @@
       const text = phrases[Math.floor(Math.random() * phrases.length)];
       appendMessage('assistant', text, 'message-idle');
     });
-  }
-
-  /* ---------------- T-21：本地番茄钟（计时 + 主进程 Notification） ---------------- */
-
-  function pomodoroMinutesFromSettings(settings) {
-    const numeric = Number(settings && settings.pomodoroMinutes);
-    return Number.isFinite(numeric) && numeric >= 1 && numeric <= 120
-      ? Math.round(numeric)
-      : DEFAULT_POMODORO_MINUTES;
-  }
-
-  function pomodoroDurationMs(settings) {
-    return pomodoroMinutesFromSettings(settings) * 60 * 1000;
-  }
-
-  function formatPomodoroTime(ms) {
-    const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-  }
-
-  function updatePomodoroDisplay() {
-    if (!elements.pomodoroTime) {
-      return;
-    }
-    const text = formatPomodoroTime(pomodoroState.remainingMs);
-    elements.pomodoroTime.textContent = text;
-    elements.pomodoroTime.setAttribute(
-      'aria-label',
-      window.PetLocales.createTranslator(currentLocale)('pomodoro.remainingAria', {
-        time: text
-      })
-    );
-  }
-
-  function updatePomodoroControls() {
-    if (!elements.pomodoroStart) {
-      return;
-    }
-    const t = window.PetLocales.createTranslator(currentLocale);
-    const label =
-      pomodoroState.mode === 'running'
-        ? t('pomodoro.pause')
-        : pomodoroState.mode === 'paused'
-          ? t('pomodoro.resume')
-          : t('pomodoro.start');
-    if (elements.pomodoroStart.textContent !== label) {
-      elements.pomodoroStart.textContent = label;
-      elements.pomodoroStart.setAttribute('aria-label', label);
-    }
-  }
-
-  function clearPomodoroTimer() {
-    if (pomodoroState.timerId != null) {
-      clearInterval(pomodoroState.timerId);
-      pomodoroState.timerId = null;
-    }
-  }
-
-  function showPomodoroStatus(text, type) {
-    if (!elements.pomodoroStatus) {
-      return;
-    }
-    elements.pomodoroStatus.textContent = text;
-    elements.pomodoroStatus.dataset.type = type || 'ok';
-    elements.pomodoroStatus.hidden = false;
-    clearTimeout(pomodoroStatusTimer);
-    pomodoroStatusTimer = setTimeout(() => {
-      if (elements.pomodoroStatus) {
-        elements.pomodoroStatus.hidden = true;
-      }
-    }, 6000);
-  }
-
-  function hidePomodoroStatus() {
-    clearTimeout(pomodoroStatusTimer);
-    if (elements.pomodoroStatus) {
-      elements.pomodoroStatus.hidden = true;
-    }
-  }
-
-  function resetPomodoro() {
-    clearPomodoroTimer();
-    pomodoroState.mode = 'idle';
-    pomodoroState.remainingMs = pomodoroState.durationMs;
-    pomodoroState.endsAt = 0;
-    hidePomodoroStatus();
-    updatePomodoroDisplay();
-    updatePomodoroControls();
-  }
-
-  /** 停止并复位到初始状态（“可关闭”语义之一） */
-  function stopPomodoro() {
-    resetPomodoro();
-  }
-
-  function tickPomodoro() {
-    const remaining = pomodoroState.endsAt - Date.now();
-    if (remaining <= 0) {
-      finishPomodoro();
-      return;
-    }
-    pomodoroState.remainingMs = remaining;
-    updatePomodoroDisplay();
-  }
-
-  /**
-   * 开始/暂停/继续番茄钟。minutesOverride 仅供测试与快捷入口使用；
-   * 正常运行使用设置中的 pomodoroMinutes。
-   */
-  function startPomodoro(minutesOverride) {
-    pokeActivity();
-    if (pomodoroState.mode === 'running') {
-      pausePomodoro();
-      return;
-    }
-    if (pomodoroState.mode === 'paused') {
-      resumePomodoro();
-      return;
-    }
-    const override = Number(minutesOverride);
-    if (Number.isFinite(override) && override > 0) {
-      // 允许小数分钟（如 0.02 ≈ 1.2 秒）便于快捷入口与自动化验证；
-      // 正常运行时长来自设置中的整数分钟。
-      const minutes = Math.min(120, Math.max(1 / 60, override));
-      pomodoroState.durationMs = minutes * 60 * 1000;
-      pomodoroState.remainingMs = pomodoroState.durationMs;
-    } else {
-      pomodoroState.durationMs = pomodoroDurationMs(currentSettings);
-      pomodoroState.remainingMs = pomodoroState.durationMs;
-    }
-    hidePomodoroStatus();
-    pomodoroState.mode = 'running';
-    pomodoroState.endsAt = Date.now() + pomodoroState.remainingMs;
-    pomodoroState.timerId = setInterval(tickPomodoro, POMODORO_TICK_MS);
-    updatePomodoroDisplay();
-    updatePomodoroControls();
-  }
-
-  function pausePomodoro() {
-    if (pomodoroState.mode !== 'running') {
-      return;
-    }
-    pomodoroState.remainingMs = Math.max(0, pomodoroState.endsAt - Date.now());
-    clearPomodoroTimer();
-    pomodoroState.mode = 'paused';
-    pomodoroState.endsAt = 0;
-    updatePomodoroDisplay();
-    updatePomodoroControls();
-  }
-
-  function resumePomodoro() {
-    if (pomodoroState.mode !== 'paused') {
-      return;
-    }
-    pomodoroState.mode = 'running';
-    pomodoroState.endsAt = Date.now() + pomodoroState.remainingMs;
-    pomodoroState.timerId = setInterval(tickPomodoro, POMODORO_TICK_MS);
-    updatePomodoroControls();
-  }
-
-  /** 计时结束：界面提示 + 写入 settings 通知信号，由主进程弹系统通知 */
-  function finishPomodoro() {
-    if (pomodoroState.mode === 'finished') {
-      return; // T-27：同一轮倒计时的完成信号只处理一次（幂等）
-    }
-    clearPomodoroTimer();
-    pomodoroState.mode = 'finished';
-    pomodoroState.remainingMs = 0;
-    pomodoroState.endsAt = 0;
-    updatePomodoroDisplay();
-    updatePomodoroControls();
-    const t = window.PetLocales.createTranslator(currentLocale);
-    showPomodoroStatus(t('pomodoro.finished'), 'ok');
-    // T-44：今日专注统计累计（次数 +1、时长累加；Pro 门控仅影响展示，数据始终本地记录）
-    void recordFocusSession(pomodoroMinutesFromSettings(currentSettings));
-    if (currentSettings.pomodoroEnabled !== false) {
-      // T-27：一次性完成信号（pomodoroNotifyAt/pomodoroNotifyMinutes）由主进程
-      // 幂等消费并清零；普通 saveSettings 的 patch 不携带这两个字段，
-      // 避免把已消费的陈旧信号回写。
-      const settingsApi =
-        window.petAPI &&
-        window.petAPI.settings &&
-        typeof window.petAPI.settings.set === 'function';
-      if (settingsApi) {
-        try {
-          void window.petAPI.settings
-            .set({
-              pomodoroNotifyAt: Date.now(),
-              pomodoroNotifyMinutes: pomodoroMinutesFromSettings(currentSettings)
-            })
-            .catch((error) => {
-              console.warn('上报番茄钟完成信号失败：', error);
-            });
-        } catch (error) {
-          console.warn('上报番茄钟完成信号失败：', error);
-        }
-      }
-    }
-  }
-
-  /** 设置变化时同步番茄钟时长（运行中不打断当前倒计时） */
-  function applyPomodoroSettings(settings) {
-    const nextDuration = pomodoroDurationMs(settings);
-    pomodoroState.durationMs = nextDuration;
-    if (pomodoroState.mode === 'idle' || pomodoroState.mode === 'finished') {
-      pomodoroState.remainingMs = nextDuration;
-    }
-    updatePomodoroDisplay();
-    updatePomodoroControls();
-  }
-
-  function getPomodoroState() {
-    const remaining =
-      pomodoroState.mode === 'running'
-        ? Math.max(0, pomodoroState.endsAt - Date.now())
-        : pomodoroState.remainingMs;
-    return {
-      mode: pomodoroState.mode,
-      remainingMs: remaining,
-      durationMs: pomodoroState.durationMs
-    };
   }
 
   function hideToTray() {
@@ -3191,8 +2945,6 @@
           typeof saved.ttsVoicePackId === 'string' ? saved.ttsVoicePackId : '',
         weatherEnabled: saved.weatherEnabled === true,
         weatherCity: saved.weatherCity,
-        pomodoroEnabled: saved.pomodoroEnabled !== false,
-        pomodoroMinutes: Number(saved.pomodoroMinutes) || DEFAULT_POMODORO_MINUTES,
         telemetryEnabled: saved.telemetryEnabled === true,
         theme: saved.theme === 'light' ? 'light' : 'dark',
         reduceMotion: saved.reduceMotion === true,
@@ -3272,11 +3024,6 @@
       currentSettings.ttsVoicePackEnabled !== false;
     renderTtsVoicePackOptions(); // T-33：语音包选项与禁用态随设置/语言刷新
     applyWeatherSettings(currentSettings); // T-22：天气开关/城市输入 + 可见性 + 刷新
-    elements.pomodoroEnabled.checked = currentSettings.pomodoroEnabled !== false;
-    elements.pomodoroMinutes.value = String(
-      pomodoroMinutesFromSettings(currentSettings)
-    );
-    applyPomodoroSettings(currentSettings);
     elements.telemetryEnabled.checked = currentSettings.telemetryEnabled === true;
     // T-44：主题/减弱动效/喝水/待办/专注统计
     theme = currentSettings.theme === 'light' ? 'light' : 'dark';
@@ -3304,7 +3051,6 @@
     }
 
     applyStaticText();
-    updatePomodoroControls(); // T-21：applyStaticText 会重置按钮静态文案，需按状态覆盖
     applyWindowFeatureSettings(currentSettings); // T-19
     updateWindowFeatureText(); // T-19: 语言切换后刷新提示文案
     applyLicenseUi(); // T-40：许可证档位/门控/额度随设置与语言刷新
@@ -3359,8 +3105,6 @@
         ttsVoicePackId: elements.ttsVoicePackId.value.trim(),
         weatherEnabled: elements.weatherEnabled.checked,
         weatherCity: elements.weatherCity.value.trim(),
-        pomodoroEnabled: elements.pomodoroEnabled.checked,
-        pomodoroMinutes: Number(elements.pomodoroMinutes.value),
         telemetryEnabled: elements.telemetryEnabled.checked,
         theme,
         reduceMotion,
@@ -3376,8 +3120,6 @@
 
     elements.settingsSave.disabled = true;
     try {
-      // T-27：普通设置保存绝不携带 pomodoroNotifyAt/pomodoroNotifyMinutes，
-      // 完成信号只由 finishPomodoro 单独写入，防止回写已消费信号。
       const saved = await window.petAPI.settings.set({
         petName,
         apiKey,
@@ -3390,8 +3132,6 @@
         ttsVoicePackId: elements.ttsVoicePackId.value.trim(),
         weatherEnabled: elements.weatherEnabled.checked,
         weatherCity: elements.weatherCity.value.trim(),
-        pomodoroEnabled: elements.pomodoroEnabled.checked,
-        pomodoroMinutes: Number(elements.pomodoroMinutes.value),
         telemetryEnabled: elements.telemetryEnabled.checked,
         theme,
         reduceMotion,
@@ -4831,10 +4571,6 @@
   window.ChatUI = {
     init,
     applyMood,
-    startPomodoro, // T-21：可传分钟数覆盖（测试/快捷入口）
-    resetPomodoro,
-    stopPomodoro,
-    getPomodoroState,
     refreshSkins, // T-43：皮肤列表刷新（测试/手动入口）
     getSkinItems: () => skinItems, // T-43
     applySkin, // T-43

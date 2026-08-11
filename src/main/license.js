@@ -79,7 +79,7 @@ function toMonthKey(date) {
 /**
  * 按档位返回功能门控（effectiveTier 决定）：
  * - Pro 专属（yearly/lifetime）：高级神经语音、皮肤市场、专注统计、待办
- * - 所有档位保留：BYOK 对话、本地记忆、番茄钟、天气
+ * - 所有档位保留：BYOK 对话、本地记忆、天气
  */
 function entitlementsForTier(tier) {
   const effectiveTier = TIERS.includes(tier) ? tier : 'free';
@@ -95,7 +95,6 @@ function entitlementsForTier(tier) {
     todos: paid,
     byokChat: true,
     localMemory: true,
-    pomodoro: true,
     weather: true
   };
 }

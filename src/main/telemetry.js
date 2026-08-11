@@ -43,7 +43,6 @@ const EVENT_NAMES = [
   'chat_sent', // 发送消息（仅字数/是否流式）
   'chat_reply', // 收到回复（仅结果/回复字数/耗时）
   'license_state_change', // 许可证状态/档位（T-40 合并后接线；档位属聚合字段）
-  'pomodoro_complete', // 番茄钟完成（仅分钟数）
   'weather_refresh' // 天气刷新（仅结果/耗时）
 ];
 const EVENT_NAMES_SET = new Set(EVENT_NAMES);
@@ -81,9 +80,6 @@ const FIELD_RULES = {
   license_state_change: {
     state: RULE_STRING_40,
     tier: RULE_STRING_40
-  },
-  pomodoro_complete: {
-    minutes: RULE_NUMBER
   },
   weather_refresh: {
     ok: RULE_NUMBER,

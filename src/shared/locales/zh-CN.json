@@ -66,7 +66,7 @@
     "complianceAccept": "同意并继续",
     "complianceDecline": "不同意",
     "complianceRequired": "请先完成年龄确认与内容合规声明。",
-    "complianceRefusedNotice": "未同意内容合规声明，AI 对话已停用。您仍可使用本地记忆、番茄钟与天气等功能。"
+    "complianceRefusedNotice": "未同意内容合规声明，AI 对话已停用。您仍可使用本地记忆与天气等功能。"
   },
   "payment": {
     "plansTitle": "沙箱支付（未接入真实网关）",
@@ -84,18 +84,6 @@
     "callbackFailed": "模拟回调失败：{error}",
     "unavailable": "支付接口不可用（当前为沙箱/桩模式）。",
     "invalidTier": "无效的购买档位。"
-  },
-  "pomodoro": {
-    "title": "番茄钟",
-    "start": "开始",
-    "pause": "暂停",
-    "resume": "继续",
-    "reset": "重置",
-    "stop": "停止",
-    "finished": "时间到！休息一下吧 🍅",
-    "remainingAria": "剩余 {time}",
-    "notificationTitle": "番茄钟时间到",
-    "notificationBody": "专注 {minutes} 分钟已完成，休息一下吧！"
   },
   "window": {
     "close": "关闭",
@@ -147,10 +135,6 @@
     "ttsVoicePack": "语音包",
     "ttsVoicePackAuto": "自动跟随人格",
     "ttsVoicePackHint": "留空时随当前人格模板自动切换；也可固定选择一套语音包。",
-    "pomodoroEnabled": "番茄钟提醒",
-    "pomodoroEnabledHint": "计时结束时弹出系统通知；关闭后仅保留界面计时。",
-    "pomodoroMinutes": "番茄钟时长（分钟）",
-    "pomodoroMinutesHint": "1–120 分钟，保存后生效。",
     "telemetryEnabled": "匿名遥测",
     "telemetryEnabledHint": "帮助改进产品体验；仅统计聚合数据（次数/时长/档位），不含聊天内容、密钥或文件路径。",
     "telemetryPrivacy": "默认关闭，可随时关闭；关闭并清除后本地遥测数据立即删除。上报端点默认为空，即默认不上传任何数据。",

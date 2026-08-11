@@ -38,11 +38,6 @@ const DEFAULT_SKIN_ID = 'default';
 
 /** 天气城市名清洗上限（T-22） */
 const WEATHER_CITY_MAX_LENGTH = 64;
-/** 番茄钟设置（T-21）：默认 25 分钟，允许 1~120 分钟 */
-const DEFAULT_POMODORO_MINUTES = 25;
-const POMODORO_MINUTES_MIN = 1;
-const POMODORO_MINUTES_MAX = 120;
-
 /** T-44：主题（深色玻璃拟态/浅色），默认深色 */
 const THEMES = ['dark', 'light'];
 const DEFAULT_THEME = 'dark';
@@ -93,10 +88,6 @@ const DEFAULT_SETTINGS = {
   ttsVoicePackId: '', // T-33：语音包 id（≤40；''=自动跟随当前 personaTemplate）
   weatherEnabled: false, // T-22：角色面板天气小部件开关（可选，默认关闭）
   weatherCity: '', // T-22：天气城市名（Open-Meteo geocoding，中英文均可）
-  pomodoroEnabled: true, // T-21：番茄钟提醒开关（关闭后仅界面计时，不弹通知）
-  pomodoroMinutes: DEFAULT_POMODORO_MINUTES, // T-21：番茄钟时长（分钟）
-  pomodoroNotifyAt: 0, // T-21/T-27：渲染层→主进程一次性完成信号（时间戳；主进程消费后清零）
-  pomodoroNotifyMinutes: 0, // T-21/T-27：信号携带的时长（分钟；0=未设置；随信号一同清零）
   telemetryEnabled: false, // T-42：匿名遥测开关（opt-in，默认关闭）
   theme: DEFAULT_THEME, // T-44：主题（dark/light，默认深色玻璃拟态）
   reduceMotion: false, // T-44：减弱动效开关（关闭呼吸/眨眼/过渡动画）
@@ -421,29 +412,14 @@ function createStore(baseDir) {
     );
     // T-29：旧 shortcutEnabled 字段按 ADR-026 移除，兼容忽略并清理
     delete merged.shortcutEnabled;
+    // T-50：旧 pomodoro 设置字段按 ADR-038 整体移除，兼容忽略并清理（不迁移、不暴露）
+    delete merged.pomodoroEnabled;
+    delete merged.pomodoroMinutes;
+    delete merged.pomodoroNotifyAt;
+    delete merged.pomodoroNotifyMinutes;
     merged.onboardingDone = sanitizeBoolean(
       merged.onboardingDone,
       DEFAULT_SETTINGS.onboardingDone
-    );
-    merged.pomodoroEnabled = sanitizeBoolean(
-      merged.pomodoroEnabled,
-      DEFAULT_SETTINGS.pomodoroEnabled
-    );
-    merged.pomodoroMinutes = sanitizeInteger(
-      merged.pomodoroMinutes,
-      DEFAULT_SETTINGS.pomodoroMinutes,
-      POMODORO_MINUTES_MIN,
-      POMODORO_MINUTES_MAX
-    );
-    merged.pomodoroNotifyAt = sanitizeNonNegativeInteger(
-      merged.pomodoroNotifyAt,
-      DEFAULT_SETTINGS.pomodoroNotifyAt
-    );
-    merged.pomodoroNotifyMinutes = sanitizeInteger(
-      merged.pomodoroNotifyMinutes,
-      DEFAULT_SETTINGS.pomodoroNotifyMinutes,
-      0,
-      POMODORO_MINUTES_MAX
     );
     merged.personaTemplate = sanitizeText(
       merged.personaTemplate,
@@ -499,9 +475,6 @@ function createStore(baseDir) {
 
   function writeSettings(patch) {
     const current = readSettings();
-    // T-27：pomodoroNotifyAt/pomodoroNotifyMinutes 是主进程消费的一次性信号，
-    // 仅当 patch 显式携带时才写入；普通设置保存不会清除待消费信号，
-    // 也不会把已消费（已清零）的信号回写为旧值。
     const allowed = [
       'apiKey',
       'model',
@@ -522,10 +495,6 @@ function createStore(baseDir) {
       'skinId',
       'weatherEnabled',
       'weatherCity',
-      'pomodoroEnabled',
-      'pomodoroMinutes',
-      'pomodoroNotifyAt',
-      'pomodoroNotifyMinutes',
       'telemetryEnabled',
       'theme',
       'reduceMotion',
@@ -661,35 +630,6 @@ function createStore(baseDir) {
           );
           continue;
         }
-        if (key === 'pomodoroEnabled') {
-          next[key] = sanitizeBoolean(patch[key], current[key]);
-          continue;
-        }
-        if (key === 'pomodoroMinutes') {
-          next.pomodoroMinutes = sanitizeInteger(
-            patch.pomodoroMinutes,
-            current.pomodoroMinutes,
-            POMODORO_MINUTES_MIN,
-            POMODORO_MINUTES_MAX
-          );
-          continue;
-        }
-        if (key === 'pomodoroNotifyAt') {
-          next.pomodoroNotifyAt = sanitizeNonNegativeInteger(
-            patch.pomodoroNotifyAt,
-            current.pomodoroNotifyAt
-          );
-          continue;
-        }
-        if (key === 'pomodoroNotifyMinutes') {
-          next.pomodoroNotifyMinutes = sanitizeInteger(
-            patch.pomodoroNotifyMinutes,
-            current.pomodoroNotifyMinutes,
-            0,
-            POMODORO_MINUTES_MAX
-          );
-          continue;
-        }
         if (key === 'telemetryEnabled') {
           next.telemetryEnabled = sanitizeBoolean(
             patch.telemetryEnabled,
@@ -756,9 +696,6 @@ module.exports = {
   LICENSE_TIERS,
   LICENSE_KEY_MAX_LENGTH,
   TTS_VOICE_PACK_ID_MAX_LENGTH,
-  DEFAULT_POMODORO_MINUTES,
-  POMODORO_MINUTES_MIN,
-  POMODORO_MINUTES_MAX,
   THEMES,
   DEFAULT_THEME,
   WATER_INTERVAL_MIN_MIN,

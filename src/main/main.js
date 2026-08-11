@@ -4,7 +4,6 @@ const {
   app,
   BrowserWindow,
   ipcMain,
-  Notification,
   screen
 } = require('electron');
 const path = require('path');
@@ -14,7 +13,7 @@ const { initUpdater, AUTO_UPDATE_CHECK_DELAY_MS } = require('./updater'); // T-3
 const ipc = require('./ipc'); // T-03: 注册 chat/settings IPC；T-15: 空闲互动接线
 const { createSecureSettings } = require('./secure-settings'); // T-19: 窗口设置持久化
 const { createDefaultStore, resolveBaseDir } = require('../storage'); // T-19: 窗口设置写入；T-42: 遥测数据目录
-const { createTranslator } = require('../shared/locales'); // T-21: 通知本地化
+const { createTranslator } = require('../shared/locales'); // T-12: 本地化翻译
 const { initTelemetry } = require('./telemetry'); // T-42: 匿名遥测（opt-in、默认关闭）
 const {
   createIdleMonitor,
@@ -41,10 +40,6 @@ const DOCK_MARGIN = 24; // 距离屏幕边缘多近视为“靠边”
 const DOCK_REGRAB_GRACE_MS = 800; // 取消吸附后的短暂窗口，防止程序化 setBounds 触发再次吸附
 const DOCK_MOVE_DEBOUNCE_MS = 200; // T-35：Windows 下 moved 不触发，以 200ms 无 move 判定拖放结束
 
-/** T-21：番茄钟完成信号轮询间隔（系统状态小部件移除后，仅保留通知消费） */
-const POMODORO_POLL_MS = 2000;
-const DEFAULT_POMODORO_MINUTES = 25;
-
 /** T-24：窗口可缩放的最小尺寸（建议 ≥280×360） */
 const MIN_WINDOW_WIDTH = 280;
 const MIN_WINDOW_HEIGHT = 360;
@@ -57,9 +52,6 @@ let dockGraceUntil = 0; // 取消吸附后的防重复触发窗口
 let positionSaveTimer = null;
 let dockMoveDebounceTimer = null; // T-35：move 防抖定时器（Windows 拖放结束判定）
 let windowSettingsWriter = null;
-// T-21：番茄钟完成信号轮询
-let pomodoroTimer = null;
-
 /** T-15：空闲参数。默认 3 分钟无交互触发、两次至少间隔 90 秒；环境变量可临时调小便于目检 */
 const IDLE_TRIGGER_MS = readPositiveEnvMs(
   'AI_PET_IDLE_TRIGGER_MS',
@@ -74,8 +66,6 @@ function readPositiveEnvMs(name, fallback) {
   const value = Number(process.env[name]);
   return Number.isFinite(value) && value > 0 ? value : fallback;
 }
-
-/* ---------------- T-21：番茄钟 Notification ---------------- */
 
 /** 按设置语言生成主进程翻译器（settings.language='system' 时跟随系统） */
 function getMainTranslator() {
@@ -114,65 +104,6 @@ function createUpdaterLogger() {
     error: (message) => write('error', message),
     debug: (message) => write('debug', message)
   };
-}
-
-/** 番茄钟结束：主进程系统通知（本地化标题/正文） */
-function showPomodoroNotification(minutes) {
-  const numeric = Number(minutes);
-  const safeMinutes =
-    Number.isFinite(numeric) && numeric > 0
-      ? Math.round(numeric)
-      : DEFAULT_POMODORO_MINUTES;
-  const t = getMainTranslator();
-  const title = t('pomodoro.notificationTitle');
-  const body = t('pomodoro.notificationBody', { minutes: safeMinutes });
-  try {
-    const notification = new Notification({ title, body });
-    notification.show();
-  } catch (error) {
-    console.warn('[pomodoro] 系统通知发送失败：', error);
-  }
-}
-
-/**
- * 消费渲染层的番茄钟完成信号（settings.pomodoroNotifyAt > 0）。
- * 渲染层计时结束写入 settings（store.js 白名单字段），本函数随状态轮询
- * 调用 ipc.consumePomodoroNotificationSignal 幂等消费：读取最新设置 →
- * 清零并同步模块缓存 → 弹通知。同一信号只弹一次；清零失败或提醒已关闭
- * 时不弹通知，避免重复弹窗。
- */
-function consumePomodoroNotificationRequest() {
-  let consumed = null;
-  try {
-    consumed = ipc.consumePomodoroNotificationSignal();
-  } catch (error) {
-    console.warn('[pomodoro] 消费通知信号失败：', error);
-    return;
-  }
-  if (!consumed) {
-    return;
-  }
-  if (consumed.enabled === false) {
-    return; // 提醒已关闭：仅清除待处理信号，不弹系统通知
-  }
-  showPomodoroNotification(consumed.minutes);
-}
-
-/** 启动番茄钟完成信号轮询（替代原系统状态轮询中的消费调用） */
-function startPomodoroNotificationPolling() {
-  stopPomodoroNotificationPolling();
-  consumePomodoroNotificationRequest();
-  pomodoroTimer = setInterval(
-    consumePomodoroNotificationRequest,
-    POMODORO_POLL_MS
-  );
-}
-
-function stopPomodoroNotificationPolling() {
-  if (pomodoroTimer) {
-    clearInterval(pomodoroTimer);
-    pomodoroTimer = null;
-  }
 }
 
 /* ---------------- T-19：窗口设置读写 ---------------- */
@@ -661,8 +592,6 @@ if (SKIP_BOOTSTRAP || !app || typeof app.requestSingleInstanceLock !== 'function
 
     createMainWindow();
     registerWindowIpc(); // T-19/T-25: window:toggle-dock / window:minimize
-    startPomodoroNotificationPolling(); // T-21/T-30: 消费番茄钟完成信号（系统状态轮询已移除）
-
     // T-37: 仅打包版初始化自动更新（开发模式绝不检查；updater 内部还有二次守卫）
     if (app.isPackaged) {
       updaterApi = initUpdater({
@@ -717,7 +646,6 @@ if (SKIP_BOOTSTRAP || !app || typeof app.requestSingleInstanceLock !== 'function
 
   app.on('before-quit', () => {
     isQuitting = true;
-    stopPomodoroNotificationPolling(); // T-21: 退出前停止番茄钟信号轮询
     updaterApi?.handleBeforeQuit(); // T-37: 用户确认后执行 quitAndInstall
     // T-42：退出前记录会话时长（留存漏斗）；补发为尽力而为，失败保留队列
     if (telemetryApi && telemetrySessionStartedAt > 0) {
@@ -743,7 +671,5 @@ if (SKIP_BOOTSTRAP || !app || typeof app.requestSingleInstanceLock !== 'function
 }
 
 module.exports = {
-  getMainTranslator,
-  showPomodoroNotification,
-  consumePomodoroNotificationRequest
+  getMainTranslator
 };
