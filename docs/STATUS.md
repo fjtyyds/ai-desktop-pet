@@ -2,9 +2,9 @@
 
 - 更新时间：2026-08-11
 - 当前阶段：T-40~T-47 全部验收合并；v0.1.0 GitHub Release 已发布；v1.0（2026-09-01）发布准备
-- 当前任务：等待用户提供商店资质/预算（Steam/MS Store/Azure 签名）与 MSIX 实施决策
+- 当前任务：T-48 设置界面布局重构（豆包式分组列表，已派发，等待 worker 回报）
 - 最近完成：T-47 MSIX 技术验证（a723513）；v0.1.0 Release（GitHub，exe+blockmap+latest.yml，CI 全绿）
-- 下一步：用户确认商店事项后按 T-47 报告拆卡实施（依赖升级需批准）；真实自动更新链路待 v0.1.1/v1.0 发布后验证
+- 下一步：验收 T-48（设置页布局）→ 合并 main → 继续用户最新请求队列；商店/签名/预算仍待用户
 - 阻塞：商店注册与预算（Steam $100/MS Store/Azure）、签名采购、MSIX 依赖升级审批、归档目录物理删除、TTS 听感复核、T-44 UI 目检均待用户决策/确认
 - 交接提示：新会话先读 `AGENTS.md` → `PLAN.md` → `docs/STATUS.md` → `docs/reports/2026-08-10-工作对接方案.md` → 自己的任务卡（docs/tasks/T-xx.md）
 
@@ -267,3 +267,9 @@
 - 验证：worker 与协调者 check 全绿；合并后 main check/smoke 全绿。
 - 说明：任务卡 add/add 冲突（main 前进入库 vs 分支完成记录）按分支版本解决；分支未触碰任何禁止文件。
 - 遗留：MSIX 实施需批准 electron-builder 27 alpha 依赖升级；Store 提审需用户账号/预算；托盘/通知需真实安装包验证。
+
+## T-48 建卡记录（2026-08-11）
+
+- 用户最新请求：设置界面布局重构，参考两张豆包设置页截图（OCR 描述见交接文件 20260811-1301）；注意上下文过长时总工交接。
+- ADR-036 落盘；任务卡 docs/tasks/T-48.md 入库；worktree E:\codex\AI桌宠-m4-settings-layout 与分支 codex/m4-settings-layout 已创建（基线 main 2938cb0）。
+- 设计：顶部账号卡片（复用 account-section）+ 外观/对话/陪伴与效率/隐私与数据 四组分组列表 + 底部版本页脚；保留全部元素 id 与既有功能。

@@ -160,6 +160,7 @@
 - [x] `docs/tasks/T-45.md` — 官网落地页与分享传播（codex/m4-marketing）
 - [x] `docs/tasks/T-46.md` — 商店发布准备与云同步评估（codex/m4-store）
 - [x] `docs/tasks/T-47.md` — MSIX 打包与商店沙箱技术验证（codex/m4-msix）
+- [ ] `docs/tasks/T-48.md` — 设置界面布局重构（豆包式分组列表，codex/m4-settings-layout）
 
 30 天节奏：W1（8/11-8/17）T-40/T-41/T-42 → W2（8/18-8/24）T-43/T-44 → W3（8/25-8/31）T-45/T-46 + 集成 → 09-01 v1.0 发布。
 
@@ -220,6 +221,7 @@
 - 2026-08-11：v0.1.0 GitHub Release 已发布（用户授权自动执行）：main 推送 + tag v0.1.0 → CI check/smoke/dist/release 全绿，exe/blockmap/latest.yml 资产上线；自动更新源首次生效，真实更新链路待 v0.1.1/v1.0 验证。
 - 2026-08-11：T-47（MSIX 打包与商店沙箱技术验证）已建卡并派发（codex/m4-msix），执行中。
 - 2026-08-11：T-47 验收合并（a723513 merge）：验证报告覆盖 electron-builder MSIX beta 支持现状、工具链、8 项沙箱风险（自动更新高风险）与 MSIX+NSIS 并存推荐（3.5~5.5 人日）；check/smoke 全绿；实施需批准依赖升级，Store 提审待用户账号/预算。
+- 2026-08-11：T-48 建卡并派发（ADR-036）：设置页重构为顶部账号卡片+分组列表+版本页脚（豆包式）；保留全部元素 id 与功能；worktree E:\codex\AI桌宠-m4-settings-layout、分支 codex/m4-settings-layout 就绪。
 
 ## Surprises & Discoveries
 
@@ -273,6 +275,7 @@
 - ADR-031：自动更新采用 electron-updater + GitHub Releases（2026-08-10，T-37）。
 - ADR-032：商业化上线方案（2026-08-11，T-40~T-46）。
 - ADR-033：项目目录规范化与归档（2026-08-11）。
+- ADR-036：设置界面布局重构——豆包式分组列表（2026-08-11，T-48）。
 
 详见 `docs/DECISIONS.md`。
 
