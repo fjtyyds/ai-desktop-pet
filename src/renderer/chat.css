@@ -124,6 +124,31 @@
   max-width: 190px;
 }
 
+/* T-45：工具栏分享菜单（复用导出菜单样式；长按/右键时浮层定位） */
+.toolbar-share {
+  position: relative;
+  display: inline-flex;
+}
+
+.share-menu {
+  min-width: 200px;
+}
+
+.share-menu-floating {
+  position: fixed;
+  top: auto;
+  right: auto;
+  z-index: 40;
+}
+
+.share-hint {
+  margin: 2px 6px 6px;
+  max-width: 210px;
+  font-size: 11px;
+  line-height: 1.4;
+  opacity: 0.75;
+}
+
 #close-btn:hover {
   background: rgba(244, 67, 54, 0.75);
   color: #fff;

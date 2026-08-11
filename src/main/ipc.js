@@ -2,7 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { ipcMain, app, BrowserWindow, dialog } = require('electron');
+const { ipcMain, app, BrowserWindow, dialog, clipboard, nativeImage } = require('electron');
 const { createProvider } = require('../llm');
 const { createDefaultStore, resolveBaseDir } = require('../storage');
 const { createMemoryStore } = require('../storage/memory-store');
@@ -52,6 +52,8 @@ const CHANNELS = {
   memoryUpdate: 'memory:update', // T-17：修正长期记忆
   historyExport: 'history:export', // T-18：导出对话
   historyClear: 'history:clear', // T-18：清除数据
+  shareSaveCard: 'share:save-card', // T-45：保存对话卡片 PNG
+  shareCopyCard: 'share:copy-card', // T-45：复制对话卡片到剪贴板
   weatherGet: 'weather:get', // T-22：天气小部件
   ttsSpeak: 'tts:speak', // T-34：在线神经语音合成（ADR-029）
   telemetryGetStatus: 'telemetry:get-status', // T-42：遥测状态
@@ -69,6 +71,9 @@ const CHANNELS = {
 
 /** history.clear 允许的范围（契约：messages / memories / settings / all） */
 const VALID_CLEAR_SCOPES = ['messages', 'memories', 'settings', 'all'];
+
+/** T-45：分享卡片 PNG 大小上限（64MB，防御异常输入） */
+const MAX_SHARE_PNG_BYTES = 64 * 1024 * 1024;
 
 let store = null;
 let memoryStore = null;
@@ -459,6 +464,103 @@ async function writeExportFile(filePath, messages, format, options = {}) {
   return content;
 }
 
+/**
+ * T-45：校验并解码分享卡片 PNG。
+ * 仅接受 data:image/png;base64 数据 URL，校验 PNG 魔数后返回 Buffer；
+ * 非法输入一律抛 'invalid-png-data'，杜绝任意文件写入。
+ */
+function decodeSharePng(dataUrl) {
+  const match = /^data:image\/png;base64,(.+)$/.exec(String(dataUrl || ''));
+  if (!match) {
+    throw new Error('invalid-png-data');
+  }
+  const base64 = match[1].replace(/\r?\n/g, '');
+  const buffer = Buffer.from(base64, 'base64');
+  if (!buffer || buffer.length < 8 || buffer.length > MAX_SHARE_PNG_BYTES) {
+    throw new Error('invalid-png-data');
+  }
+  const signature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  if (!buffer.subarray(0, 8).equals(signature)) {
+    throw new Error('invalid-png-data');
+  }
+  return buffer;
+}
+
+/** T-45：文件名清洗（移除非法字符与控制字符、限制长度；空值回退默认名）。 */
+function sanitizeShareFileName(name, fallback) {
+  let value = String(name || '')
+    .trim()
+    .replace(/[\\/:*?"<>|\u0000-\u001f]+/g, '-');
+  if (!value || value === '.' || value === '..') {
+    value = fallback;
+  }
+  return value.slice(0, 80);
+}
+
+/** T-45：保存对话卡片 PNG（主进程 showSaveDialog 选择路径后写入）。 */
+async function handleShareSaveCard(event, payload) {
+  let png;
+  try {
+    png = decodeSharePng(payload && payload.dataUrl);
+  } catch (_error) {
+    return { ok: false, filePath: null, error: 'invalid-png-data' };
+  }
+  const t = getTranslator();
+  const fallbackName = `${t('share.saveDialogDefaultName')}-${formatFileTimestamp(
+    new Date()
+  )}`;
+  const defaultName = sanitizeShareFileName(
+    payload && payload.suggestedName,
+    fallbackName
+  );
+  const dialogOptions = {
+    title: t('share.saveDialogTitle'),
+    defaultPath: `${defaultName}.png`,
+    filters: [{ name: 'PNG', extensions: ['png'] }]
+  };
+  const win = BrowserWindow.fromWebContents(event.sender);
+  const result =
+    win && !win.isDestroyed()
+      ? await dialog.showSaveDialog(win, dialogOptions)
+      : await dialog.showSaveDialog(dialogOptions);
+  if (result.canceled || !result.filePath) {
+    return { ok: false, filePath: null, error: 'cancelled' };
+  }
+  try {
+    await fs.promises.writeFile(result.filePath, png);
+    return { ok: true, filePath: result.filePath, error: null };
+  } catch (error) {
+    return {
+      ok: false,
+      filePath: null,
+      error: error && error.message ? error.message : String(error)
+    };
+  }
+}
+
+/** T-45：复制对话卡片 PNG 到系统剪贴板。 */
+function handleShareCopyCard(_event, payload) {
+  let png;
+  try {
+    png = decodeSharePng(payload && payload.dataUrl);
+  } catch (_error) {
+    return { ok: false, error: 'invalid-png-data' };
+  }
+  try {
+    const image = nativeImage.createFromBuffer(png);
+    if (image.isEmpty()) {
+      return { ok: false, error: 'invalid-png-data' };
+    }
+    clipboard.writeImage(image);
+    return { ok: true, error: null };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error && error.message ? error.message : String(error)
+    };
+  }
+}
+
 function writeDataFile(file, content) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, content, 'utf8');
@@ -826,6 +928,8 @@ function registerIpcHandlers() {
   ipcMain.handle(CHANNELS.memoryUpdate, handleMemoryUpdate);
   ipcMain.handle(CHANNELS.historyExport, handleHistoryExport);
   ipcMain.handle(CHANNELS.historyClear, handleHistoryClear);
+  ipcMain.handle(CHANNELS.shareSaveCard, handleShareSaveCard);
+  ipcMain.handle(CHANNELS.shareCopyCard, handleShareCopyCard);
   ipcMain.handle(CHANNELS.weatherGet, handleWeatherGet);
   ipcMain.handle(CHANNELS.ttsSpeak, handleTtsSpeak);
   ipcMain.handle(CHANNELS.telemetryGetStatus, handleTelemetryGetStatus);
@@ -857,5 +961,7 @@ module.exports = {
   buildMarkdownExport,
   buildJsonExport,
   writeExportFile,
+  decodeSharePng,
+  sanitizeShareFileName,
   clearData
 };

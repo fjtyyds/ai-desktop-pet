@@ -13,6 +13,8 @@ const CHANNELS = {
   idleEvent: 'idle:event',
   activityPoke: 'activity:poke',
   moodGet: 'mood:get',
+  shareSaveCard: 'share:save-card', // T-45：保存对话卡片 PNG
+  shareCopyCard: 'share:copy-card', // T-45：复制对话卡片到剪贴板
   memoryList: 'memory:list',
   memoryDelete: 'memory:delete',
   memoryUpdate: 'memory:update',
@@ -69,6 +71,10 @@ contextBridge.exposeInMainWorld('petAPI', {
     get: () => ipcRenderer.invoke(CHANNELS.historyGet),
     export: (payload) => ipcRenderer.invoke(CHANNELS.historyExport, payload),
     clear: (payload) => ipcRenderer.invoke(CHANNELS.historyClear, payload)
+  },
+  share: {
+    saveCard: (payload) => ipcRenderer.invoke(CHANNELS.shareSaveCard, payload), // T-45
+    copyCard: (payload) => ipcRenderer.invoke(CHANNELS.shareCopyCard, payload) // T-45
   },
   idle: {
     onTrigger: (cb) => {

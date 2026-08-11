@@ -60,6 +60,54 @@
               ></p>
             </div>
           </div>
+          <!-- T-45：应用内分享（对话卡片生成/保存/复制，长按或右键消息也可唤起） -->
+          <div id="toolbar-share" class="toolbar-share">
+            <button
+              id="share-btn"
+              class="icon-btn"
+              type="button"
+              title="分享"
+              aria-label="分享"
+              aria-haspopup="menu"
+              aria-expanded="false"
+              data-i18n-title="share.title"
+              data-i18n-aria-label="share.title"
+            >⇗</button>
+            <div
+              id="share-menu"
+              class="export-menu share-menu"
+              role="menu"
+              aria-label="分享"
+              data-i18n-aria-label="share.title"
+              hidden
+            >
+              <button
+                id="share-save"
+                class="export-menu-item"
+                type="button"
+                role="menuitem"
+                data-i18n="share.saveCard"
+              >生成对话卡片并保存</button>
+              <button
+                id="share-copy"
+                class="export-menu-item"
+                type="button"
+                role="menuitem"
+                data-i18n="share.copyCard"
+              >复制对话卡片到剪贴板</button>
+              <p
+                id="share-hint"
+                class="share-hint"
+                data-i18n="share.unmasked"
+              >分享卡片会自动隐藏 API Key 与本地路径等敏感信息。</p>
+              <p
+                id="share-status"
+                class="settings-status export-status"
+                role="status"
+                hidden
+              ></p>
+            </div>
+          </div>
           <button
             id="settings-btn"
             class="icon-btn"

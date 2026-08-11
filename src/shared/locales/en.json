@@ -237,6 +237,25 @@
     "clearError": "Clear failed: {error}",
     "apiUnavailable": "API unavailable"
   },
+  "share": {
+    "title": "Share",
+    "saveCard": "Generate chat card & save",
+    "copyCard": "Copy chat card to clipboard",
+    "generating": "Generating card…",
+    "saved": "Saved to: {filePath}",
+    "copied": "Chat card copied to clipboard",
+    "cancelled": "Cancelled",
+    "error": "Share failed: {error}",
+    "noMessages": "No messages to share yet",
+    "unmasked": "Shared cards automatically hide API keys and local paths.",
+    "saveDialogTitle": "Save Chat Card",
+    "saveDialogDefaultName": "AI Pet Chat Card",
+    "cardSubtitle": "Chat card",
+    "cardFooter": "AI Desktop Pet — a companion that talks, remembers, and helps you focus",
+    "cardTag": "#AIDesktopPet",
+    "maskedText": "[redacted]",
+    "maskedPath": "[path hidden]"
+  },
   "updater": {
     "checkForUpdates": "Check for Updates",
     "checking": "Checking for updates…",

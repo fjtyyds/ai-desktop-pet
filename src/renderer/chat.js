@@ -419,6 +419,12 @@
       toolbarExport: document.getElementById('toolbar-export'),
       exportBtn: document.getElementById('export-btn'),
       exportMenu: document.getElementById('export-menu'),
+      toolbarShare: document.getElementById('toolbar-share'),
+      shareBtn: document.getElementById('share-btn'),
+      shareMenu: document.getElementById('share-menu'),
+      shareSave: document.getElementById('share-save'),
+      shareCopy: document.getElementById('share-copy'),
+      shareStatus: document.getElementById('share-status'),
       settingsBack: document.getElementById('settings-back'),
       memoryManageBtn: document.getElementById('memory-manage-btn'),
       memoryBack: document.getElementById('memory-back'),
@@ -519,6 +525,7 @@
       complianceRefused: document.getElementById('compliance-refused')
     };
     showExportStatus = makeStatusShower(elements.exportStatus);
+    showShareStatus = makeStatusShower(elements.shareStatus);
     showClearStatus = makeStatusShower(elements.clearStatus);
     showTelemetryStatus = makeStatusShower(elements.telemetryStatus);
     showSkinStatus = makeStatusShower(elements.skinStatus);
@@ -648,6 +655,9 @@
     elements.closeBtn.addEventListener('click', hideToTray);
     elements.minimizeBtn.addEventListener('click', minimizeWindow);
     elements.exportBtn.addEventListener('click', toggleExportMenu);
+    elements.shareBtn.addEventListener('click', toggleShareMenu);
+    elements.shareSave.addEventListener('click', () => void saveShareCard());
+    elements.shareCopy.addEventListener('click', () => void copyShareCard());
     elements.settingsBack.addEventListener('click', showChatView);
     elements.memoryManageBtn.addEventListener('click', openMemoryView);
     elements.memoryBack.addEventListener('click', closeMemoryView);
@@ -712,6 +722,28 @@
         closeExportMenu();
         if (elements.exportBtn) {
           elements.exportBtn.focus();
+        }
+      }
+    });
+    // T-45：点击分享菜单外关闭；Escape 关闭并归还焦点
+    document.addEventListener('click', (event) => {
+      if (!elements.shareMenu || elements.shareMenu.hidden) {
+        return;
+      }
+      const wrap = elements.toolbarShare;
+      if (!wrap || !wrap.contains(event.target)) {
+        closeShareMenu();
+      }
+    });
+    document.addEventListener('keydown', (event) => {
+      if (
+        event.key === 'Escape' &&
+        elements.shareMenu &&
+        !elements.shareMenu.hidden
+      ) {
+        closeShareMenu();
+        if (elements.shareBtn) {
+          elements.shareBtn.focus();
         }
       }
     });
@@ -1362,6 +1394,7 @@
     if (role === 'assistant') {
       attachSpeakButton(item); // T-23：桌宠回复可朗读
     }
+    attachMessageShareGesture(item); // T-45：长按/右键唤起分享菜单
     elements.messageList.appendChild(item);
     messages.push({ role, content });
     scrollToBottom();
@@ -3635,6 +3668,397 @@
     }
   }
 
+  /* ---------------- T-45：应用内分享（对话卡片 Canvas 渲染 + 保存/复制） ---------------- */
+
+  const SHARE_CARD_WIDTH = 1080;
+  const SHARE_CARD_HEIGHT = 1350; // 4:5 竖版，适配小红书/朋友圈/B 站动态
+  const SHARE_CARD_MAX_MESSAGES = 6;
+  const SHARE_CARD_MAX_CHARS = 240;
+  const SHARE_LONG_PRESS_MS = 600;
+
+  let sharePressTimer = null;
+
+  function hasShareApi() {
+    return Boolean(
+      window.petAPI &&
+        window.petAPI.share &&
+        typeof window.petAPI.share.saveCard === 'function' &&
+        typeof window.petAPI.share.copyCard === 'function'
+    );
+  }
+
+  /** T-45：脱敏——隐藏 API Key/令牌/本地路径等敏感信息后再入卡片。 */
+  function sanitizeShareText(text) {
+    const t = window.PetLocales.createTranslator(currentLocale);
+    let value = String(text || '');
+    value = value.replace(/(sk-[A-Za-z0-9_-]{8,})/g, t('share.maskedText'));
+    value = value.replace(/\b(?:api[_-]?key|api key|apikey)\b/gi, t('share.maskedText'));
+    value = value.replace(
+      /(?:api[_-]?key|apikey)\s*[:=]\s*[^\s,，;；]+/gi,
+      t('share.maskedText')
+    );
+    value = value.replace(/\bBearer\s+[A-Za-z0-9._-]{8,}/gi, t('share.maskedText'));
+    value = value.replace(/[A-Za-z]:\\(?:[^\\\s]+\\)*[^\\\s]*/g, t('share.maskedPath'));
+    value = value.replace(/(?:\/home|\/Users)\/[^\s]+/g, t('share.maskedPath'));
+    return value.replace(/\s+/g, ' ').trim();
+  }
+
+  /** 选取最近几条可分享消息（跳过空消息与“正在思考…”占位）。 */
+  function pickShareMessages() {
+    const t = window.PetLocales.createTranslator(currentLocale);
+    const thinking = t('chat.thinking');
+    const candidates = messages.filter((item) => {
+      if (!item || (item.role !== 'user' && item.role !== 'assistant')) {
+        return false;
+      }
+      const content =
+        typeof item.content === 'string' ? item.content.trim() : '';
+      return content && content !== thinking;
+    });
+    return candidates.slice(-SHARE_CARD_MAX_MESSAGES);
+  }
+
+  /** 按像素宽度逐字符折行（保留换行），用于 Canvas 气泡排版。 */
+  function wrapShareText(ctx, text, maxWidth) {
+    const lines = [];
+    for (const rawLine of String(text).split('\n')) {
+      let line = rawLine.trim();
+      if (!line) {
+        lines.push('');
+        continue;
+      }
+      while (line) {
+        let slice = line;
+        while (slice.length > 1 && ctx.measureText(slice).width > maxWidth) {
+          slice = slice.slice(0, -1);
+        }
+        lines.push(slice);
+        line = line.slice(slice.length);
+      }
+    }
+    return lines;
+  }
+
+  function formatShareDate(date) {
+    const pad = (value) => String(value).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  }
+
+  function roundRect(ctx, x, y, width, height, radius) {
+    ctx.beginPath();
+    ctx.moveTo(x + radius, y);
+    ctx.arcTo(x + width, y, x + width, y + height, radius);
+    ctx.arcTo(x + width, y + height, x, y + height, radius);
+    ctx.arcTo(x, y + height, x, y, radius);
+    ctx.arcTo(x, y, x + width, y, radius);
+    ctx.closePath();
+  }
+
+  /** 卡片头部角色头像：优先当前皮肤 idle 资源（data URL），缺失时画品牌兜底。 */
+  function drawShareAvatar(ctx, x, y, size) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(x + size / 2, y + size / 2, size / 2, 0, Math.PI * 2);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
+    ctx.fill();
+    ctx.clip();
+    const img = elements.petAvatar;
+    if (img && img.src && img.naturalWidth > 0) {
+      ctx.drawImage(img, x, y, size, size);
+    } else {
+      ctx.fillStyle = '#4f6ef7';
+      ctx.fillRect(x, y, size, size);
+      ctx.fillStyle = '#ffffff';
+      ctx.font = `bold ${size * 0.5}px "Segoe UI", "Microsoft YaHei", sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('AI', x + size / 2, y + size / 2 + 4);
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'alphabetic';
+    }
+    ctx.restore();
+  }
+
+  /** 渲染对话卡片 Canvas（深色玻璃风：角色头部 + 气泡消息 + 品牌尾注）。 */
+  function buildShareCardCanvas() {
+    const t = window.PetLocales.createTranslator(currentLocale);
+    const items = pickShareMessages();
+    const canvas = document.createElement('canvas');
+    canvas.width = SHARE_CARD_WIDTH;
+    canvas.height = SHARE_CARD_HEIGHT;
+    const ctx = canvas.getContext('2d');
+
+    // 背景渐变
+    const gradient = ctx.createLinearGradient(0, 0, 0, SHARE_CARD_HEIGHT);
+    gradient.addColorStop(0, '#262b40');
+    gradient.addColorStop(1, '#171b2a');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, SHARE_CARD_WIDTH, SHARE_CARD_HEIGHT);
+
+    // 顶部角色区
+    const avatarSize = 112;
+    const avatarX = 64;
+    const avatarY = 48;
+    drawShareAvatar(ctx, avatarX, avatarY, avatarSize);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 46px "Segoe UI", "Microsoft YaHei", sans-serif';
+    ctx.fillText(
+      currentPetName || t('app.defaultPetName'),
+      avatarX + avatarSize + 28,
+      avatarY + 54
+    );
+    ctx.fillStyle = '#aab3d0';
+    ctx.font = '28px "Segoe UI", "Microsoft YaHei", sans-serif';
+    ctx.fillText(
+      `${t('share.cardSubtitle')} · ${formatShareDate(new Date())}`,
+      avatarX + avatarSize + 28,
+      avatarY + 104
+    );
+
+    // 消息区：从最近消息反推可容纳数量，不足时至少保留一条
+    const contentTop = 230;
+    const contentBottom = 1150;
+    const maxBubbleWidth = 900;
+    const lineHeight = 46;
+    const bubblePaddingX = 28;
+    const bubblePaddingY = 22;
+    const bubbleGap = 34;
+    ctx.font = '30px "Segoe UI", "Microsoft YaHei", sans-serif';
+
+    const planned = [];
+    let usedHeight = 0;
+    for (let i = items.length - 1; i >= 0; i -= 1) {
+      const item = items[i];
+      const content = sanitizeShareText(item.content);
+      const clipped =
+        content.length > SHARE_CARD_MAX_CHARS
+          ? `${content.slice(0, SHARE_CARD_MAX_CHARS)}…`
+          : content;
+      const lines = wrapShareText(ctx, clipped, maxBubbleWidth - bubblePaddingX * 2);
+      const height = lines.length * lineHeight + bubblePaddingY * 2;
+      if (
+        usedHeight + height + (planned.length ? bubbleGap : 0) >
+        contentBottom - contentTop
+      ) {
+        break;
+      }
+      usedHeight += height + (planned.length ? bubbleGap : 0);
+      planned.unshift({ item, lines });
+    }
+    if (planned.length === 0 && items.length > 0) {
+      const last = items[items.length - 1];
+      const content = sanitizeShareText(last.content).slice(0, SHARE_CARD_MAX_CHARS);
+      planned.push({ item: last, lines: wrapShareText(ctx, content, maxBubbleWidth - 36) });
+    }
+
+    let y = contentTop;
+    for (const { item, lines } of planned) {
+      const textWidth = lines.reduce(
+        (max, line) => Math.max(max, ctx.measureText(line).width),
+        0
+      );
+      const bubbleWidth = Math.min(maxBubbleWidth, textWidth + bubblePaddingX * 2);
+      const bubbleHeight = lines.length * lineHeight + bubblePaddingY * 2;
+      const x =
+        item.role === 'user' ? SHARE_CARD_WIDTH - 64 - bubbleWidth : 64;
+      roundRect(ctx, x, y, bubbleWidth, bubbleHeight, 26);
+      ctx.fillStyle = item.role === 'user' ? '#4f6ef7' : '#343b57';
+      ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      lines.forEach((line, index) => {
+        ctx.fillText(
+          line,
+          x + bubblePaddingX,
+          y + bubblePaddingY + 34 + index * lineHeight
+        );
+      });
+      y += bubbleHeight + bubbleGap;
+    }
+
+    // 底部品牌尾注
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+    ctx.fillRect(0, SHARE_CARD_HEIGHT - 170, SHARE_CARD_WIDTH, 2);
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#dfe3f5';
+    ctx.font = '30px "Segoe UI", "Microsoft YaHei", sans-serif';
+    ctx.fillText(t('share.cardFooter'), SHARE_CARD_WIDTH / 2, SHARE_CARD_HEIGHT - 96);
+    ctx.fillStyle = '#8ab4ff';
+    ctx.font = 'bold 28px "Segoe UI", "Microsoft YaHei", sans-serif';
+    ctx.fillText(t('share.cardTag'), SHARE_CARD_WIDTH / 2, SHARE_CARD_HEIGHT - 46);
+    ctx.textAlign = 'left';
+    return canvas;
+  }
+
+  /** 生成对话卡片 PNG（脱敏后内容；返回 dataUrl 供保存/复制，也便于测试断言）。 */
+  function generateShareCard() {
+    const items = pickShareMessages();
+    if (items.length === 0) {
+      return { ok: false, error: 'no-messages' };
+    }
+    const dataUrl = buildShareCardCanvas().toDataURL('image/png');
+    const sanitized = items.map((item) => ({
+      role: item.role,
+      content: sanitizeShareText(item.content)
+    }));
+    return { ok: true, dataUrl, sanitized, count: items.length };
+  }
+
+  /** 打开分享菜单：floating 模式用于长按/右键消息定位，toolbar 模式由按钮触发。 */
+  function openShareMenuAt(x, y) {
+    if (!elements.shareMenu || !elements.shareBtn || !elements.shareSave) {
+      return;
+    }
+    elements.shareMenu.classList.add('share-menu-floating');
+    elements.shareMenu.style.left = `${Math.max(8, x - 120)}px`;
+    elements.shareMenu.style.top = `${Math.max(8, y - 8)}px`;
+    elements.shareMenu.hidden = false;
+    elements.shareBtn.setAttribute('aria-expanded', 'true');
+    elements.shareSave.focus();
+  }
+
+  function toggleShareMenu() {
+    if (!elements.shareMenu || !elements.shareBtn || !elements.shareSave) {
+      return;
+    }
+    if (elements.shareMenu.hidden) {
+      elements.shareMenu.classList.remove('share-menu-floating');
+      elements.shareMenu.style.left = '';
+      elements.shareMenu.style.top = '';
+      elements.shareMenu.hidden = false;
+      elements.shareBtn.setAttribute('aria-expanded', 'true');
+      elements.shareSave.focus();
+    } else {
+      closeShareMenu();
+    }
+  }
+
+  function closeShareMenu() {
+    if (!elements.shareMenu || elements.shareMenu.hidden) {
+      return;
+    }
+    elements.shareMenu.hidden = true;
+    elements.shareBtn.setAttribute('aria-expanded', 'false');
+  }
+
+  /** 消息长按（600ms）或右键唤起分享菜单；拖动/移出/抬起即取消计时。 */
+  function attachMessageShareGesture(item) {
+    if (!item || item.dataset.shareGesture) {
+      return;
+    }
+    item.dataset.shareGesture = '1';
+    const cancelTimer = () => {
+      if (sharePressTimer) {
+        clearTimeout(sharePressTimer);
+        sharePressTimer = null;
+      }
+    };
+    item.addEventListener('pointerdown', (event) => {
+      if (event.pointerType === 'mouse' && event.button !== 0) {
+        return;
+      }
+      cancelTimer();
+      sharePressTimer = setTimeout(() => {
+        sharePressTimer = null;
+        openShareMenuAt(event.clientX, event.clientY);
+      }, SHARE_LONG_PRESS_MS);
+    });
+    item.addEventListener('pointermove', cancelTimer);
+    item.addEventListener('pointerup', cancelTimer);
+    item.addEventListener('pointercancel', cancelTimer);
+    item.addEventListener('pointerleave', cancelTimer);
+    item.addEventListener('contextmenu', (event) => {
+      event.preventDefault();
+      cancelTimer();
+      openShareMenuAt(event.clientX, event.clientY);
+    });
+  }
+
+  /** 生成并保存对话卡片 PNG（主进程弹保存框）。 */
+  async function saveShareCard() {
+    await window.PetLocales.ready;
+    const t = window.PetLocales.createTranslator(currentLocale);
+    if (!hasShareApi()) {
+      showShareStatus(
+        t('share.error', { error: t('data.apiUnavailable') }),
+        'error'
+      );
+      return;
+    }
+    const generated = generateShareCard();
+    if (!generated.ok) {
+      showShareStatus(t('share.noMessages'), 'error');
+      return;
+    }
+    elements.shareSave.disabled = true;
+    elements.shareCopy.disabled = true;
+    showShareStatus(t('share.generating'), 'ok');
+    try {
+      const result = await window.petAPI.share.saveCard({
+        dataUrl: generated.dataUrl,
+        suggestedName: `${t('share.saveDialogDefaultName')}-${currentPetName}`
+      });
+      if (result && result.ok && result.filePath) {
+        showShareStatus(t('share.saved', { filePath: result.filePath }), 'ok');
+      } else if (result && result.error && result.error !== 'cancelled') {
+        showShareStatus(t('share.error', { error: result.error }), 'error');
+      } else {
+        showShareStatus(t('share.cancelled'), 'ok');
+      }
+    } catch (error) {
+      showShareStatus(
+        t('share.error', {
+          error: error && error.message ? error.message : String(error)
+        }),
+        'error'
+      );
+    } finally {
+      elements.shareSave.disabled = false;
+      elements.shareCopy.disabled = false;
+    }
+  }
+
+  /** 生成并复制对话卡片 PNG 到剪贴板。 */
+  async function copyShareCard() {
+    await window.PetLocales.ready;
+    const t = window.PetLocales.createTranslator(currentLocale);
+    if (!hasShareApi()) {
+      showShareStatus(
+        t('share.error', { error: t('data.apiUnavailable') }),
+        'error'
+      );
+      return;
+    }
+    const generated = generateShareCard();
+    if (!generated.ok) {
+      showShareStatus(t('share.noMessages'), 'error');
+      return;
+    }
+    elements.shareSave.disabled = true;
+    elements.shareCopy.disabled = true;
+    showShareStatus(t('share.generating'), 'ok');
+    try {
+      const result = await window.petAPI.share.copyCard({
+        dataUrl: generated.dataUrl
+      });
+      if (result && result.ok) {
+        showShareStatus(t('share.copied'), 'ok');
+      } else if (result && result.error) {
+        showShareStatus(t('share.error', { error: result.error }), 'error');
+      }
+    } catch (error) {
+      showShareStatus(
+        t('share.error', {
+          error: error && error.message ? error.message : String(error)
+        }),
+        'error'
+      );
+    } finally {
+      elements.shareSave.disabled = false;
+      elements.shareCopy.disabled = false;
+    }
+  }
+
   /** 清空当前聊天视图并恢复到空态问候（不写历史，仅 UI 刷新） */
   function resetChatView() {
     stopSpeaking(); // T-23: 气泡被清空时停止朗读，避免按钮随 DOM 移除后状态残留
@@ -3743,6 +4167,7 @@
   }
 
   let showExportStatus = () => {};
+  let showShareStatus = () => {}; // T-45
   let showClearStatus = () => {};
   let showTelemetryStatus = () => {};
   let showSkinStatus = () => {}; // T-43
@@ -3757,6 +4182,10 @@
     getPomodoroState,
     refreshSkins, // T-43：皮肤列表刷新（测试/手动入口）
     getSkinItems: () => skinItems, // T-43
-    applySkin // T-43
+    applySkin, // T-43
+    sanitizeShareText, // T-45：脱敏（测试/手动入口）
+    generateShareCard, // T-45：生成对话卡片 PNG
+    saveShareCard, // T-45：保存卡片
+    copyShareCard // T-45：复制卡片
   };
 })();
