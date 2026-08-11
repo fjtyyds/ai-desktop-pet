@@ -1,10 +1,10 @@
 # 项目状态
 
 - 更新时间：2026-08-10
-- 当前阶段：M4 P0/P1/P3/P4 完成；商业化上线方案执行中（T-42/T-43 已合并，T-40 执行中）
-- 当前任务：T-40 许可证与付费墙（进行中）→ 随后 T-41/T-44/T-45/T-46
-- 最近完成：T-42 匿名遥测（fd0b3a3）、T-43 皮肤市场 MVP（df99fa2）验收合并
-- 下一步：验收 T-40 后派发 T-41（支付，依赖 T-40）与 T-44/T-45/T-46；首次发布并入 v1.0 计划（2026-09-01）
+- 当前阶段：M4 P0/P1/P3/P4 完成；商业化上线方案执行中（T-40/T-42/T-43 已合并）
+- 当前任务：派发 T-41（支付）/T-44（UI 大改）/T-45（官网与分享）
+- 最近完成：T-40 许可证与付费墙（dece63a）、T-42 匿名遥测（fd0b3a3）、T-43 皮肤市场 MVP（df99fa2）验收合并
+- 下一步：验收 T-41/T-44/T-45 后派发 T-46（商店发布准备）；首次发布并入 v1.0 计划（2026-09-01）
 - 阻塞：无（P2 签名/商店预算、大目录/worktree 清理、UI 大改排期、TTS 听感复核仍待用户决策）
 - 交接提示：新会话先读 `AGENTS.md` → `PLAN.md` → `docs/STATUS.md` → `docs/reports/2026-08-10-工作对接方案.md` → 自己的任务卡（docs/tasks/T-xx.md）
 
@@ -221,3 +221,9 @@
 - 分支 codex/m4-skins @ 29548a4（merge 到 df99fa2，5 个共享文件冲突已解决）：src/main/skin-store.js、3 套内置默认皮肤、skin:* IPC、设置页“皮肤与配件”子页与 pet-avatar 切换；格式文档 docs/reports/2026-08-11-皮肤包格式.md。
 - 安全验证：zip 校验拒绝缺清单/exe/js/超 10MB/路径跳转/加密包；无 child_process/eval/Function 等代码执行机制；内置皮肤不可移除。
 - 验证：worker 与协调者 check/smoke 全绿；端到端导入→应用→导出→重导入一致。
+
+## T-40 合并记录（2026-08-11，项目内线程闭环）
+
+- 分支 codex/m4-license @ 6ac339b（merge 到 dece63a，3 个共享文件冲突已解决）：src/main/license.js 新增；license:* IPC；设置页“账户/订阅”区块、Pro 门控、首次启动年龄+合规弹窗；store 白名单 licenseTier/licenseKey/licenseExpiresAt/deviceId/complianceAccepted。
+- 验证：三态切换持久化、激活码/订单号 mock、过期/吊销/设备绑定、云额度（BYOK 不消耗）、门控与合规弹窗（拒绝后 AI 对话停用）；worker 与协调者 check/smoke 全绿。
+- 遗留：真实支付与订单服务端校验待 T-41；license_state_change 遥测埋点已由 T-42 预留，合并后已可接线。
