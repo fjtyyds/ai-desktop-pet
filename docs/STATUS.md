@@ -2,9 +2,9 @@
 
 - 更新时间：2026-08-11
 - 当前阶段：T-40~T-47 全部验收合并；v0.1.0 GitHub Release 已发布；v1.0（2026-09-01）发布准备
-- 当前任务：T-48/T-49 已验收合并；等待用户 `npm run dev` 目检（新设置页布局 + 紧凑小部件 + 情绪变化）
-- 最近完成：T-49 小部件紧凑化与情绪中性化（026c1c5）；T-48 设置页三段式布局重构（7b448cf）；v0.1.0 Release（GitHub，exe+blockmap+latest.yml，CI 全绿）
-- 下一步：按用户目检反馈微调（设置分组默认展开/命名、小部件尺寸、情绪幅度）→ 继续用户最新请求队列；商店/签名/预算仍待用户
+- 当前任务：T-50 已派发（账户区并入分组 + 移除番茄钟），等待 worker 回报
+- 最近完成：T-48/T-49 验收合并（设置页三段式布局 7b448cf、小部件紧凑化与情绪中性化 026c1c5）；v0.1.0 Release（GitHub，exe+blockmap+latest.yml，CI 全绿）
+- 下一步：验收 T-50 → 合并 main → 继续用户最新请求队列；商店/签名/预算仍待用户
 - 阻塞：商店注册与预算（Steam $100/MS Store/Azure）、签名采购、MSIX 依赖升级审批、归档目录物理删除、TTS 听感复核、T-44 UI 目检均待用户决策/确认
 - 交接提示：新会话先读 `AGENTS.md` → `PLAN.md` → `docs/STATUS.md` → `docs/reports/2026-08-10-工作对接方案.md` → 自己的任务卡（docs/tasks/T-xx.md）
 
@@ -287,3 +287,9 @@
 - 验证：worker 与协调者 check/smoke 全绿；元素 id 保留；52 落在“平静”区间；离屏 DOM 尺寸实测通过。
 - 处置：主工作区已恢复 main；ADR-037 + 任务卡 T-49 入库；分支 rebase 后 fast-forward 合并（026c1c5）；无 worktree 需清理。
 - 纪律重申：任何任务必须独立 worktree 开发，main 工作区保持 main（T-44/T-45 同类问题第三次发生，已记录）。
+
+## T-50 建卡记录（2026-08-11）
+
+- 用户反馈：①账户与订阅要与其他设置项外观一致（不要单独占大块）；②番茄钟没用，删除。
+- ADR-038 落盘；任务卡 docs/tasks/T-50.md 入库；worktree E:\codex\AI桌宠-m4-account-pomodoro 与分支 codex/m4-account-pomodoro 已创建（基线 main ec57384）。
+- 范围：账户区改为分组行（第一组，保留全部 id/功能）；番茄钟全链路移除（渲染层/store/主进程通知/遥测/license/文案/check/smoke）；专注统计组件保留（数据源移除后不再增长，另行说明）。
