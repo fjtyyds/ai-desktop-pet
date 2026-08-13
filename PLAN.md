@@ -220,7 +220,7 @@
 - [x] T-60 系统与性能（76e7c27）
 - [x] T-61 设置与引导（ee95481）
 
-**M5.2：动画宠物包与任务级进度气泡——实施中（2026-08-13）**
+**M5.2：动画宠物包与任务级进度气泡——已完成（2026-08-13，computer use 目检通过）**
 
 目标：内置开箱即用动画宠物包（pixel-pet + 可复用生成脚本）与任务级进度气泡（标题/阶段/百分比/结果；首批接入皮肤批量导入与自动更新下载）（ADR-046）。
 
@@ -240,8 +240,11 @@
 
 - [x] T-62 动画宠物包（0e9f5bd，已合并 main）
 - [x] T-63 任务级进度气泡（a7b31d8，已合并 main）
+- [x] computer use 目检与收尾（pixel-pet 动画/任务气泡/批量导入/右键菜单实测通过；进度残留清理 + 皮肤同步刷新两处小修）
 
 ## Progress
+
+- 2026-08-13：M5.2 computer use 目检完成：真实 UI 路径验证 pixel-pet 应用与 idle 8 帧动画播放（背景位置 50%→87.5% 推进）；任务级进度气泡全序列（25→50→75→finish、提醒排队补放、结束隐藏进度条）；真实点击“扫描 Codex 宠物目录”导入 8 个测试包，浮窗收到 13%→100% 任务事件；右键菜单 Esc 关闭不收起浮窗。收尾两处小修：① overlay.js 任务结束清空进度 label/宽度残留；② ipc.js skin:apply/remove 后 overlay.refresh() 同步浮窗（UI 与直连 API 一致）。check/smoke 全绿（含新增断言）。
 
 - 2026-08-13：T-63 任务级进度气泡验收合并（a7b31d8 fast-forward）：petAPI.petOverlay.startTask/updateTask/finishTask/getConfig + pet:task-* IPC；任务气泡运行中优先、提醒排队补放；皮肤批量导入与更新下载接入（onProgress/onDownloadProgress）；overlay 进度条渲染；T-63 check/smoke 断言与端到端全绿；main 复跑 check/smoke 全绿。待人工目检与 sync-latest。
 

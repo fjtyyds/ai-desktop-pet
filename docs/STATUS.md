@@ -2,9 +2,9 @@
 
 - 更新时间：2026-08-13
 - 当前阶段：M5.2 宠物浮窗增强——动画宠物包与任务级进度气泡（ADR-046）
-- 当前任务：T-62/T-63 均已验收合并（0e9f5bd / a7b31d8）；待人工目检与 sync-latest
-- 最近完成：T-63 任务级进度气泡验收合并（a7b31d8，main check/smoke 全绿）；T-62 动画宠物包验收合并（0e9f5bd）
-- 下一步：用户 `npm run dev` 目检（pixel-pet 动画观感 + 任务气泡体验）→ sync-latest 同步最新版 → push 授权后推送
+- 当前任务：M5.2 computer use 目检完成（pixel-pet 动画/任务气泡/批量导入/右键菜单），两处收尾修复已合并；最新版待本轮同步
+- 最近完成：T-62/T-63 验收合并（0e9f5bd / a7b31d8）+ computer use 目检结论与收尾修复（进度残留清理、皮肤 apply/remove 浮窗同步刷新）
+- 下一步：sync-latest 同步最新版 → push origin main（已授权）；后续方向（宠物包在线商店等）待用户拍板
 - 阻塞：无（商店/签名资金冻结仍按 ADR-041 处理）
 - 最新版：`E:\codex\AI桌宠最新版`（scripts/sync-latest.ps1 自动同步，当前 0.1.0 @ f029dbb，ADR-042/043）
 - 交接提示：新会话先读 `AGENTS.md` → `PLAN.md` → `docs/STATUS.md` → `docs/reports/2026-08-10-工作对接方案.md` → 自己的任务卡（docs/tasks/T-xx.md）
