@@ -9,6 +9,12 @@
 - 最新版：`E:\codex\AI桌宠最新版`（scripts/sync-latest.ps1 自动同步，当前 0.1.0 @ d237fba，ADR-042/043）
 - 交接提示：新会话先读 `AGENTS.md` → `PLAN.md` → `docs/STATUS.md` → `docs/reports/2026-08-10-工作对接方案.md` → 自己的任务卡（docs/tasks/T-xx.md）
 
+## ADR-047 总工交接项目外事故记录（2026-08-13）
+
+- 事故：22:34 总工交接再次把新总工创建为“不在项目中工作”的项目外线程（send-prompt 漏带 `--project`，误建 019ffb8b；其一度写入 coordinator-loop-state.json 自认总工）。
+- 处置：ADR-047 固化“项目总工交接必须 `--project E:\codex\AI桌宠`”；交接文件新增“项目根目录”字段；codex-context-handoff 技能 §5/§6/§7 增加必带参数、项目归属验证与项目外误建补救流程；AGENTS.md 与总工交接提示词模板同步更新。
+- 重交：22:37 以 `--project E:\codex\AI桌宠` 重交成功，项目内总工 019ffb8e（cwd=E:\codex\AI桌宠，提示词已送达）；019ffb8b 作废/只读（停手消息两次未确认送达，建议用户归档该线程）。
+
 ## M1 集成完成记录（2026-08-09）
 
 - 合并：codex/m1-tray（T-01，此前已并入）→ codex/m1-chat（T-02 渲染层 + e95c411 T-03）→ codex/m1-llm（T-03，842f18a）。

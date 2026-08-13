@@ -244,6 +244,8 @@
 
 ## Progress
 
+- 2026-08-13：ADR-047 落盘——总工交接再次把新总工建到项目外（send-prompt 漏带 --project，走“不在项目中工作”路径，误建 019ffb8b）；已固化硬规则（交接命令必带 `--project E:\codex\AI桌宠`、交接文件新增“项目根目录”、codex-context-handoff 技能 §5/§6/§7 更新、AGENTS.md/交接模板同步），项目内总工 019ffb8e 已重交上岗，019ffb8b 作废只读（停手消息两次未确认送达，用户可归档该线程）。
+
 - 2026-08-13：M5.2 computer use 目检完成：真实 UI 路径验证 pixel-pet 应用与 idle 8 帧动画播放（背景位置 50%→87.5% 推进）；任务级进度气泡全序列（25→50→75→finish、提醒排队补放、结束隐藏进度条）；真实点击“扫描 Codex 宠物目录”导入 8 个测试包，浮窗收到 13%→100% 任务事件；右键菜单 Esc 关闭不收起浮窗。收尾两处小修：① overlay.js 任务结束清空进度 label/宽度残留；② ipc.js skin:apply/remove 后 overlay.refresh() 同步浮窗（UI 与直连 API 一致）。check/smoke 全绿（含新增断言）。
 
 - 2026-08-13：T-63 任务级进度气泡验收合并（a7b31d8 fast-forward）：petAPI.petOverlay.startTask/updateTask/finishTask/getConfig + pet:task-* IPC；任务气泡运行中优先、提醒排队补放；皮肤批量导入与更新下载接入（onProgress/onDownloadProgress）；overlay 进度条渲染；T-63 check/smoke 断言与端到端全绿；main 复跑 check/smoke 全绿。待人工目检与 sync-latest。
@@ -386,6 +388,7 @@
 - ADR-044：宠物浮窗（Codex Pets 式）——独立悬浮宠物 + 工作状态气泡 + 宠物包导入（2026-08-13，T-55）。
 - ADR-045：宠物浮窗优化方案——交互/状态机/情绪动画/皮肤/性能/设置引导六卡（2026-08-13，T-56~T-61）。
 - ADR-046：动画宠物包与任务级进度气泡（2026-08-13，T-62/T-63）。
+- ADR-047：总工交接必须保持项目上下文——send-prompt 必带 --project（2026-08-13，项目外误建线程事故复盘）。
 - ADR-047：总工交接必须保持项目上下文——`--project` 必填，禁止项目外总工（2026-08-13，误建线程事故复盘）。
 
 详见 `docs/DECISIONS.md`。
