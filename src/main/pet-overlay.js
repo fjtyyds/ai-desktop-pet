@@ -38,6 +38,7 @@ const PET_CHANNELS = {
   tuckAway: 'pet:tuck-away',
   showMain: 'pet:show-main',
   toggleMain: 'pet:toggle-main',
+  moveWindow: 'pet:move-window',
   refreshSkin: 'pet:refresh-skin',
   skinUpdated: 'pet:skin-updated',
   statusUpdated: 'pet:status-updated',
@@ -385,6 +386,22 @@ function createPetOverlay(options = {}) {
 
     ipcMain.handle(PET_CHANNELS.toggleMain, () => {
       toggleMainWindow?.();
+      return { ok: true };
+    });
+
+    ipcMain.handle(PET_CHANNELS.moveWindow, (_event, payload) => {
+      const dx = Number(payload && payload.dx);
+      const dy = Number(payload && payload.dy);
+      if (
+        win &&
+        !win.isDestroyed() &&
+        Number.isFinite(dx) &&
+        Number.isFinite(dy)
+      ) {
+        const [x, y] = win.getPosition();
+        win.setPosition(Math.round(x + dx), Math.round(y + dy));
+        persistBounds(win.getBounds());
+      }
       return { ok: true };
     });
 

@@ -345,13 +345,21 @@ app.whenReady().then(() => {
         const api = window.petAPI.petOverlay;
         const show = await api.showMain();
         const toggle = await api.toggleMain();
+        const move = await api.moveBy({ dx: 1, dy: 1 });
+        const petEl = document.getElementById('overlay-pet');
+        const petStyle = petEl ? getComputedStyle(petEl) : null;
         return {
           showOk: Boolean(show && show.ok),
-          toggleOk: Boolean(toggle && toggle.ok)
+          toggleOk: Boolean(toggle && toggle.ok),
+          moveOk: Boolean(move && move.ok),
+          noDragRegion: petStyle ? petStyle.webkitAppRegion !== 'drag' : false
         };
       })()`);
-      if (!t56State.showOk || !t56State.toggleOk) {
+      if (!t56State.showOk || !t56State.toggleOk || !t56State.moveOk) {
         fail(`T-56 showMain/toggleMain 通道异常: ${JSON.stringify(t56State)}`);
+      }
+      if (!t56State.noDragRegion) {
+        fail('浮窗宠物区域仍为拖拽区（会吞掉点击/双击）');
       }
       console.log('[smoke] T-56 浮窗交互通道端到端通过');
       // T-60：状态事件推送 + 完整状态端到端

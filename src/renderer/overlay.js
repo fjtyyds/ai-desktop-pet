@@ -278,6 +278,54 @@
   pet.addEventListener('dblclick', () => {
     void window.petAPI.petOverlay.toggleMain();
   });
+  // T-56 修复：拖拽区（-webkit-app-region）会吞掉点击/双击，改为手动指针拖拽
+  let dragState = null;
+  pet.addEventListener('pointerdown', (event) => {
+    if (event.button !== 0) {
+      return;
+    }
+    dragState = {
+      x: event.screenX,
+      y: event.screenY,
+      moved: false,
+      pointerId: event.pointerId
+    };
+    try {
+      pet.setPointerCapture(event.pointerId);
+    } catch (_error) {
+      // 指针捕获失败不阻塞后续移动
+    }
+  });
+  pet.addEventListener('pointermove', (event) => {
+    if (!dragState || dragState.pointerId !== event.pointerId) {
+      return;
+    }
+    const dx = event.screenX - dragState.x;
+    const dy = event.screenY - dragState.y;
+    if (Math.abs(dx) > 2 || Math.abs(dy) > 2) {
+      dragState.moved = true;
+    }
+    if (!dragState.moved) {
+      return;
+    }
+    dragState.x = event.screenX;
+    dragState.y = event.screenY;
+    void window.petAPI.petOverlay.moveBy({ dx, dy }).catch(() => {
+      // 移动失败保持原位
+    });
+  });
+  function endDrag(event) {
+    if (dragState && dragState.pointerId === event.pointerId) {
+      dragState = null;
+      try {
+        pet.releasePointerCapture(event.pointerId);
+      } catch (_error) {
+        // 指针已释放时忽略
+      }
+    }
+  }
+  pet.addEventListener('pointerup', endDrag);
+  pet.addEventListener('pointercancel', endDrag);
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') {
       void window.petAPI.petOverlay.tuckAway();

@@ -3783,6 +3783,24 @@ pass('T-48 设置页三段式布局、既有元素 id 与双语文案断言通�
   if (!overlayJsSource.includes("'dblclick'") || !overlayJsSource.includes('Escape')) {
     fail('overlay.js 缺少双击唤起/Esc 收起');
   }
+  if (
+    !overlayJsSource.includes('moveBy') ||
+    !overlayJsSource.includes('pointerdown')
+  ) {
+    fail('overlay.js 缺少手动拖拽（moveBy/pointerdown）');
+  }
+  if (overlayCssSource.includes('-webkit-app-region: drag')) {
+    fail('overlay.css 仍在宠物区域使用拖拽区（会吞掉点击/双击）');
+  }
+  if (
+    !preloadSource.includes('pet:move-window') ||
+    !preloadSource.includes('moveBy:')
+  ) {
+    fail('preload.js 缺少 pet:move-window/moveBy');
+  }
+  if (!petOverlaySource.includes('pet:move-window')) {
+    fail('pet-overlay.js 缺少 pet:move-window 处理器');
+  }
   for (const localeFile of ['zh-CN', 'en']) {
     const locale = JSON.parse(
       fs.readFileSync(

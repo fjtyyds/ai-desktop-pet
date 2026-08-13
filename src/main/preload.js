@@ -47,6 +47,7 @@ const CHANNELS = {
   petTuckAway: 'pet:tuck-away', // T-55：收起草宠（隐藏并持久化关闭）
   petShowMain: 'pet:show-main', // T-56：唤起主聊天窗口
   petToggleMain: 'pet:toggle-main', // T-56：点击宠物切换主聊天窗口显示
+  petMoveWindow: 'pet:move-window', // T-56：手动拖拽移动浮窗
   petRefreshSkin: 'pet:refresh-skin', // T-55：皮肤变更后刷新浮窗
   petSkinUpdated: 'pet:skin-updated', // T-55：主进程推送浮窗皮肤变更
   petStatusUpdated: 'pet:status-updated', // T-60：主进程推送浮窗状态变更
@@ -153,6 +154,7 @@ contextBridge.exposeInMainWorld('petAPI', {
     tuckAway: () => ipcRenderer.invoke(CHANNELS.petTuckAway), // T-55
     showMain: () => ipcRenderer.invoke(CHANNELS.petShowMain), // T-56
     toggleMain: () => ipcRenderer.invoke(CHANNELS.petToggleMain), // T-56
+    moveBy: (payload) => ipcRenderer.invoke(CHANNELS.petMoveWindow, payload), // T-56
     refreshSkin: () => ipcRenderer.invoke(CHANNELS.petRefreshSkin), // T-55
     getOverlayState: () => ipcRenderer.invoke(CHANNELS.petGetOverlayState), // T-60
     onSkinUpdated: (callback) => {

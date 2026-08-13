@@ -67,7 +67,7 @@ body {
   background-repeat: no-repeat;
   background-position: center;
   background-size: contain;
-  -webkit-app-region: drag;
+  touch-action: none;
   cursor: grab;
 }
 
