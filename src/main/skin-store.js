@@ -32,8 +32,10 @@ const MAX_PACK_BYTES = 10 * 1024 * 1024;
 const MAX_PACK_ENTRIES = 50;
 /** 清单文件名（必须在包根目录） */
 const MANIFEST_NAME = 'manifest.json';
+/** T-55：Codex 宠物包清单文件名（pet.json + spritesheet.webp，8 列×9 行动画图集） */
+const PET_MANIFEST_NAME = 'pet.json';
 /** 允许的包内文件扩展名：仅 PNG 与 JSON（含清单）；其余一律拒绝 */
-const ALLOWED_EXTENSIONS = new Set(['.png', '.json']);
+const ALLOWED_EXTENSIONS = new Set(['.png', '.json', '.webp']);
 const ID_PATTERN = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 const ASSET_KEY_PATTERN = /^[a-z0-9_-]{1,32}$/;
 
@@ -322,9 +324,132 @@ function parseManifest(buffer, fileNames) {
 }
 
 /**
+ * 解析 WebP 画布尺寸（T-55）：
+ * - VP8X（含透明/动画的扩展头）优先；canvas width/height 为 24 位小端 +1；
+ * - 无 VP8X 时回退 VP8（有损）与 VP8L（无损）帧头。
+ * 无法解析时返回 null，导入校验据此拒绝。
+ */
+function parseWebpSize(buffer) {
+  if (!Buffer.isBuffer(buffer) || buffer.length < 20) {
+    return null;
+  }
+  if (
+    buffer.toString('ascii', 0, 4) !== 'RIFF' ||
+    buffer.toString('ascii', 8, 12) !== 'WEBP'
+  ) {
+    return null;
+  }
+  let offset = 12;
+  while (offset + 8 <= buffer.length) {
+    const fourcc = buffer.toString('ascii', offset, offset + 4);
+    const size = buffer.readUInt32LE(offset + 4);
+    const dataStart = offset + 8;
+    if (fourcc === 'VP8X' && dataStart + 10 <= buffer.length) {
+      return {
+        width: 1 + buffer.readUIntLE(dataStart + 4, 3),
+        height: 1 + buffer.readUIntLE(dataStart + 7, 3)
+      };
+    }
+    if (fourcc === 'VP8 ' && dataStart + 10 <= buffer.length) {
+      const width = buffer.readUInt16LE(dataStart + 6) & 0x3fff;
+      const height = buffer.readUInt16LE(dataStart + 8) & 0x3fff;
+      if (width > 0 && height > 0) {
+        return { width, height };
+      }
+    }
+    if (fourcc === 'VP8L' && dataStart + 5 <= buffer.length) {
+      const bits = buffer.readUInt32LE(dataStart + 1);
+      const width = (bits & 0x3fff) + 1;
+      const height = ((bits >> 14) & 0x3fff) + 1;
+      if (width > 0 && height > 0) {
+        return { width, height };
+      }
+    }
+    offset = dataStart + size + (size % 2);
+  }
+  return null;
+}
+
+/** 校验 Codex 宠物包图集：8 列×9 行、单元格 64~512 像素 */
+function validateAtlasSize(buffer) {
+  const dims = parseWebpSize(buffer);
+  if (!dims) {
+    throw new SkinError('spritesheet.webp 无法解析尺寸（需要有效的 WebP 文件）');
+  }
+  if (dims.width % 8 !== 0 || dims.height % 9 !== 0) {
+    throw new SkinError(
+      `spritesheet.webp 需为 8 列×9 行动画图集，实际 ${dims.width}×${dims.height}`
+    );
+  }
+  const cellWidth = dims.width / 8;
+  const cellHeight = dims.height / 9;
+  if (cellWidth < 64 || cellWidth > 512 || cellHeight < 64 || cellHeight > 512) {
+    throw new SkinError(
+      `spritesheet.webp 单元格尺寸超出 64~512 像素（实际 ${cellWidth}×${cellHeight}）`
+    );
+  }
+  return { cols: 8, rows: 9, cellWidth, cellHeight };
+}
+
+/**
+ * 解析并校验 pet.json（Codex 宠物包清单，T-55）：
+ * { id, displayName, description, spritesheetPath }
+ */
+function parsePetManifest(buffer, fileNames) {
+  let manifest;
+  try {
+    manifest = JSON.parse(buffer.toString('utf8'));
+  } catch (_error) {
+    throw new SkinError('pet.json 不是合法 JSON');
+  }
+  if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest)) {
+    throw new SkinError('pet.json 必须为 JSON 对象');
+  }
+  const id = typeof manifest.id === 'string' ? manifest.id.trim() : '';
+  if (!ID_PATTERN.test(id)) {
+    throw new SkinError(
+      'pet.json.id 非法（须为 1~64 位小写字母/数字/-/_，且以字母或数字开头）'
+    );
+  }
+  if (id === DEFAULT_SKIN_ID) {
+    throw new SkinError('default 为内置皮肤 id，不可导入');
+  }
+  const displayName =
+    typeof manifest.displayName === 'string' ? manifest.displayName.trim() : '';
+  if (!displayName || displayName.length > 80) {
+    throw new SkinError('pet.json.displayName 须为 1~80 字符的非空字符串');
+  }
+  const description =
+    typeof manifest.description === 'string' ? manifest.description.trim() : '';
+  if (description.length > 200) {
+    throw new SkinError('pet.json.description 超长（上限 200 字符）');
+  }
+  const spritesheet =
+    typeof manifest.spritesheetPath === 'string'
+      ? manifest.spritesheetPath.trim()
+      : '';
+  if (!spritesheet || path.extname(spritesheet).toLowerCase() !== '.webp') {
+    throw new SkinError('pet.json.spritesheetPath 必须引用包内 .webp 文件');
+  }
+  const normalized = normalizeEntryName(spritesheet);
+  if (!fileNames.has(normalized)) {
+    throw new SkinError(`pet.json 引用的 spritesheet 不存在: ${spritesheet}`);
+  }
+  return {
+    id,
+    name: displayName,
+    author: '',
+    version: '1.0.0',
+    preview: spritesheet,
+    spritesheetPath: normalized,
+    description
+  };
+}
+
+/**
  * 校验整包文件（目录或 zip 解压后统一入口）：
  * - 大小/条目数/扩展名/重复/路径；
- * - manifest.json 必须存在且引用资源均在包内。
+ * - manifest.json 或 pet.json 必须存在且引用资源均在包内。
  */
 function validateSkinPackFiles(files) {
   if (!Array.isArray(files) || files.length === 0) {
@@ -355,18 +480,39 @@ function validateSkinPackFiles(files) {
     const ext = path.extname(name).toLowerCase();
     if (!ALLOWED_EXTENSIONS.has(ext)) {
       throw new SkinError(
-        `包内包含不允许的文件类型: ${name}（仅允许 .png/.json，拒绝可执行文件与脚本）`
+        `包内包含不允许的文件类型: ${name}（仅允许 .png/.json/.webp，拒绝可执行文件与脚本）`
       );
     }
     fileNames.add(name);
   }
-  if (!fileNames.has(MANIFEST_NAME)) {
-    throw new SkinError('缺少 manifest.json 清单');
+  const hasManifest = fileNames.has(MANIFEST_NAME);
+  const hasPetManifest = fileNames.has(PET_MANIFEST_NAME);
+  if (!hasManifest && !hasPetManifest) {
+    throw new SkinError('缺少 manifest.json 或 pet.json 清单');
   }
-  const manifestFile = files.find((file) => normalizeEntryName(file.name) === MANIFEST_NAME);
-  const manifest = parseManifest(manifestFile.data, fileNames);
+  if (hasManifest && hasPetManifest) {
+    throw new SkinError('包内不能同时包含 manifest.json 与 pet.json');
+  }
+  let manifest = null;
+  let atlas = null;
+  if (hasManifest) {
+    const manifestFile = files.find(
+      (file) => normalizeEntryName(file.name) === MANIFEST_NAME
+    );
+    manifest = parseManifest(manifestFile.data, fileNames);
+  } else {
+    const petFile = files.find(
+      (file) => normalizeEntryName(file.name) === PET_MANIFEST_NAME
+    );
+    manifest = parsePetManifest(petFile.data, fileNames);
+    const spriteFile = files.find(
+      (file) => normalizeEntryName(file.name) === manifest.spritesheetPath
+    );
+    atlas = validateAtlasSize(spriteFile.data);
+  }
   return {
     manifest,
+    atlas,
     files: files.map((file) => ({ name: normalizeEntryName(file.name), data: file.data }))
   };
 }
@@ -411,7 +557,12 @@ function collectDirectoryPack(dir) {
 function toDataUrl(filePath) {
   const data = fs.readFileSync(filePath);
   const ext = path.extname(filePath).toLowerCase();
-  const mime = ext === '.png' ? 'image/png' : 'application/octet-stream';
+  const mime =
+    ext === '.png'
+      ? 'image/png'
+      : ext === '.webp'
+        ? 'image/webp'
+        : 'application/octet-stream';
   return `data:${mime};base64,${data.toString('base64')}`;
 }
 
@@ -463,7 +614,71 @@ function createSkinStore(options = {}) {
     return parsed;
   }
 
+  /** 读取 Codex 宠物包 pet.json（T-55） */
+  function readPetManifest(dir) {
+    const manifestPath = path.join(dir, PET_MANIFEST_NAME);
+    if (!fs.existsSync(manifestPath)) {
+      throw new SkinError(`宠物包缺少 ${PET_MANIFEST_NAME}: ${dir}`);
+    }
+    let parsed;
+    try {
+      parsed = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    } catch (error) {
+      throw new SkinError(
+        `pet.json 解析失败: ${error && error.message ? error.message : error}`
+      );
+    }
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      throw new SkinError('pet.json 必须为 JSON 对象');
+    }
+    return parsed;
+  }
+
+  /** Codex 宠物包目录条目：图集 data URL + 网格信息 */
+  function petEntryFromDir(dir, id, builtin) {
+    const pet = readPetManifest(dir);
+    const spritesheetRel =
+      typeof pet.spritesheetPath === 'string' && pet.spritesheetPath.trim()
+        ? pet.spritesheetPath.trim()
+        : '';
+    if (!spritesheetRel) {
+      throw new SkinError('pet.json.spritesheetPath 缺失');
+    }
+    const spritesheetPath = path.join(dir, normalizeEntryName(spritesheetRel));
+    const dims = parseWebpSize(fs.readFileSync(spritesheetPath));
+    if (!dims || dims.width % 8 !== 0 || dims.height % 9 !== 0) {
+      throw new SkinError('spritesheet.webp 不是 8 列×9 行动画图集');
+    }
+    const previewRel =
+      typeof pet.preview === 'string' &&
+      pet.preview.trim() &&
+      fs.existsSync(path.join(dir, normalizeEntryName(pet.preview)))
+        ? pet.preview
+        : spritesheetRel;
+    return {
+      id,
+      name: typeof pet.displayName === 'string' ? pet.displayName : id,
+      author: '',
+      version: '1.0.0',
+      builtin,
+      kind: 'atlas',
+      description: typeof pet.description === 'string' ? pet.description : '',
+      previewDataUrl: toDataUrl(path.join(dir, normalizeEntryName(previewRel))),
+      roleAssets: {},
+      spritesheetDataUrl: toDataUrl(spritesheetPath),
+      atlas: {
+        cols: 8,
+        rows: 9,
+        cellWidth: dims.width / 8,
+        cellHeight: dims.height / 9
+      }
+    };
+  }
+
   function entryFromDir(dir, id, builtin) {
+    if (fs.existsSync(path.join(dir, PET_MANIFEST_NAME))) {
+      return petEntryFromDir(dir, id, builtin);
+    }
     const manifest = readManifest(dir);
     const previewPath = path.join(dir, normalizeEntryName(manifest.preview || ''));
     const roleAssets = {};
@@ -482,6 +697,7 @@ function createSkinStore(options = {}) {
       author: typeof manifest.author === 'string' ? manifest.author : '',
       version: typeof manifest.version === 'string' ? manifest.version : '',
       builtin,
+      kind: 'static',
       previewDataUrl: fs.existsSync(previewPath) ? toDataUrl(previewPath) : '',
       roleAssets
     };
@@ -648,5 +864,7 @@ module.exports = {
   MAX_PACK_BYTES,
   MAX_PACK_ENTRIES,
   MANIFEST_NAME,
+  PET_MANIFEST_NAME,
+  parseWebpSize,
   ALLOWED_EXTENSIONS
 };

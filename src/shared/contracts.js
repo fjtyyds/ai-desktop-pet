@@ -81,6 +81,26 @@ const DEFAULT_MODEL = 'deepseek-v4-flash';
  * @property {string|null} error 失败原因（不抛异常）
  */
 
+/**
+ * T-55（ADR-044）：宠物浮窗状态（Codex Pets 式独立悬浮宠物）。
+ * @typedef {Object} PetOverlayStatus
+ * @property {'idle'|'working'|'ready'|'failed'} state
+ *   idle=等待聊天；working=LLM 回复中；ready=回复完成；failed=回复出错
+ * @property {string} text 气泡文案（可为空串，由浮窗本地化回退）
+ * @property {number} at 状态更新时间戳
+ */
+
+/**
+ * 宠物浮窗 petAPI.petOverlay 契约（T-55，ADR-044）：
+ * - toggle() -> Promise<{ ok, enabled, visible }>（切换并持久化 petOverlayEnabled）
+ * - setEnabled({ enabled }) -> Promise<{ ok, enabled, visible }>（设置页开关）
+ * - setStatus({ state, text? }) -> Promise<PetOverlayStatus>（聊天页上报）
+ * - getStatus() -> Promise<PetOverlayStatus>
+ * - getSkin() -> Promise<{ ok, skin }>（含 spritesheetDataUrl/atlas 的皮肤条目）
+ * - tuckAway() -> Promise<{ ok, enabled }>（收起草宠）
+ * - refreshSkin() / onSkinUpdated(cb)（皮肤变更刷新）
+ */
+
 /** 短期记忆窗口大小（M2 默认最近 20 条消息） */
 const DEFAULT_SHORT_TERM_WINDOW = 20;
 

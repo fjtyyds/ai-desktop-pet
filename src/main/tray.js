@@ -48,6 +48,8 @@ function createTrayIcon() {
  * @param {() => void} handlers.toggleMainWindow
  * @param {() => void} handlers.quitApp
  * @param {() => void} [handlers.checkForUpdates] 可选：托盘“检查更新”回调（T-37）
+ * @param {() => void} [handlers.togglePetOverlay] 可选：托盘“显示/隐藏宠物浮窗”回调（T-55）
+ * @param {() => boolean} [handlers.getPetOverlayVisible] 可选：宠物浮窗当前可见状态（T-55）
  * @param {() => string} [handlers.getLocale] 可选：主进程注入语言读取器；缺省时从 settings.json 读取
  */
 function createTray({
@@ -56,6 +58,8 @@ function createTray({
   toggleMainWindow,
   quitApp,
   checkForUpdates,
+  togglePetOverlay,
+  getPetOverlayVisible,
   getLocale
 }) {
   const tray = new Tray(createTrayIcon());
@@ -82,12 +86,19 @@ function createTray({
   function refreshMenu() {
     const t = createTranslator(getCurrentLocale());
     const visible = Boolean(getMainWindow()?.isVisible());
+    const petVisible = typeof getPetOverlayVisible === 'function'
+      ? getPetOverlayVisible()
+      : false;
     tray.setToolTip(t('app.name'));
     tray.setContextMenu(
       Menu.buildFromTemplate([
         {
           label: visible ? t('tray.hideWindow') : t('tray.showWindow'),
           click: toggleMainWindow
+        },
+        {
+          label: petVisible ? t('tray.hidePet') : t('tray.showPet'),
+          click: () => togglePetOverlay?.()
         },
         { type: 'separator' },
         {

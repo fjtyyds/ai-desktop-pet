@@ -70,6 +70,7 @@ html.reduce-motion *::after {
 @media (prefers-reduced-motion: reduce) {
   .pet-avatar-wrap,
   .pet-avatar,
+  .skin-preview-atlas,
   .pet-card.mood-intense .mood-face,
   .mood-indicator.is-thinking .mood-face {
     animation: none !important;
@@ -199,6 +200,23 @@ html.reduce-motion *::after {
 
 .pet-avatar[hidden] {
   display: none;
+}
+
+/* T-55：Codex 宠物包图集皮肤在标题栏裁切首行动画 */
+.pet-avatar.is-atlas {
+  border-radius: 0;
+  background-position: 0% 0%;
+  background-repeat: no-repeat;
+  animation: pet-atlas-idle 2.4s steps(8) infinite;
+}
+
+@keyframes pet-atlas-idle {
+  from {
+    background-position: 0% 0%;
+  }
+  to {
+    background-position: 100% 0%;
+  }
 }
 
 .icon-btn {
@@ -942,6 +960,15 @@ html.reduce-motion *::after {
   height: 100%;
   object-fit: cover;
   display: block;
+}
+
+/* T-55：宠物包图集预览（首行动画） */
+.skin-preview-atlas {
+  width: 100%;
+  height: 100%;
+  background-repeat: no-repeat;
+  background-position: 0% 0%;
+  animation: pet-atlas-idle 2.4s steps(8) infinite;
 }
 
 .skin-preview-empty {

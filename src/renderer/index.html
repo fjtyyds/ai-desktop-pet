@@ -406,6 +406,21 @@
                     >关闭角色的呼吸/眨眼、过渡与动效，减少视觉刺激。</span
                   >
                 </label>
+                <!-- T-55：宠物浮窗（Codex Pets 式独立悬浮宠物，ADR-044） -->
+                <label class="field field-switch">
+                  <span class="field-label" data-i18n="settings.petOverlay">宠物浮窗</span>
+                  <input id="pet-overlay-enabled" class="field-checkbox" type="checkbox" />
+                  <span class="field-hint" data-i18n="settings.petOverlayHint"
+                    >在桌面显示独立悬浮宠物，聊天窗口隐藏时仍可见，并显示工作状态气泡。
+                  </span>
+                </label>
+                <button id="pet-overlay-toggle-btn" class="settings-link-row" type="button">
+                  <span class="settings-row-icon" aria-hidden="true">🐾</span>
+                  <span class="settings-row-label" data-i18n="settings.petOverlayToggle"
+                    >显示/隐藏宠物</span
+                  >
+                  <span class="settings-row-arrow" aria-hidden="true">›</span>
+                </button>
                 <button id="skin-manage-btn" class="settings-link-row" type="button">
                   <span class="settings-row-icon" aria-hidden="true">🧩</span>
                   <span class="settings-row-label" data-i18n="skin.manage"

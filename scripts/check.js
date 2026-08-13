@@ -37,9 +37,13 @@ const requiredFiles = [
   'docs/DECISIONS.md',
   'docs/STATUS.md',
   'src/main/main.js',
+  'src/main/pet-overlay.js',
   'src/main/telemetry.js',
   'src/main/preload.js',
   'src/renderer/index.html',
+  'src/renderer/overlay.html',
+  'src/renderer/overlay.css',
+  'src/renderer/overlay.js',
   'src/renderer/styles.css',
   'src/renderer/renderer.js'
 ];
@@ -3416,6 +3420,224 @@ pass('T-48 设置页三段式布局、既有元素 id 与双语文案断言通�
     pass('T-45 分享 PNG 校验与文件名清洗运行时断言通过');
   } catch (error) {
     fail(`T-45 分享校验检查异常: ${error && error.message ? error.message : error}`);
+  }
+
+  // T-55：宠物浮窗（Codex Pets 式独立悬浮宠物 + 宠物包导入，ADR-044）
+  const petOverlaySource = fs.readFileSync(
+    path.join(root, 'src', 'main', 'pet-overlay.js'),
+    'utf8'
+  );
+  const overlayHtmlSource = fs.readFileSync(
+    path.join(root, 'src', 'renderer', 'overlay.html'),
+    'utf8'
+  );
+  const overlayJsSource = fs.readFileSync(
+    path.join(root, 'src', 'renderer', 'overlay.js'),
+    'utf8'
+  );
+  const overlayCssSource = fs.readFileSync(
+    path.join(root, 'src', 'renderer', 'overlay.css'),
+    'utf8'
+  );
+  const traySource = fs.readFileSync(
+    path.join(root, 'src', 'main', 'tray.js'),
+    'utf8'
+  );
+  const skinStoreSource = fs.readFileSync(
+    path.join(root, 'src', 'main', 'skin-store.js'),
+    'utf8'
+  );
+  const storeSource = fs.readFileSync(
+    path.join(root, 'src', 'storage', 'store.js'),
+    'utf8'
+  );
+
+  for (const token of [
+    'pet:get-status',
+    'pet:set-status',
+    'pet:get-skin',
+    'pet:toggle-overlay',
+    'pet:set-enabled',
+    'pet:tuck-away',
+    'pet:refresh-skin',
+    'pet:skin-updated'
+  ]) {
+    if (!preloadSource.includes(token)) {
+      fail(`preload.js 缺少宠物浮窗通道 ${token}`);
+    }
+  }
+  if (!preloadSource.includes('petOverlay')) {
+    fail('preload.js 缺少 petAPI.petOverlay 暴露');
+  }
+  if (!mainSource.includes("require('./pet-overlay')")) {
+    fail('main.js 未接入 pet-overlay 模块');
+  }
+  if (!mainSource.includes('petOverlayEnabled === true')) {
+    fail('main.js 未按设置自动显示宠物浮窗');
+  }
+  if (!traySource.includes('togglePetOverlay')) {
+    fail('tray.js 未接入宠物浮窗切换');
+  }
+  if (!rendererIndexSource.includes('id="pet-overlay-enabled"')) {
+    fail('index.html 缺少宠物浮窗开关');
+  }
+  if (!rendererIndexSource.includes('id="pet-overlay-toggle-btn"')) {
+    fail('index.html 缺少显示/隐藏宠物入口');
+  }
+  if (!rendererChatSource.includes('reportPetStatus')) {
+    fail('chat.js 缺少宠物浮窗状态上报');
+  }
+  if (!rendererChatSource.includes('\\/pet\\b')) {
+    fail('chat.js 缺少 /pet 命令');
+  }
+  if (!overlayJsSource.includes('getStatus') || !overlayJsSource.includes('getSkin')) {
+    fail('overlay.js 缺少状态/皮肤读取');
+  }
+  if (!overlayJsSource.includes('tuckAway')) {
+    fail('overlay.js 缺少收起草宠交互');
+  }
+  if (!overlayCssSource.includes('pet-row-working')) {
+    fail('overlay.css 缺少工作状态动画');
+  }
+  if (
+    !overlayHtmlSource.includes('id="overlay-bubble"') ||
+    !overlayHtmlSource.includes('id="overlay-pet"')
+  ) {
+    fail('overlay.html 缺少浮窗结构');
+  }
+  if (
+    !skinStoreSource.includes('PET_MANIFEST_NAME') ||
+    !skinStoreSource.includes('parsePetManifest')
+  ) {
+    fail('skin-store.js 未支持 Codex 宠物包（pet.json）');
+  }
+  if (!skinStoreSource.includes("'.webp'")) {
+    fail('skin-store.js 未允许 .webp 资源');
+  }
+  if (!storeSource.includes('petOverlayEnabled')) {
+    fail('store.js 缺少 petOverlayEnabled 设置字段');
+  }
+
+  for (const localeFile of ['zh-CN', 'en']) {
+    const locale = JSON.parse(
+      fs.readFileSync(
+        path.join(root, 'src', 'shared', 'locales', `${localeFile}.json`),
+        'utf8'
+      )
+    );
+    for (const key of [
+      'tuckAway',
+      'statusIdle',
+      'statusWorking',
+      'statusReady',
+      'statusFailed'
+    ]) {
+      if (
+        !locale.overlay ||
+        typeof locale.overlay[key] !== 'string' ||
+        !locale.overlay[key].trim()
+      ) {
+        fail(`${localeFile}.json 缺少 overlay.${key} 文案`);
+      }
+    }
+    for (const key of ['petOverlay', 'petOverlayHint', 'petOverlayToggle']) {
+      if (
+        !locale.settings ||
+        typeof locale.settings[key] !== 'string' ||
+        !locale.settings[key].trim()
+      ) {
+        fail(`${localeFile}.json 缺少 settings.${key} 文案`);
+      }
+    }
+    if (
+      !locale.skin ||
+      typeof locale.skin.animated !== 'string' ||
+      !locale.skin.animated.trim()
+    ) {
+      fail(`${localeFile}.json 缺少 skin.animated 文案`);
+    }
+    if (
+      !locale.tray ||
+      typeof locale.tray.showPet !== 'string' ||
+      typeof locale.tray.hidePet !== 'string'
+    ) {
+      fail(`${localeFile}.json 缺少 tray.showPet/hidePet 文案`);
+    }
+  }
+  pass('T-55 宠物浮窗静态断言通过');
+
+  // T-55 运行时：WebP 尺寸解析 + Codex 宠物包导入/非法图集拒绝
+  try {
+    const skinStoreModule = require(path.join(root, 'src', 'main', 'skin-store.js'));
+    const webp = Buffer.alloc(30);
+    webp.write('RIFF', 0, 'ascii');
+    webp.writeUInt32LE(22, 4);
+    webp.write('WEBP', 8, 'ascii');
+    webp.write('VP8X', 12, 'ascii');
+    webp.writeUInt32LE(10, 16);
+    webp.writeUIntLE(1535, 24, 3);
+    webp.writeUIntLE(1871, 27, 3);
+    const dims = skinStoreModule.parseWebpSize(webp);
+    if (!dims || dims.width !== 1536 || dims.height !== 1872) {
+      fail(`parseWebpSize 解析异常: ${JSON.stringify(dims)}`);
+    }
+    const petTmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-pet-check-'));
+    const petDir = path.join(petTmp, 'pkg');
+    fs.mkdirSync(petDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(petDir, 'pet.json'),
+      JSON.stringify({
+        id: 'check-pet',
+        displayName: 'Check Pet',
+        description: 'check',
+        spritesheetPath: 'spritesheet.webp'
+      }),
+      'utf8'
+    );
+    fs.writeFileSync(path.join(petDir, 'spritesheet.webp'), webp);
+    const petStore = skinStoreModule.createSkinStore({
+      baseDir: path.join(petTmp, 'skins'),
+      defaultsDir: path.join(petTmp, 'defaults')
+    });
+    const imported = petStore.importPack(petDir);
+    if (
+      !imported ||
+      imported.kind !== 'atlas' ||
+      !imported.atlas ||
+      imported.atlas.cols !== 8 ||
+      imported.atlas.rows !== 9 ||
+      !imported.spritesheetDataUrl.startsWith('data:image/webp;base64,')
+    ) {
+      fail('Codex 宠物包导入结果异常');
+    }
+    const badWebp = Buffer.from(webp);
+    badWebp.writeUIntLE(191, 24, 3); // 宽 192 → 单元格 24px，低于下限
+    const badDir = path.join(petTmp, 'bad');
+    fs.mkdirSync(badDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(badDir, 'pet.json'),
+      JSON.stringify({
+        id: 'check-bad',
+        displayName: 'Bad',
+        description: '',
+        spritesheetPath: 'spritesheet.webp'
+      }),
+      'utf8'
+    );
+    fs.writeFileSync(path.join(badDir, 'spritesheet.webp'), badWebp);
+    let rejected = false;
+    try {
+      petStore.importPack(badDir);
+    } catch (_error) {
+      rejected = true;
+    }
+    if (!rejected) {
+      fail('非法图集未被拒绝');
+    }
+    fs.rmSync(petTmp, { recursive: true, force: true });
+    pass('T-55 WebP 解析与 Codex 宠物包导入/拒绝运行时通过');
+  } catch (error) {
+    fail(`T-55 宠物包运行时检查异常: ${error && error.message ? error.message : error}`);
   }
 
   console.log('[check] 全部通过');

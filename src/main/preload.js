@@ -36,7 +36,15 @@ const CHANNELS = {
   licenseActivate: 'license:activate', // T-40：激活
   licenseDeactivate: 'license:deactivate', // T-40：注销激活
   paymentCreateOrder: 'payment:create-order', // T-41：沙箱下单
-  paymentMockCallback: 'payment:mock-callback' // T-41：沙箱模拟回调（仅沙箱可用）
+  paymentMockCallback: 'payment:mock-callback', // T-41：沙箱模拟回调（仅沙箱可用）
+  petGetStatus: 'pet:get-status', // T-55：宠物浮窗状态读取
+  petSetStatus: 'pet:set-status', // T-55：宠物浮窗状态上报（聊天页驱动）
+  petGetSkin: 'pet:get-skin', // T-55：宠物浮窗当前皮肤
+  petToggleOverlay: 'pet:toggle-overlay', // T-55：显示/隐藏宠物浮窗
+  petSetEnabled: 'pet:set-enabled', // T-55：按开关持久化并同步浮窗显示
+  petTuckAway: 'pet:tuck-away', // T-55：收起草宠（隐藏并持久化关闭）
+  petRefreshSkin: 'pet:refresh-skin', // T-55：皮肤变更后刷新浮窗
+  petSkinUpdated: 'pet:skin-updated' // T-55：主进程推送浮窗皮肤变更
 };
 
 contextBridge.exposeInMainWorld('petAPI', {
@@ -126,5 +134,24 @@ contextBridge.exposeInMainWorld('petAPI', {
       ipcRenderer.invoke(CHANNELS.paymentCreateOrder, payload), // T-41
     mockCallback: (payload) =>
       ipcRenderer.invoke(CHANNELS.paymentMockCallback, payload) // T-41
+  },
+  petOverlay: {
+    getStatus: () => ipcRenderer.invoke(CHANNELS.petGetStatus), // T-55
+    setStatus: (payload) => ipcRenderer.invoke(CHANNELS.petSetStatus, payload), // T-55
+    getSkin: () => ipcRenderer.invoke(CHANNELS.petGetSkin), // T-55
+    toggle: () => ipcRenderer.invoke(CHANNELS.petToggleOverlay), // T-55
+    setEnabled: (payload) => ipcRenderer.invoke(CHANNELS.petSetEnabled, payload), // T-55
+    tuckAway: () => ipcRenderer.invoke(CHANNELS.petTuckAway), // T-55
+    refreshSkin: () => ipcRenderer.invoke(CHANNELS.petRefreshSkin), // T-55
+    onSkinUpdated: (callback) => {
+      // T-55：皮肤变更事件（浮窗页订阅）
+      const listener = (_event, _payload) => {
+        if (typeof callback === 'function') {
+          callback();
+        }
+      };
+      ipcRenderer.on(CHANNELS.petSkinUpdated, listener);
+      return () => ipcRenderer.removeListener(CHANNELS.petSkinUpdated, listener);
+    }
   }
 });

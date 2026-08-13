@@ -20,6 +20,7 @@ const {
   DEFAULT_IDLE_TRIGGER_MS,
   DEFAULT_MIN_INTERVAL_MS
 } = require('./idle'); // T-15: 空闲主动互动计时
+const { createPetOverlay } = require('./pet-overlay'); // T-55: 宠物浮窗（Codex Pets 式）
 
 let mainWindow = null;
 let trayApi = null;
@@ -28,6 +29,7 @@ let idleMonitor = null;
 let updaterApi = null; // T-37: 自动更新（仅打包版初始化）
 let telemetryApi = null; // T-42: 匿名遥测实例
 let telemetrySessionStartedAt = 0; // T-42: 会话时长统计起点
+let petOverlayApi = null; // T-55: 宠物浮窗实例
 
 /** T-19：窗口体验 IPC 通道（ADR-022 冻结契约；preload.js 同名常量保持一致） */
 const WINDOW_CHANNELS = {
@@ -598,6 +600,19 @@ if (SKIP_BOOTSTRAP || !app || typeof app.requestSingleInstanceLock !== 'function
     telemetryApi.flush(); // 尽力补发上次残留队列（失败保留，下次再试）
 
     createMainWindow();
+    // T-55：创建宠物浮窗（独立悬浮宠物）；默认关闭，按设置决定是否显示
+    petOverlayApi = createPetOverlay({
+      getSettings: () => ipc.getSettings(),
+      getTray: () => trayApi
+    });
+    try {
+      const settings = ipc.getSettings();
+      if (settings && settings.petOverlayEnabled === true) {
+        petOverlayApi.show();
+      }
+    } catch (_error) {
+      // 设置读取失败时不自动显示浮窗
+    }
     registerWindowIpc(); // T-19/T-25: window:toggle-dock / window:minimize
     // T-37: 仅打包版初始化自动更新（开发模式绝不检查；updater 内部还有二次守卫）
     if (app.isPackaged) {
@@ -616,7 +631,9 @@ if (SKIP_BOOTSTRAP || !app || typeof app.requestSingleInstanceLock !== 'function
       showMainWindow,
       toggleMainWindow,
       quitApp,
-      checkForUpdates: () => updaterApi?.checkForUpdates({ manual: true }) // T-37: 托盘手动检查
+      checkForUpdates: () => updaterApi?.checkForUpdates({ manual: true }), // T-37: 托盘手动检查
+      togglePetOverlay: () => petOverlayApi?.toggle(), // T-55: 托盘显示/隐藏宠物浮窗
+      getPetOverlayVisible: () => petOverlayApi?.isVisible?.() ?? false // T-55
     });
 
     // T-15: 空闲主动互动（节流、防打扰、可关闭）
@@ -653,6 +670,7 @@ if (SKIP_BOOTSTRAP || !app || typeof app.requestSingleInstanceLock !== 'function
 
   app.on('before-quit', () => {
     isQuitting = true;
+    petOverlayApi?.dispose?.(); // T-55: 退出前销毁浮窗
     updaterApi?.handleBeforeQuit(); // T-37: 用户确认后执行 quitAndInstall
     // T-42：退出前记录会话时长（留存漏斗）；补发为尽力而为，失败保留队列
     if (telemetryApi && telemetrySessionStartedAt > 0) {

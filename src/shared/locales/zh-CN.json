@@ -18,6 +18,13 @@
     "errorPrefix": "出错了：{error}",
     "greeting": "你好，我是你的 AI 桌宠 👋 想聊点什么？"
   },
+  "overlay": {
+    "tuckAway": "隐藏宠物",
+    "statusIdle": "等你聊天",
+    "statusWorking": "正在思考…",
+    "statusReady": "回复完成",
+    "statusFailed": "刚才出错了"
+  },
   "idle": {
     "phrases": [
       "你在忙吗？我在这儿等你呢 🐾",
@@ -160,7 +167,10 @@
     "memoryEmptyContent": "记忆内容不能为空",
     "memoryNotFound": "未找到该记忆，可能已被删除",
     "memoryInvalidId": "记忆 ID 无效",
-    "memoryUpdatedAt": "更新于 {time}"
+    "memoryUpdatedAt": "更新于 {time}",
+    "petOverlay": "宠物浮窗",
+    "petOverlayHint": "在桌面显示独立悬浮宠物，聊天窗口隐藏时仍可见，并显示工作状态气泡。",
+    "petOverlayToggle": "显示/隐藏宠物"
   },
   "water": {
     "widgetAriaLabel": "喝水提醒",
@@ -191,7 +201,7 @@
   "skin": {
     "manage": "皮肤与配件",
     "title": "皮肤与配件",
-    "hint": "皮肤包仅包含图片与清单（PNG/JSON），不包含可执行代码；支持 zip 或目录导入，商店上架后续接入。",
+    "hint": "皮肤包仅包含图片与清单（PNG/WebP/JSON），不包含可执行代码；支持 zip 或目录导入（含 Codex 动画宠物包），商店上架后续接入。",
     "import": "导入皮肤包",
     "importDialogTitle": "选择皮肤包（.zip 文件或文件夹）",
     "export": "导出",
@@ -213,7 +223,8 @@
     "installed": "已安装",
     "empty": "暂无可用皮肤。",
     "unavailable": "皮肤功能暂不可用（petAPI.skin 未提供）。",
-    "noPreview": "无预览图"
+    "noPreview": "无预览图",
+    "animated": "动画"
   },
   "data": {
     "exportTitle": "导出对话",
@@ -295,6 +306,8 @@
   "tray": {
     "hideWindow": "隐藏窗口",
     "showWindow": "显示窗口",
+    "showPet": "显示宠物",
+    "hidePet": "隐藏宠物",
     "quit": "退出"
   }
 }

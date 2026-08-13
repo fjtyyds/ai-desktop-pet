@@ -98,6 +98,8 @@ const DEFAULT_SETTINGS = {
   }, // T-44：喝水提醒（间隔与最近一次喝水时间）
   todos: [], // T-44：待办列表 { id, text, done, createdAt, completedAt }
   skinId: DEFAULT_SKIN_ID, // T-43：当前启用皮肤 id（≤64；default=内置经典皮肤）
+  petOverlayEnabled: false, // T-55：宠物浮窗（Codex Pets 式独立悬浮宠物）开关，默认关闭
+  petOverlayBounds: null, // T-55：宠物浮窗位置 { x, y }；null 表示未保存
   persona: { ...DEFAULT_PERSONA }
 };
 
@@ -444,6 +446,14 @@ function createStore(baseDir) {
       DEFAULT_SETTINGS.waterReminder
     );
     merged.todos = sanitizeTodos(merged.todos, DEFAULT_SETTINGS.todos);
+    merged.petOverlayEnabled = sanitizeBoolean(
+      merged.petOverlayEnabled,
+      DEFAULT_SETTINGS.petOverlayEnabled
+    );
+    merged.petOverlayBounds = sanitizeWindowBounds(
+      merged.petOverlayBounds,
+      DEFAULT_SETTINGS.petOverlayBounds
+    );
     return merged;
   }
 
@@ -473,7 +483,9 @@ function createStore(baseDir) {
       'theme',
       'reduceMotion',
       'waterReminder',
-      'todos'
+      'todos',
+      'petOverlayEnabled',
+      'petOverlayBounds'
     ];
     const next = { ...current };
     for (const key of allowed) {
@@ -630,6 +642,20 @@ function createStore(baseDir) {
         }
         if (key === 'todos') {
           next.todos = sanitizeTodos(patch.todos, current.todos);
+          continue;
+        }
+        if (key === 'petOverlayEnabled') {
+          next.petOverlayEnabled = sanitizeBoolean(
+            patch.petOverlayEnabled,
+            current.petOverlayEnabled
+          );
+          continue;
+        }
+        if (key === 'petOverlayBounds') {
+          next.petOverlayBounds = sanitizeWindowBounds(
+            patch.petOverlayBounds,
+            current.petOverlayBounds
+          );
           continue;
         }
         next[key] = typeof patch[key] === 'string' ? patch[key].trim() : String(patch[key]);

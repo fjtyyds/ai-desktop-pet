@@ -25,6 +25,8 @@ fs.writeFileSync(
 
 // 注册 IPC 处理器（聊天/设置/历史/许可证等），供渲染层端到端断言调用
 require(path.join(__dirname, '..', 'src', 'main', 'ipc'));
+// T-55：注册宠物浮窗 IPC（状态/皮肤/开关）
+const { createPetOverlay } = require(path.join(__dirname, '..', 'src', 'main', 'pet-overlay'));
 
 process.on('exit', () => {
   try {
@@ -35,6 +37,12 @@ process.on('exit', () => {
 });
 
 app.whenReady().then(() => {
+  createPetOverlay({
+    getSettings: () =>
+      require(path.join(__dirname, '..', 'src', 'main', 'ipc')).getSettings(),
+    getTray: () => null
+  });
+
   const win = new BrowserWindow({
     show: false,
     width: 320,
@@ -138,6 +146,61 @@ app.whenReady().then(() => {
         );
       }
       console.log('[smoke] 新用户首启引导可见且默认 onboardingDone=false 通过');
+      // T-55：宠物浮窗端到端断言
+      const overlayWin = new BrowserWindow({
+        show: false,
+        width: 240,
+        height: 320,
+        webPreferences: {
+          preload: path.join(__dirname, '..', 'src', 'main', 'preload.js'),
+          contextIsolation: true,
+          nodeIntegration: false,
+          sandbox: true,
+          offscreen: true
+        }
+      });
+      await overlayWin.loadFile(
+        path.join(__dirname, '..', 'src', 'renderer', 'overlay.html')
+      );
+      const overlayState = await overlayWin.webContents.executeJavaScript(`(async () => {
+        const api = window.petAPI.petOverlay || {};
+        const hasApi = Boolean(
+          api.getStatus && api.setStatus && api.getSkin && api.toggle &&
+          api.tuckAway && api.setEnabled && api.refreshSkin
+        );
+        if (!hasApi) return { hasApi, state: null, text: '', skinOk: false, bubbleVisible: false };
+        const initial = await api.getStatus();
+        await api.setStatus({ state: 'working', text: 'smoke' });
+        const status = await api.getStatus();
+        const skin = await api.getSkin();
+        const bubble = document.getElementById('overlay-bubble');
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        return {
+          hasApi,
+          initialState: initial && initial.state,
+          state: status && status.state,
+          text: status && status.text,
+          skinOk: Boolean(skin && skin.ok && skin.skin),
+          bubbleVisible: Boolean(bubble && !bubble.hidden && bubble.textContent.length > 0)
+        };
+      })()`);
+      if (!overlayState.hasApi) {
+        fail('petAPI.petOverlay 未完整暴露');
+      }
+      if (overlayState.initialState !== 'idle') {
+        fail(`浮窗初始状态应为 idle，实际 ${overlayState.initialState}`);
+      }
+      if (overlayState.state !== 'working' || overlayState.text !== 'smoke') {
+        fail(`浮窗状态上报异常: ${JSON.stringify(overlayState)}`);
+      }
+      if (!overlayState.skinOk) {
+        fail('pet:get-skin 未返回当前皮肤');
+      }
+      if (!overlayState.bubbleVisible) {
+        fail('浮窗气泡未显示工作状态文案');
+      }
+      console.log('[smoke] 宠物浮窗状态/皮肤/气泡端到端通过');
+      overlayWin.destroy();
       app.quit();
     } catch (error) {
       fail(`端到端断言异常: ${error && error.message ? error.message : error}`);

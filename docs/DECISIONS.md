@@ -382,3 +382,16 @@
   4. scripts/check.js 由“必须包含”改为“不得包含”防回归断言；scripts/smoke.js 新增全新 userData 首启引导可见断言。
   5. 验收通过后由协调者合并 main，并运行 scripts/sync-latest.ps1 更新 E:\codex\AI桌宠最新版。
 - 后果：生产安装包不再暴露支付/激活测试桩；全新安装与已有用户均可完整看到三步引导；主进程支付/许可证桩保留，未来接真实网关时复用。
+
+## ADR-044：宠物浮窗（Codex Pets 式独立悬浮宠物）（2026-08-13，T-55）
+
+- 状态：Accepted（已实施）
+- 背景：用户看到 OpenAI Codex 的“显示宠物”功能（Settings → Appearance → Pets，`/pet` 命令或托盘切换独立悬浮宠物，宠物显示 Codex 工作状态：运行中/等待输入/待审阅，并支持 ~/.codex/pets 的 pet.json + spritesheet.webp 自定义宠物包），希望 AI 桌宠也具备同等能力。项目已有主窗口内角色形象（T-43 皮肤 + T-44 动效），但没有独立浮窗、状态气泡与动画宠物包。
+- 决策：
+  1. 新增独立宠物浮窗 `src/main/pet-overlay.js` + `src/renderer/overlay.html/css/js`：240×320 透明置顶小窗，仅显示当前皮肤角色与状态气泡；主聊天窗口隐藏/最小化时仍可悬浮桌面；位置记忆到 `settings.petOverlayBounds`。
+  2. 开关与入口：设置页“外观”组新增“宠物浮窗”开关与“显示/隐藏宠物”行；托盘菜单新增“显示宠物/隐藏宠物”；聊天输入框支持 `/pet` 命令（不发给 AI）。设置持久化为 `settings.petOverlayEnabled`（默认 false）。
+  3. 状态契约（pet:get-status / pet:set-status）：`idle`（等待聊天，默认）、`working`（LLM 回复中）、`ready`（回复完成）、`failed`（回复出错）；聊天页在发送/完成/失败时上报；ready/failed 气泡 6 秒后自动回落 idle。
+  4. 支持导入 Codex 宠物包（`pet.json` + `spritesheet.webp`，8 列×9 行、单元格 64~512px）：扩展 skin-store 允许 `.webp`、校验 WebP 尺寸（VP8X/VP8/VP8L 解析）、按 9 行状态映射动画（idle/running/waiting/failed/review 等）；普通 PNG 皮肤仍可静态显示；标题栏与皮肤列表对图集皮肤做 CSS 裁切预览。
+  5. 安全边界沿用 T-43：包内仅允许 .png/.json/.webp、≤10MB、≤50 条目、拒绝路径跳转/加密 zip/符号链接，不执行包内任何代码。
+  6. IPC/preload 新增 `petAPI.petOverlay.{getStatus,setStatus,getSkin,toggle,setEnabled,tuckAway,refreshSkin,onSkinUpdated}`；契约写入 contracts.js；check/smoke 增加静态与运行时断言（含 WebP 尺寸解析、宠物包导入与非法图集拒绝）。
+- 后果：用户可像 Codex 一样让宠物独立悬浮桌面并看到工作状态；未来可在浮窗上扩展点击唤起主窗口、任务气泡等；皮肤包格式兼容 Codex 生态（可直接导入 hatch-pet 等产出的宠物包）。

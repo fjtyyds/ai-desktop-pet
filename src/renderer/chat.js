@@ -437,6 +437,8 @@
       memoryManageBtn: document.getElementById('memory-manage-btn'),
       memoryBack: document.getElementById('memory-back'),
       skinManageBtn: document.getElementById('skin-manage-btn'),
+      petOverlayEnabled: document.getElementById('pet-overlay-enabled'),
+      petOverlayToggleBtn: document.getElementById('pet-overlay-toggle-btn'),
       skinBack: document.getElementById('skin-back'),
       skinList: document.getElementById('skin-list'),
       skinImportBtn: document.getElementById('skin-import-btn'),
@@ -717,6 +719,19 @@
     elements.memoryManageBtn.addEventListener('click', openMemoryView);
     elements.memoryBack.addEventListener('click', closeMemoryView);
     elements.skinManageBtn.addEventListener('click', openSkinView);
+    if (elements.petOverlayToggleBtn) {
+      elements.petOverlayToggleBtn.addEventListener('click', () => {
+        pokeActivity();
+        void togglePetOverlay();
+      });
+    }
+    if (elements.petOverlayEnabled) {
+      elements.petOverlayEnabled.addEventListener('change', () => {
+        const enabled = elements.petOverlayEnabled.checked;
+        currentSettings = { ...currentSettings, petOverlayEnabled: enabled };
+        void applyPetOverlayEnabled(enabled);
+      });
+    }
     elements.skinBack.addEventListener('click', closeSkinView);
     elements.skinImportBtn.addEventListener('click', () => void handleSkinImport());
     elements.settingsSave.addEventListener('click', saveSettings);
@@ -1003,6 +1018,11 @@
       return;
     }
     elements.chatInput.value = '';
+    // T-55：`/pet` 命令切换宠物浮窗（Codex Pets 式），不发送给 AI
+    if (/^\/pet\b/i.test(text)) {
+      void togglePetOverlay();
+      return;
+    }
     appendMessage('user', text);
     void sendMessage(text);
   }
@@ -1057,6 +1077,8 @@
     setStreaming(true);
     const bubble = appendMessage('assistant', t('chat.thinking'));
     let received = '';
+    let replyOk = false;
+    let cancelled = false;
     let unsubscribe = null;
     // T-16：等待回复期间表情呈“思考”动效；文案仍保留当前 mood，避免与
     // T-14 的“正在思考…”气泡抢占同一视觉/文案通道。
@@ -1074,10 +1096,13 @@
           updateBubble(bubble, received);
         });
         const result = await window.petAPI.chat.sendStream({ text });
+        replyOk = Boolean(result && result.ok);
+        cancelled = result && result.error === '已取消';
         applyStreamResult(result, bubble, received, t);
       } else {
         // 兼容旧契约：无流式通道时走非流式发送
         const result = await window.petAPI.chat.send({ text });
+        replyOk = Boolean(result && result.ok);
         if (result && result.ok) {
           updateBubble(bubble, result.reply || t('chat.emptyReply'));
         } else {
@@ -1103,6 +1128,8 @@
       if (elements.moodIndicator) {
         elements.moodIndicator.classList.remove('is-thinking');
       }
+      // T-55：把聊天状态同步给宠物浮窗（气泡文案由浮窗本地化）
+      reportPetStatus(cancelled ? 'idle' : replyOk ? 'ready' : 'failed');
       void refreshMood();
       elements.chatInput.focus();
     }
@@ -2545,7 +2572,85 @@
     elements.settingsBack.focus();
   }
 
-  /** 标题栏角色形象：按 settings.skinId 取 roleAssets.idle（data URL） */
+  /* T-55：宠物浮窗 API（Codex Pets 式） */
+
+  function hasPetOverlayApi() {
+    return Boolean(
+      window.petAPI &&
+        window.petAPI.petOverlay &&
+        typeof window.petAPI.petOverlay.setStatus === 'function' &&
+        typeof window.petAPI.petOverlay.toggle === 'function'
+    );
+  }
+
+  function reportPetStatus(state, text) {
+    if (!hasPetOverlayApi()) {
+      return;
+    }
+    window.petAPI.petOverlay
+      .setStatus({ state, text: text || '' })
+      .catch((error) => {
+        console.warn('上报宠物浮窗状态失败：', error);
+      });
+  }
+
+  async function togglePetOverlay() {
+    if (!hasPetOverlayApi()) {
+      return;
+    }
+    try {
+      const result = await window.petAPI.petOverlay.toggle();
+      if (result && typeof result.enabled === 'boolean') {
+        if (elements.petOverlayEnabled) {
+          elements.petOverlayEnabled.checked = result.enabled;
+        }
+        currentSettings = { ...currentSettings, petOverlayEnabled: result.enabled };
+      }
+    } catch (error) {
+      console.warn('切换宠物浮窗失败：', error);
+    }
+  }
+
+  /** 设置页开关：立即显示/隐藏浮窗并持久化 */
+  async function applyPetOverlayEnabled(enabled) {
+    const api =
+      window.petAPI &&
+      window.petAPI.petOverlay &&
+      typeof window.petAPI.petOverlay.setEnabled === 'function'
+        ? window.petAPI.petOverlay
+        : null;
+    if (!api) {
+      return;
+    }
+    try {
+      const result = await api.setEnabled({ enabled });
+      if (result && typeof result.enabled === 'boolean') {
+        currentSettings = { ...currentSettings, petOverlayEnabled: result.enabled };
+      }
+    } catch (error) {
+      console.warn('应用宠物浮窗开关失败：', error);
+      if (elements.petOverlayEnabled) {
+        elements.petOverlayEnabled.checked = currentSettings.petOverlayEnabled === true;
+      }
+    }
+  }
+
+  /** 皮肤变更后刷新浮窗角色资源 */
+  function refreshPetOverlaySkin() {
+    const api =
+      window.petAPI &&
+      window.petAPI.petOverlay &&
+      typeof window.petAPI.petOverlay.refreshSkin === 'function'
+        ? window.petAPI.petOverlay
+        : null;
+    if (api) {
+      api.refreshSkin().catch((error) => {
+        console.warn('刷新宠物浮窗皮肤失败：', error);
+      });
+    }
+  }
+
+  /** 标题栏角色形象：按 settings.skinId 取角色资源；图集皮肤以 CSS 裁切首帧循环 */
   function updatePetAvatar() {
     if (!elements.petAvatar) {
       return;
@@ -2554,6 +2659,26 @@
     const skin =
       skinItems.find((item) => item.id === id) ||
       skinItems.find((item) => item.id === 'default');
+    const atlas =
+      skin && skin.spritesheetDataUrl && skin.atlas
+        ? {
+            url: skin.spritesheetDataUrl,
+            cols: skin.atlas.cols,
+            rows: skin.atlas.rows
+          }
+        : null;
+    if (atlas) {
+      elements.petAvatar.hidden = false;
+      elements.petAvatar.removeAttribute('src');
+      elements.petAvatar.classList.add('is-atlas');
+      elements.petAvatar.style.backgroundImage = `url("${atlas.url}")`;
+      elements.petAvatar.style.backgroundSize = `${atlas.cols * 100}% ${atlas.rows * 100}%`;
+      elements.petAvatar.style.backgroundRepeat = 'no-repeat';
+      elements.petAvatar.alt = skin.name || '';
+      return;
+    }
+    elements.petAvatar.classList.remove('is-atlas');
+    elements.petAvatar.style.backgroundImage = '';
     const asset = skin && skin.roleAssets && skin.roleAssets.idle;
     if (asset) {
       elements.petAvatar.src = asset;
@@ -2587,7 +2712,14 @@
 
       const preview = document.createElement('div');
       preview.className = 'skin-preview';
-      if (skin.previewDataUrl) {
+      if (skin.atlas && skin.spritesheetDataUrl) {
+        // T-55：Codex 宠物包（动画图集）在列表中直接预览首行动画
+        const animated = document.createElement('div');
+        animated.className = 'skin-preview-atlas';
+        animated.style.backgroundImage = `url("${skin.spritesheetDataUrl}")`;
+        animated.style.backgroundSize = `${skin.atlas.cols * 100}% ${skin.atlas.rows * 100}%`;
+        preview.appendChild(animated);
+      } else if (skin.previewDataUrl) {
         const img = document.createElement('img');
         img.src = skin.previewDataUrl;
         img.alt = skin.name || skin.id;
@@ -2617,7 +2749,10 @@
       const meta = document.createElement('div');
       meta.className = 'skin-meta';
       const tag = skin.builtin ? t('skin.builtin') : t('skin.installed');
-      meta.textContent = `${skin.version || '?'} · ${skin.author || '-'} · ${tag}`;
+      const kindTag = skin.atlas ? t('skin.animated') : '';
+      meta.textContent = `${skin.version || '?'} · ${skin.author || '-'} · ${tag}${
+        kindTag ? ` · ${kindTag}` : ''
+      }`;
 
       const actions = document.createElement('div');
       actions.className = 'skin-card-actions';
@@ -2658,6 +2793,7 @@
         currentSettings = result.settings;
         showSkinStatus(t('skin.applySuccess', { name: displayName }), 'ok');
         await refreshSkins();
+        refreshPetOverlaySkin(); // T-55：皮肤变更同步到浮窗
       } else {
         showSkinStatus(
           t('skin.applyError', {
@@ -2829,6 +2965,7 @@
         weatherEnabled: saved.weatherEnabled === true,
         weatherCity: saved.weatherCity,
         telemetryEnabled: saved.telemetryEnabled === true,
+        petOverlayEnabled: saved.petOverlayEnabled === true,
         theme: saved.theme === 'light' ? 'light' : 'dark',
         reduceMotion: saved.reduceMotion === true,
         waterReminder: saved.waterReminder,
@@ -2907,6 +3044,10 @@
     renderTtsVoicePackOptions(); // T-33：语音包选项与禁用态随设置/语言刷新
     applyWeatherSettings(currentSettings); // T-22：天气开关/城市输入 + 可见性 + 刷新
     elements.telemetryEnabled.checked = currentSettings.telemetryEnabled === true;
+    if (elements.petOverlayEnabled) {
+      elements.petOverlayEnabled.checked =
+        currentSettings.petOverlayEnabled === true;
+    }
     // T-44：主题/减弱动效/喝水/待办
     theme = currentSettings.theme === 'light' ? 'light' : 'dark';
     reduceMotion = currentSettings.reduceMotion === true;
@@ -2988,6 +3129,7 @@
         weatherEnabled: elements.weatherEnabled.checked,
         weatherCity: elements.weatherCity.value.trim(),
         telemetryEnabled: elements.telemetryEnabled.checked,
+        petOverlayEnabled: elements.petOverlayEnabled.checked,
         theme,
         reduceMotion,
         waterReminder: {
@@ -3015,6 +3157,7 @@
         weatherEnabled: elements.weatherEnabled.checked,
         weatherCity: elements.weatherCity.value.trim(),
         telemetryEnabled: elements.telemetryEnabled.checked,
+        petOverlayEnabled: elements.petOverlayEnabled.checked,
         theme,
         reduceMotion,
         waterReminder: {

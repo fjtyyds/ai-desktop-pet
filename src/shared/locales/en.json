@@ -18,6 +18,13 @@
     "errorPrefix": "Error: {error}",
     "greeting": "Hi! I am your AI pet 👋 What would you like to chat about?"
   },
+  "overlay": {
+    "tuckAway": "Tuck away pet",
+    "statusIdle": "Ready to chat",
+    "statusWorking": "Thinking…",
+    "statusReady": "Reply ready",
+    "statusFailed": "Something went wrong"
+  },
   "idle": {
     "phrases": [
       "Are you busy? I'm right here waiting for you 🐾",
@@ -160,7 +167,10 @@
     "memoryEmptyContent": "Memory content cannot be empty",
     "memoryNotFound": "Memory not found; it may have been deleted",
     "memoryInvalidId": "Invalid memory ID",
-    "memoryUpdatedAt": "Updated {time}"
+    "memoryUpdatedAt": "Updated {time}",
+    "petOverlay": "Pet overlay",
+    "petOverlayHint": "Show a standalone floating pet on the desktop. It stays visible when the chat window is hidden and shows status bubbles.",
+    "petOverlayToggle": "Show / hide pet"
   },
   "water": {
     "widgetAriaLabel": "Water reminder",
@@ -191,7 +201,7 @@
   "skin": {
     "manage": "Skins & accessories",
     "title": "Skins & accessories",
-    "hint": "Skin packs contain only images and a manifest (PNG/JSON), never executable code. Import from a .zip file or a folder; store listing will be connected later.",
+    "hint": "Skin packs contain only images and a manifest (PNG/WebP/JSON), never executable code. Import from a .zip file or a folder, including Codex animated pet packs; store listing will be connected later.",
     "import": "Import skin pack",
     "importDialogTitle": "Choose a skin pack (.zip or folder)",
     "export": "Export",
@@ -213,7 +223,8 @@
     "installed": "Installed",
     "empty": "No skins available.",
     "unavailable": "Skin feature is unavailable (petAPI.skin missing).",
-    "noPreview": "No preview"
+    "noPreview": "No preview",
+    "animated": "Animated"
   },
   "data": {
     "exportTitle": "Export chat",
@@ -295,6 +306,8 @@
   "tray": {
     "hideWindow": "Hide window",
     "showWindow": "Show window",
+    "showPet": "Show pet",
+    "hidePet": "Hide pet",
     "quit": "Quit"
   }
 }
