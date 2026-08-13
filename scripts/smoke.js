@@ -291,7 +291,19 @@ app.whenReady().then(() => {
           state: 'attention',
           text: 'bubble-57'
         });
-        await new Promise((resolve) => setTimeout(resolve, 1200));
+        // T-60 起浮窗心跳为 5s：轮询等待气泡出现（事件通道在真实浮窗窗口生效）
+        const bubbleDeadline = Date.now() + 6500;
+        while (
+          !(
+            bubble &&
+            !bubble.hidden &&
+            bubble.textContent.indexOf('bubble-57') !== -1
+          ) &&
+          Date.now() < bubbleDeadline
+        ) {
+          await new Promise((resolve) => setTimeout(resolve, 200));
+          await api.getStatus();
+        }
         const during = await api.getStatus();
         const visibleDuring = Boolean(
           bubble && !bubble.hidden && bubble.textContent.indexOf('bubble-57') !== -1
@@ -300,7 +312,11 @@ app.whenReady().then(() => {
         const after = await api.getStatus();
         await window.petAPI.settings.set({ petOverlayBubbleEnabled: false });
         await api.pushBubble({ state: 'attention', text: 'hidden-57' });
-        await new Promise((resolve) => setTimeout(resolve, 1300));
+        const hideDeadline = Date.now() + 6500;
+        while (!(bubble && bubble.hidden) && Date.now() < hideDeadline) {
+          await new Promise((resolve) => setTimeout(resolve, 200));
+          await api.getStatus();
+        }
         const hiddenAfterDisable = Boolean(bubble && bubble.hidden);
         await window.petAPI.settings.set({ petOverlayBubbleEnabled: true });
         return {
@@ -338,6 +354,42 @@ app.whenReady().then(() => {
         fail(`T-56 showMain/toggleMain 通道异常: ${JSON.stringify(t56State)}`);
       }
       console.log('[smoke] T-56 浮窗交互通道端到端通过');
+      // T-60：状态事件推送 + 完整状态端到端
+      const perfState = await overlayWin.webContents.executeJavaScript(`(async () => {
+        const api = window.petAPI.petOverlay;
+        let eventReceived = null;
+        api.onStatusUpdated((status) => {
+          eventReceived = status;
+        });
+        await api.setStatus({ state: 'ready', text: 'event-60' });
+        await new Promise((resolve) => setTimeout(resolve, 400));
+        const overlayState = await api.getOverlayState();
+        const bubble = document.getElementById('overlay-bubble');
+        return {
+          eventState: eventReceived && eventReceived.state,
+          eventText: eventReceived && eventReceived.text,
+          bubbleShown: Boolean(
+            bubble && !bubble.hidden && bubble.textContent.indexOf('event-60') !== -1
+          ),
+          stateHasStatus: Boolean(
+            overlayState && overlayState.status && overlayState.status.state === 'ready'
+          ),
+          stateHasFlags:
+            overlayState &&
+            typeof overlayState.enabled === 'boolean' &&
+            typeof overlayState.visible === 'boolean'
+        };
+      })()`);
+      if (perfState.eventState !== 'ready' || perfState.eventText !== 'event-60') {
+        fail(`T-60 状态事件推送异常: ${JSON.stringify(perfState)}`);
+      }
+      if (!perfState.bubbleShown) {
+        fail('T-60 事件推送后气泡未更新');
+      }
+      if (!perfState.stateHasStatus || !perfState.stateHasFlags) {
+        fail(`T-60 getOverlayState 异常: ${JSON.stringify(perfState)}`);
+      }
+      console.log('[smoke] T-60 状态事件推送/完整状态端到端通过');
       overlayWin.destroy();
       app.quit();
     } catch (error) {

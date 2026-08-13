@@ -3802,5 +3802,39 @@ pass('T-48 设置页三段式布局、既有元素 id 与双语文案断言通�
   }
   pass('T-56 浮窗交互增强静态断言通过');
 
+  // T-60：系统与性能（多显示器/事件推送/隐藏暂停，ADR-045）
+  if (
+    !petOverlaySource.includes('pet:status-updated') ||
+    !petOverlaySource.includes('pet:get-overlay-state')
+  ) {
+    fail('pet-overlay.js 缺少状态事件/完整状态通道');
+  }
+  if (!petOverlaySource.includes('getAllDisplays')) {
+    fail('pet-overlay.js 未做多显示器存在性校验');
+  }
+  if (!petOverlaySource.includes('notifyStatus')) {
+    fail('pet-overlay.js 未实现状态变更推送');
+  }
+  if (
+    !preloadSource.includes('pet:status-updated') ||
+    !preloadSource.includes('pet:get-overlay-state') ||
+    !preloadSource.includes('onStatusUpdated') ||
+    !preloadSource.includes('getOverlayState')
+  ) {
+    fail('preload.js 缺少 T-60 事件/状态暴露');
+  }
+  if (
+    !overlayJsSource.includes('STATUS_HEARTBEAT_MS = 5000') ||
+    !overlayJsSource.includes('visibilitychange') ||
+    !overlayJsSource.includes('is-paused') ||
+    !overlayJsSource.includes('onStatusUpdated')
+  ) {
+    fail('overlay.js 缺少心跳/隐藏暂停/事件订阅');
+  }
+  if (!overlayCssSource.includes('is-paused')) {
+    fail('overlay.css 缺少暂停动画样式');
+  }
+  pass('T-60 系统与性能静态断言通过');
+
   console.log('[check] 全部通过');
 })();

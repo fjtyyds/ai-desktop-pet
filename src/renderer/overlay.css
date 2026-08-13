@@ -71,6 +71,11 @@ body {
   cursor: grab;
 }
 
+/* T-60：浮窗隐藏/页面不可见时暂停动画 */
+.overlay-pet.is-paused {
+  animation-play-state: paused !important;
+}
+
 /* Codex 宠物包：8 列×9 行动画图集，按状态/情绪切换行 */
 .overlay-pet.is-atlas {
   background-size: 800% 900%;

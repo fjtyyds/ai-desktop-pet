@@ -41,6 +41,7 @@
     failed: 5
   };
   const MOOD_POLL_MS = 3000;
+  const STATUS_HEARTBEAT_MS = 5000;
   const MOOD_EMOJI = { excited: '🥳' };
   const MOOD_LOCALE_KEY = { excited: 'moodExcited' };
   let currentLocale = window.PetLocales.DEFAULT_LOCALE;
@@ -53,6 +54,8 @@
   let bubbleEnabled = true;
   let moodPolling = false;
   let moodBubble = null;
+  let statusTimer = null;
+  let moodTimer = null;
 
   function t(key, params) {
     return window.PetLocales.createTranslator(currentLocale)(key, params);
@@ -228,6 +231,29 @@
     }
   }
 
+  /** T-60：状态变更事件订阅（心跳兜底；隐藏时暂停，恢复立即同步） */
+  function pauseOverlay() {
+    clearInterval(statusTimer);
+    clearInterval(moodTimer);
+    statusTimer = null;
+    moodTimer = null;
+    pet.classList.add('is-paused');
+  }
+
+  function resumeOverlay() {
+    pet.classList.remove('is-paused');
+    if (!statusTimer) {
+      statusTimer = setInterval(pollStatus, STATUS_HEARTBEAT_MS);
+    }
+    if (!moodTimer) {
+      moodTimer = setInterval(() => {
+        void pollMood();
+      }, MOOD_POLL_MS);
+    }
+    void pollStatus();
+    void pollMood();
+  }
+
   async function loadSkin() {
     try {
       const result = await window.petAPI.petOverlay.getSkin();
@@ -261,15 +287,27 @@
   window.petAPI.petOverlay.onSkinUpdated(() => {
     void loadSkin();
   });
+  window.petAPI.petOverlay.onStatusUpdated((status) => {
+    if (status && typeof status.state === 'string') {
+      applyState(status.state, status.text || '');
+    }
+    if (status && typeof status.bubbleEnabled === 'boolean') {
+      applyBubbleEnabled(status.bubbleEnabled);
+    }
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      pauseOverlay();
+    } else {
+      resumeOverlay();
+    }
+  });
 
   await loadLocale();
   await loadSkin();
   await pollStatus();
   await pollMood();
-  setInterval(pollStatus, 800);
-  setInterval(() => {
-    void pollMood();
-  }, MOOD_POLL_MS);
+  resumeOverlay();
 
   // 冒烟测试钩子：注入假 mood/状态/皮肤，验证行切换与 reduceMotion 接线
   window.__overlayTest = {

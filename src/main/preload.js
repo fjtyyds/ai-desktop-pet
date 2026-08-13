@@ -47,7 +47,9 @@ const CHANNELS = {
   petShowMain: 'pet:show-main', // T-56：唤起主聊天窗口
   petToggleMain: 'pet:toggle-main', // T-56：点击宠物切换主聊天窗口显示
   petRefreshSkin: 'pet:refresh-skin', // T-55：皮肤变更后刷新浮窗
-  petSkinUpdated: 'pet:skin-updated' // T-55：主进程推送浮窗皮肤变更
+  petSkinUpdated: 'pet:skin-updated', // T-55：主进程推送浮窗皮肤变更
+  petStatusUpdated: 'pet:status-updated', // T-60：主进程推送浮窗状态变更
+  petGetOverlayState: 'pet:get-overlay-state' // T-60：浮窗完整状态（心跳/冒烟）
 };
 
 contextBridge.exposeInMainWorld('petAPI', {
@@ -149,6 +151,7 @@ contextBridge.exposeInMainWorld('petAPI', {
     showMain: () => ipcRenderer.invoke(CHANNELS.petShowMain), // T-56
     toggleMain: () => ipcRenderer.invoke(CHANNELS.petToggleMain), // T-56
     refreshSkin: () => ipcRenderer.invoke(CHANNELS.petRefreshSkin), // T-55
+    getOverlayState: () => ipcRenderer.invoke(CHANNELS.petGetOverlayState), // T-60
     onSkinUpdated: (callback) => {
       // T-55：皮肤变更事件（浮窗页订阅）
       const listener = (_event, _payload) => {
@@ -158,6 +161,16 @@ contextBridge.exposeInMainWorld('petAPI', {
       };
       ipcRenderer.on(CHANNELS.petSkinUpdated, listener);
       return () => ipcRenderer.removeListener(CHANNELS.petSkinUpdated, listener);
+    },
+    onStatusUpdated: (callback) => {
+      // T-60：状态变更事件（浮窗页订阅，心跳兜底）
+      const listener = (_event, payload) => {
+        if (typeof callback === 'function') {
+          callback(payload);
+        }
+      };
+      ipcRenderer.on(CHANNELS.petStatusUpdated, listener);
+      return () => ipcRenderer.removeListener(CHANNELS.petStatusUpdated, listener);
     }
   }
 });

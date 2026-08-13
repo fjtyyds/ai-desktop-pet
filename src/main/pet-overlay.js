@@ -39,7 +39,9 @@ const PET_CHANNELS = {
   showMain: 'pet:show-main',
   toggleMain: 'pet:toggle-main',
   refreshSkin: 'pet:refresh-skin',
-  skinUpdated: 'pet:skin-updated'
+  skinUpdated: 'pet:skin-updated',
+  statusUpdated: 'pet:status-updated',
+  getOverlayState: 'pet:get-overlay-state'
 };
 
 const OVERLAY_WIDTH = 240;
@@ -131,6 +133,26 @@ function createPetOverlay(options = {}) {
         Math.abs(bounds.x) < 100000 &&
         Math.abs(bounds.y) < 100000
       ) {
+        // T-60：多显示器——保存过 displayId 时校验显示器仍存在且坐标在工作区内
+        if (Number.isInteger(bounds.displayId)) {
+          const display = screen
+            .getAllDisplays()
+            .find((item) => item.id === bounds.displayId);
+          if (!display) {
+            return null;
+          }
+          const area = display.workArea;
+          const centerX = bounds.x + OVERLAY_WIDTH / 2;
+          const centerY = bounds.y + OVERLAY_HEIGHT / 2;
+          if (
+            centerX < area.x ||
+            centerX > area.x + area.width ||
+            centerY < area.y ||
+            centerY > area.y + area.height
+          ) {
+            return null;
+          }
+        }
         return { x: Math.round(bounds.x), y: Math.round(bounds.y) };
       }
     } catch (_error) {
@@ -205,6 +227,22 @@ function createPetOverlay(options = {}) {
     return { ...base, bubbleEnabled: bubbleEnabledFromSettings() };
   }
 
+  /** T-60：状态变化主动推送给浮窗（浮窗心跳降为 5s 兜底） */
+  function notifyStatus() {
+    const payload = currentStatus();
+    // 广播给所有加载 overlay.html 的窗口（生产环境只有一个浮窗；冒烟窗口也可收到）
+    for (const window of BrowserWindow.getAllWindows()) {
+      if (
+        !window.isDestroyed() &&
+        window.webContents &&
+        !window.webContents.isDestroyed() &&
+        window.webContents.getURL().endsWith('overlay.html')
+      ) {
+        window.webContents.send(PET_CHANNELS.statusUpdated, payload);
+      }
+    }
+  }
+
   function clearBubbleTimer() {
     if (bubbleTimer) {
       clearTimeout(bubbleTimer);
@@ -218,9 +256,11 @@ function createPetOverlay(options = {}) {
     queue.shift();
     if (queue.length === 0) {
       queue = [{ state: 'idle', text: '', at: Date.now() }];
+      notifyStatus();
       return;
     }
     bubbleTimer = setTimeout(advanceQueue, bubbleSeconds() * 1000);
+    notifyStatus();
   }
 
   /** 即时状态：直接替换当前显示（聊天/TTS 驱动），并调度 ready/failed 回落 */
@@ -240,6 +280,7 @@ function createPetOverlay(options = {}) {
     if (nextState === 'ready' || nextState === 'failed') {
       bubbleTimer = setTimeout(advanceQueue, bubbleSeconds() * 1000);
     }
+    notifyStatus();
     return { ...next };
   }
 
@@ -270,6 +311,7 @@ function createPetOverlay(options = {}) {
         bubbleTimer = setTimeout(advanceQueue, bubbleSeconds() * 1000);
       }
     }
+    notifyStatus();
     return { ...next };
   }
 
@@ -349,6 +391,17 @@ function createPetOverlay(options = {}) {
     ipcMain.handle(PET_CHANNELS.refreshSkin, () => {
       invalidateSkin();
       return { ok: true };
+    });
+
+    ipcMain.handle(PET_CHANNELS.getOverlayState, () => {
+      let enabled = false;
+      try {
+        const settings = getSettings();
+        enabled = settings ? settings.petOverlayEnabled === true : false;
+      } catch (_error) {
+        enabled = false;
+      }
+      return { enabled, visible: isVisible(), status: currentStatus() };
     });
   }
 
