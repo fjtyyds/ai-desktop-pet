@@ -421,6 +421,47 @@
                   >
                   <span class="settings-row-arrow" aria-hidden="true">›</span>
                 </button>
+                <!-- T-61：浮窗设置细化（气泡开关/时长/提醒透出，ADR-045） -->
+                <label class="field field-switch">
+                  <span class="field-label" data-i18n="settings.petOverlayBubble"
+                    >显示气泡</span
+                  >
+                  <input
+                    id="pet-overlay-bubble-enabled"
+                    class="field-checkbox"
+                    type="checkbox"
+                  />
+                  <span class="field-hint" data-i18n="settings.petOverlayBubbleHint"
+                    >关闭后浮窗只显示宠物，不显示状态气泡。
+                  </span>
+                </label>
+                <label class="field">
+                  <span class="field-label" data-i18n="settings.petOverlayBubbleSeconds"
+                    >气泡时长（秒）</span
+                  >
+                  <input
+                    id="pet-overlay-bubble-seconds"
+                    class="field-input"
+                    type="number"
+                    min="3"
+                    max="20"
+                    step="1"
+                  />
+                  <span
+                    class="field-hint"
+                    data-i18n="settings.petOverlayBubbleSecondsHint"
+                    >3~20 秒，保存后生效。
+                  </span>
+                </label>
+                <label class="field field-switch">
+                  <span class="field-label" data-i18n="settings.petOverlayReminders"
+                    >提醒透出</span
+                  >
+                  <input id="pet-overlay-reminders" class="field-checkbox" type="checkbox" />
+                  <span class="field-hint" data-i18n="settings.petOverlayRemindersHint"
+                    >空闲互动、喝水提醒也会通过浮窗气泡提示。
+                  </span>
+                </label>
                 <button id="skin-manage-btn" class="settings-link-row" type="button">
                   <span class="settings-row-icon" aria-hidden="true">🧩</span>
                   <span class="settings-row-label" data-i18n="skin.manage"

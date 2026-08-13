@@ -3836,5 +3836,54 @@ pass('T-48 设置页三段式布局、既有元素 id 与双语文案断言通�
   }
   pass('T-60 系统与性能静态断言通过');
 
+  // T-61：设置与引导（浮窗设置块 + 首次开启引导气泡，ADR-045）
+  if (
+    !rendererIndexSource.includes('id="pet-overlay-bubble-enabled"') ||
+    !rendererIndexSource.includes('id="pet-overlay-bubble-seconds"') ||
+    !rendererIndexSource.includes('id="pet-overlay-reminders"')
+  ) {
+    fail('index.html 缺少浮窗设置控件');
+  }
+  if (
+    !rendererChatSource.includes('persistPetOverlayConfig') ||
+    !rendererChatSource.includes('maybeGuidePetOverlay') ||
+    !rendererChatSource.includes('petOverlayGuided') ||
+    !rendererChatSource.includes('petOverlayBubbleSeconds')
+  ) {
+    fail('chat.js 缺少浮窗配置保存/引导逻辑');
+  }
+  for (const localeFile of ['zh-CN', 'en']) {
+    const locale = JSON.parse(
+      fs.readFileSync(
+        path.join(root, 'src', 'shared', 'locales', `${localeFile}.json`),
+        'utf8'
+      )
+    );
+    for (const key of [
+      'petOverlayBubble',
+      'petOverlayBubbleHint',
+      'petOverlayBubbleSeconds',
+      'petOverlayBubbleSecondsHint',
+      'petOverlayReminders',
+      'petOverlayRemindersHint'
+    ]) {
+      if (
+        !locale.settings ||
+        typeof locale.settings[key] !== 'string' ||
+        !locale.settings[key].trim()
+      ) {
+        fail(`${localeFile}.json 缺少 settings.${key} 文案`);
+      }
+    }
+    if (
+      !locale.overlay ||
+      typeof locale.overlay.firstTimeHint !== 'string' ||
+      !locale.overlay.firstTimeHint.trim()
+    ) {
+      fail(`${localeFile}.json 缺少 overlay.firstTimeHint 文案`);
+    }
+  }
+  pass('T-61 设置与引导静态断言通过');
+
   console.log('[check] 全部通过');
 })();

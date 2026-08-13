@@ -390,6 +390,44 @@ app.whenReady().then(() => {
         fail(`T-60 getOverlayState 异常: ${JSON.stringify(perfState)}`);
       }
       console.log('[smoke] T-60 状态事件推送/完整状态端到端通过');
+      // T-61：设置控件存在 + 浮窗配置读写/清洗端到端
+      const t61State = await win.webContents.executeJavaScript(`(async () => {
+        const hasControls = Boolean(
+          document.getElementById('pet-overlay-bubble-enabled') &&
+          document.getElementById('pet-overlay-bubble-seconds') &&
+          document.getElementById('pet-overlay-reminders')
+        );
+        const saved = await window.petAPI.settings.set({
+          petOverlayBubbleEnabled: false,
+          petOverlayBubbleSeconds: 9,
+          petOverlayReminders: false
+        });
+        const after = await window.petAPI.settings.get();
+        const clamped = await window.petAPI.settings.set({
+          petOverlayBubbleSeconds: 99
+        });
+        return {
+          hasControls,
+          bubbleEnabled: after && after.petOverlayBubbleEnabled,
+          bubbleSeconds: after && after.petOverlayBubbleSeconds,
+          reminders: after && after.petOverlayReminders,
+          clampedSeconds: clamped && clamped.petOverlayBubbleSeconds
+        };
+      })()`);
+      if (!t61State.hasControls) {
+        fail('主窗口缺少 T-61 浮窗设置控件');
+      }
+      if (
+        t61State.bubbleEnabled !== false ||
+        t61State.bubbleSeconds !== 9 ||
+        t61State.reminders !== false
+      ) {
+        fail(`浮窗配置读写异常: ${JSON.stringify(t61State)}`);
+      }
+      if (t61State.clampedSeconds !== 20) {
+        fail(`气泡时长未夹取到 3~20: ${JSON.stringify(t61State)}`);
+      }
+      console.log('[smoke] T-61 浮窗设置读写/清洗端到端通过');
       overlayWin.destroy();
       app.quit();
     } catch (error) {

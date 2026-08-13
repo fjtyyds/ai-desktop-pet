@@ -31,6 +31,7 @@
     "menuToggleBubble": "Toggle bubbles",
     "menuTuckAway": "Tuck away pet",
     "menuQuit": "Quit app",
+    "firstTimeHint": "I'm on your desktop now — double-click me to open the chat window!",
     "moodExcited": "Feeling great today!"
   },
   "idle": {
@@ -178,7 +179,13 @@
     "memoryUpdatedAt": "Updated {time}",
     "petOverlay": "Pet overlay",
     "petOverlayHint": "Show a standalone floating pet on the desktop. It stays visible when the chat window is hidden and shows status bubbles.",
-    "petOverlayToggle": "Show / hide pet"
+    "petOverlayToggle": "Show / hide pet",
+    "petOverlayBubble": "Show bubbles",
+    "petOverlayBubbleHint": "When off, the floating pet shows no status bubbles.",
+    "petOverlayBubbleSeconds": "Bubble duration (seconds)",
+    "petOverlayBubbleSecondsHint": "3–20 seconds, applied after saving.",
+    "petOverlayReminders": "Reminder bubbles",
+    "petOverlayRemindersHint": "Idle chat and water reminders can also appear as floating bubbles."
   },
   "water": {
     "widgetAriaLabel": "Water reminder",

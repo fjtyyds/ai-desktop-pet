@@ -31,6 +31,7 @@
     "menuToggleBubble": "切换气泡显示",
     "menuTuckAway": "收起宠物",
     "menuQuit": "退出应用",
+    "firstTimeHint": "我已出现在桌面右下角，双击我可以回到聊天窗口哦！",
     "moodExcited": "今天心情超好！"
   },
   "idle": {
@@ -178,7 +179,13 @@
     "memoryUpdatedAt": "更新于 {time}",
     "petOverlay": "宠物浮窗",
     "petOverlayHint": "在桌面显示独立悬浮宠物，聊天窗口隐藏时仍可见，并显示工作状态气泡。",
-    "petOverlayToggle": "显示/隐藏宠物"
+    "petOverlayToggle": "显示/隐藏宠物",
+    "petOverlayBubble": "显示气泡",
+    "petOverlayBubbleHint": "关闭后浮窗只显示宠物，不显示状态气泡。",
+    "petOverlayBubbleSeconds": "气泡时长（秒）",
+    "petOverlayBubbleSecondsHint": "3~20 秒，保存后生效。",
+    "petOverlayReminders": "提醒透出",
+    "petOverlayRemindersHint": "空闲互动、喝水提醒也会通过浮窗气泡提示。"
   },
   "water": {
     "widgetAriaLabel": "喝水提醒",

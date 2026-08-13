@@ -439,6 +439,9 @@
       skinManageBtn: document.getElementById('skin-manage-btn'),
       petOverlayEnabled: document.getElementById('pet-overlay-enabled'),
       petOverlayToggleBtn: document.getElementById('pet-overlay-toggle-btn'),
+      petOverlayBubbleEnabled: document.getElementById('pet-overlay-bubble-enabled'),
+      petOverlayBubbleSeconds: document.getElementById('pet-overlay-bubble-seconds'),
+      petOverlayReminders: document.getElementById('pet-overlay-reminders'),
       skinBack: document.getElementById('skin-back'),
       skinList: document.getElementById('skin-list'),
       skinImportBtn: document.getElementById('skin-import-btn'),
@@ -730,6 +733,21 @@
         const enabled = elements.petOverlayEnabled.checked;
         currentSettings = { ...currentSettings, petOverlayEnabled: enabled };
         void applyPetOverlayEnabled(enabled);
+      });
+    }
+    if (elements.petOverlayBubbleEnabled) {
+      elements.petOverlayBubbleEnabled.addEventListener('change', () => {
+        void persistPetOverlayConfig();
+      });
+    }
+    if (elements.petOverlayReminders) {
+      elements.petOverlayReminders.addEventListener('change', () => {
+        void persistPetOverlayConfig();
+      });
+    }
+    if (elements.petOverlayBubbleSeconds) {
+      elements.petOverlayBubbleSeconds.addEventListener('change', () => {
+        void persistPetOverlayConfig();
       });
     }
     elements.skinBack.addEventListener('click', closeSkinView);
@@ -2611,6 +2629,9 @@
           elements.petOverlayEnabled.checked = result.enabled;
         }
         currentSettings = { ...currentSettings, petOverlayEnabled: result.enabled };
+        if (result.enabled) {
+          maybeGuidePetOverlay();
+        }
       }
     } catch (error) {
       console.warn('切换宠物浮窗失败：', error);
@@ -2632,6 +2653,9 @@
       const result = await api.setEnabled({ enabled });
       if (result && typeof result.enabled === 'boolean') {
         currentSettings = { ...currentSettings, petOverlayEnabled: result.enabled };
+        if (result.enabled) {
+          maybeGuidePetOverlay();
+        }
       }
     } catch (error) {
       console.warn('应用宠物浮窗开关失败：', error);
@@ -2639,6 +2663,69 @@
         elements.petOverlayEnabled.checked = currentSettings.petOverlayEnabled === true;
       }
     }
+  }
+
+  /** T-61：浮窗配置（气泡开关/时长/提醒透出）立即持久化 */
+  async function persistPetOverlayConfig() {
+    const rawSeconds = Number(
+      elements.petOverlayBubbleSeconds
+        ? elements.petOverlayBubbleSeconds.value
+        : 6
+    );
+    const seconds = Number.isFinite(rawSeconds)
+      ? Math.min(20, Math.max(3, Math.round(rawSeconds)))
+      : 6;
+    if (elements.petOverlayBubbleSeconds) {
+      elements.petOverlayBubbleSeconds.value = String(seconds);
+    }
+    const patch = {
+      petOverlayBubbleEnabled: elements.petOverlayBubbleEnabled
+        ? elements.petOverlayBubbleEnabled.checked
+        : true,
+      petOverlayBubbleSeconds: seconds,
+      petOverlayReminders: elements.petOverlayReminders
+        ? elements.petOverlayReminders.checked
+        : true
+    };
+    currentSettings = { ...currentSettings, ...patch };
+    const api =
+      window.petAPI &&
+      window.petAPI.settings &&
+      typeof window.petAPI.settings.set === 'function'
+        ? window.petAPI.settings
+        : null;
+    if (!api) {
+      return;
+    }
+    try {
+      const saved = await api.set(patch);
+      if (saved && typeof saved === 'object') {
+        currentSettings = saved;
+      }
+    } catch (error) {
+      console.warn('保存浮窗配置失败：', error);
+    }
+  }
+
+  /** T-61：首次开启浮窗时显示引导气泡（localStorage 标记，清数据时清除） */
+  function maybeGuidePetOverlay() {
+    if (!hasPetOverlayApi()) {
+      return;
+    }
+    try {
+      if (localStorage.getItem('petOverlayGuided')) {
+        return;
+      }
+      localStorage.setItem('petOverlayGuided', '1');
+    } catch (_error) {
+      return;
+    }
+    const t = window.PetLocales.createTranslator(currentLocale);
+    window.petAPI.petOverlay
+      .pushBubble({ state: 'attention', text: t('overlay.firstTimeHint') })
+      .catch((error) => {
+        console.warn('引导气泡发送失败：', error);
+      });
   }
 
   /** 皮肤变更后刷新浮窗角色资源 */
@@ -2972,6 +3059,11 @@
         weatherCity: saved.weatherCity,
         telemetryEnabled: saved.telemetryEnabled === true,
         petOverlayEnabled: saved.petOverlayEnabled === true,
+        petOverlayBubbleEnabled: saved.petOverlayBubbleEnabled !== false,
+        petOverlayBubbleSeconds: Number.isFinite(Number(saved.petOverlayBubbleSeconds))
+          ? Math.min(20, Math.max(3, Math.round(Number(saved.petOverlayBubbleSeconds))))
+          : 6,
+        petOverlayReminders: saved.petOverlayReminders !== false,
         theme: saved.theme === 'light' ? 'light' : 'dark',
         reduceMotion: saved.reduceMotion === true,
         waterReminder: saved.waterReminder,
@@ -3053,6 +3145,22 @@
     if (elements.petOverlayEnabled) {
       elements.petOverlayEnabled.checked =
         currentSettings.petOverlayEnabled === true;
+    }
+    if (elements.petOverlayBubbleEnabled) {
+      elements.petOverlayBubbleEnabled.checked =
+        currentSettings.petOverlayBubbleEnabled !== false;
+    }
+    if (elements.petOverlayReminders) {
+      elements.petOverlayReminders.checked =
+        currentSettings.petOverlayReminders !== false;
+    }
+    if (elements.petOverlayBubbleSeconds) {
+      const seconds = Number(currentSettings.petOverlayBubbleSeconds);
+      elements.petOverlayBubbleSeconds.value = String(
+        Number.isFinite(seconds)
+          ? Math.min(20, Math.max(3, Math.round(seconds)))
+          : 6
+      );
     }
     // T-44：主题/减弱动效/喝水/待办
     theme = currentSettings.theme === 'light' ? 'light' : 'dark';
@@ -3136,6 +3244,15 @@
         weatherCity: elements.weatherCity.value.trim(),
         telemetryEnabled: elements.telemetryEnabled.checked,
         petOverlayEnabled: elements.petOverlayEnabled.checked,
+        petOverlayBubbleEnabled: elements.petOverlayBubbleEnabled
+          ? elements.petOverlayBubbleEnabled.checked
+          : true,
+        petOverlayBubbleSeconds: elements.petOverlayBubbleSeconds
+          ? Number(elements.petOverlayBubbleSeconds.value)
+          : 6,
+        petOverlayReminders: elements.petOverlayReminders
+          ? elements.petOverlayReminders.checked
+          : true,
         theme,
         reduceMotion,
         waterReminder: {
@@ -3164,6 +3281,15 @@
         weatherCity: elements.weatherCity.value.trim(),
         telemetryEnabled: elements.telemetryEnabled.checked,
         petOverlayEnabled: elements.petOverlayEnabled.checked,
+        petOverlayBubbleEnabled: elements.petOverlayBubbleEnabled
+          ? elements.petOverlayBubbleEnabled.checked
+          : true,
+        petOverlayBubbleSeconds: elements.petOverlayBubbleSeconds
+          ? Number(elements.petOverlayBubbleSeconds.value)
+          : 6,
+        petOverlayReminders: elements.petOverlayReminders
+          ? elements.petOverlayReminders.checked
+          : true,
         theme,
         reduceMotion,
         waterReminder: {
@@ -4332,6 +4458,12 @@
           resetChatView();
         }
         if (scope === 'settings' || scope === 'all') {
+          // T-61：清数据时清除浮窗引导标记，下次开启可再次看到引导
+          try {
+            localStorage.removeItem('petOverlayGuided');
+          } catch (_error) {
+            // localStorage 不可用时忽略
+          }
           await restoreSettings();
         }
         const scopeLabel = t(`data.scope${scope[0].toUpperCase()}${scope.slice(1)}`);
