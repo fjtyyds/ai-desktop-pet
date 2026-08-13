@@ -220,7 +220,30 @@
 - [x] T-60 系统与性能（76e7c27）
 - [x] T-61 设置与引导（ee95481）
 
+**M5.2：动画宠物包与任务级进度气泡——实施中（2026-08-13）**
+
+目标：内置开箱即用动画宠物包（pixel-pet + 可复用生成脚本）与任务级进度气泡（标题/阶段/百分比/结果；首批接入皮肤批量导入与自动更新下载）（ADR-046）。
+
+任务卡：
+
+- `docs/tasks/T-62.md` — 动画宠物包（codex/m5x-animpack）
+- `docs/tasks/T-63.md` — 任务级进度气泡（codex/m5x-taskbubble）
+
+验收标准：
+
+1. 两张卡完成后 main `npm run check`、`npm run smoke` 通过。
+2. 皮肤列表含 pixel-pet（atlas 8×9、单元格 128px）；生成脚本可重复运行。
+3. 任务气泡运行中不被提醒打断，结束后提醒补放；批量导入与更新下载按包/按百分比推进。
+4. 全部完成后 `npm run dev` 人工目检 + sync-latest 同步最新版。
+
+任务清单：
+
+- [x] T-62 动画宠物包（0e9f5bd，已合并 main）
+- [ ] T-63 任务级进度气泡（实施中，子代理 t63_taskbubble）
+
 ## Progress
+
+- 2026-08-13：T-62 动画宠物包验收合并（0e9f5bd fast-forward）：内置 pixel-pet（1024×1152 WebP 8×9 图集）+ scripts/make-pet-pack.js 可复现生成脚本；worktree 与 main `npm run check`、`npm run smoke` 全绿；T-63 任务级进度气泡由子代理 t63_taskbubble 实施中。
 
 - 2026-08-13：M5.1 宠物浮窗优化六卡全部完成并合并 main（T-56~T-61）；main check/smoke 全绿（含各卡新增断言与端到端）；待用户 `npm run dev` 目检与 sync-latest 同步最新版。
 
