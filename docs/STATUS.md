@@ -362,4 +362,5 @@
 - 背景：用户希望 AI 桌宠具备 Codex “显示宠物”功能（独立悬浮宠物 + 工作状态气泡 + 自定义宠物包）。
 - 实施（codex/m5-pet-overlay，复用 E:\codex\AI桌宠-m4-newuser 工作树）：新增宠物浮窗（src/main/pet-overlay.js + src/renderer/overlay.html/css/js），设置页“外观”组开关与“显示/隐藏宠物”入口、托盘菜单、`/pet` 命令；状态机 idle/working/ready/failed 由聊天页驱动；skin-store 支持 Codex 宠物包（pet.json + spritesheet.webp，8×9 图集，WebP 尺寸校验）；petOverlayEnabled/petOverlayBounds 持久化；双语文案与 check/smoke 断言（含 WebP 解析、宠物包导入/拒绝、浮窗端到端）。
 - 验证：npm run check 全绿；npm run smoke 全绿（浮窗状态/皮肤/气泡端到端）；离屏像素验证浮窗气泡与角色区域实际渲染。
-- 待办：协调者验收合并 main；人工 `npm run dev` 目检浮窗观感；合并后按 ADR-042 同步最新版（如需）。
+- 合并与复验：cb92ec0 fast-forward 合并入 main；main `npm run check`、`npm run smoke` 复跑全绿。
+- 待办：人工 `npm run dev` 目检浮窗观感；按 ADR-042 同步最新版（如需）。
