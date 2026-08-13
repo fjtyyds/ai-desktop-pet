@@ -30,6 +30,29 @@ window.petAPI = {
 }
 ```
 
+### 宠物浮窗 petOverlay（T-55~T-63，ADR-044/045/046 冻结）
+
+```js
+petAPI.petOverlay.getStatus() -> Promise<PetOverlayStatus>
+petAPI.petOverlay.setStatus({ state, text? }) -> Promise<PetOverlayStatus>
+petAPI.petOverlay.pushBubble({ state, text? }) -> Promise<PetOverlayStatus>
+petAPI.petOverlay.getSkin() -> Promise<{ ok, skin }>
+petAPI.petOverlay.toggle() -> Promise<{ ok, enabled, visible }>
+petAPI.petOverlay.setEnabled({ enabled }) -> Promise<{ ok, enabled, visible }>
+petAPI.petOverlay.tuckAway() -> Promise<{ ok, enabled }>
+petAPI.petOverlay.showMain() / toggleMain() -> Promise<{ ok }>
+petAPI.petOverlay.moveBy({ dx, dy }) -> Promise<{ ok }>
+petAPI.petOverlay.refreshSkin() / getOverlayState() / onSkinUpdated(cb) / onStatusUpdated(cb)
+// T-63（ADR-046）：任务级进度气泡
+petAPI.petOverlay.startTask({ id, title, message?, percent?, stage?, totalStages? }) -> Promise<{ ok, task }>
+petAPI.petOverlay.updateTask({ id, percent?, message?, stage? }) -> Promise<{ ok, task }>
+petAPI.petOverlay.finishTask({ id, ok, message? }) -> Promise<{ ok, task: null }>
+petAPI.petOverlay.getConfig() -> Promise<{ bubbleEnabled, bubbleSeconds, reminders }>
+```
+
+- 状态值：`idle / working / ready / failed / speaking / attention`（T-57 扩展）。
+- 任务约束：`id ≤64`、`title/message ≤80`、`percent 0~100`（null=不确定）、`stage/totalStages` 可选整数；任务不持久化；运行中任务气泡优先，提醒气泡排队补放；状态事件 `pet:status-updated` payload 带 `task` 字段（无任务为 null）。
+
 ### 在线神经语音约定（ADR-029，T-34 冻结）
 
 - 渲染层调用 `petAPI.tts.speak({ text, voice, rate, pitch })` 请求主进程合成 MP3；参数 `voice` 为 Edge 神经语音 ShortName（如 `zh-CN-XiaoxiaoNeural`），`rate`/`pitch` 为 SSML 风格字符串（如 `'-5%'`、`'+8Hz'`）。
@@ -60,6 +83,13 @@ window.petAPI = {
 | `history:export` / `history:clear` | invoke | M3.5：导出对话 / 清除数据 |
 | `window:toggle-dock` | invoke | M3.5：贴边开关（T-31 起语义改为“靠边吸附”，ADR-026） |
 | `tts:speak` | invoke | T-34：在线神经语音合成（参数 text/voice/rate/pitch，返回 MP3 data URL） |
+| `pet:get-status` / `pet:set-status` | invoke | T-55：浮窗状态读取/上报（聊天页驱动） |
+| `pet:push-bubble` | invoke | T-57：提醒/互动气泡入队 |
+| `pet:task-start` / `pet:task-update` / `pet:task-finish` | invoke | T-63：任务级进度气泡生命周期 |
+| `pet:get-skin` / `pet:refresh-skin` / `pet:skin-updated` | invoke / main→renderer | T-55：浮窗皮肤读取与刷新 |
+| `pet:toggle-overlay` / `pet:set-enabled` / `pet:tuck-away` | invoke | T-55：显示/隐藏/收起草宠 |
+| `pet:show-main` / `pet:toggle-main` / `pet:move-window` | invoke | T-56：唤起主窗口/切换显示/手动拖拽 |
+| `pet:status-updated` / `pet:get-overlay-state` | main→renderer / invoke | T-60：状态事件推送与完整状态 |
 
 ## 3. 内部模块接口
 

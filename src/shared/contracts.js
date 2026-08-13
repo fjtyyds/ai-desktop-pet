@@ -112,6 +112,28 @@ const DEFAULT_MODEL = 'deepseek-v4-flash';
  * - petOverlayBounds.displayId：可选显示器标识（整数），用于多显示器位置记忆。
  */
 
+/**
+ * T-63（ADR-046）：任务级进度气泡契约（总工已冻结，worker 只读）。
+ * petAPI.petOverlay 新增：
+ * - startTask({ id, title, message?, percent?, stage?, totalStages? }) -> Promise<{ ok, task }>
+ * - updateTask({ id, percent?, message?, stage? }) -> Promise<{ ok, task }>
+ * - finishTask({ id, ok, message? }) -> Promise<{ ok, task: null }>
+ * - getConfig() -> Promise<{ bubbleEnabled, bubbleSeconds, reminders }>（T-57/T-61 契约补实现）
+ * IPC：pet:task-start / pet:task-update / pet:task-finish
+ *
+ * @typedef {Object} PetOverlayTask
+ * @property {string} id 任务标识（≤64 字符）
+ * @property {string} title 任务标题（≤80 字符）
+ * @property {string} message 当前阶段文案（≤80 字符，可为空串）
+ * @property {number|null} percent 0~100 进度；null=未知（浮窗显示不确定进度）
+ * @property {number|null} stage 当前阶段序号（可选）
+ * @property {number|null} totalStages 阶段总数（可选）
+ * @property {'running'|'done'|'failed'} status 任务状态
+ *
+ * 约束：任务不持久化，重启即清空；运行中任务气泡优先显示，提醒气泡排队并在任务
+ * 结束后补放；状态事件（pet:status-updated）payload 增加 task 字段（无任务为 null）。
+ */
+
 /** 短期记忆窗口大小（M2 默认最近 20 条消息） */
 const DEFAULT_SHORT_TERM_WINDOW = 20;
 

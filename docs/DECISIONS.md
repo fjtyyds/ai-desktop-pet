@@ -407,3 +407,16 @@
   4. 执行流程：建卡 → 派活（子代理并行）→ 等待回报 → 总工验收（check/smoke/diff 边界）→ 串行合并 main → 更新 PLAN/STATUS → 全部完成后 sync-latest + 人工目检。
   5. 交接纪律：上下文阈值下按 docs/reports/2026-08-11-总工交接提示词模板.md 交接；当前上下文上限已调高至 500k，本轮不强制交接，但每轮写 outputs/ 交接文件。
 - 后果：浮窗从“能显示”走向“好用”；设置白名单在批次开始时即为最终形态，避免 worker 反复改 store.js；共享文件冲突由总工在合并阶段解决。
+
+## ADR-046：动画宠物包与任务级进度气泡（2026-08-13，T-62/T-63）
+
+- 状态：Accepted（方案已定，两张卡并行实施）
+- 背景：M5.1 完成后用户拍板下一方向为“动画宠物包”与“任务级进度气泡”：
+  1. 当前浮窗虽支持 Codex 宠物包（pet.json + spritesheet.webp 8×9），但内置皮肤均为静态 PNG，用户无开箱动画可体验，也缺制作工具；
+  2. 状态气泡只表达“工作中/完成/失败”，无法展示任务进行到哪一步（标题、阶段、百分比）。
+- 决策：
+  1. T-62 动画宠物包：新增内置动画皮肤 `pixel-pet`（像素小宠，8 列×9 行、单元格 128px、整体 1024×1152 WebP）；新增 `scripts/make-pet-pack.js` 复用脚本——Electron 内置 canvas 像素画绘制 + `toDataURL('image/webp')` 导出，零新增 npm 依赖，可重复生成；行语义与 overlay.js STATE_ROWS 对齐（0 idle / 3 speaking / 4 excited / 5 sad / 6 attention / 7 working / 8 ready，1/2 自由设计）。
+  2. T-63 任务级进度气泡：契约冻结 `petAPI.petOverlay.startTask/updateTask/finishTask/getConfig` 与 `pet:task-start/update/finish`；状态事件 payload 增加 `task` 字段；主进程任务注册表（内存态，不持久化）；运行中任务气泡优先显示，提醒气泡排队并在任务结束后补放；完成/失败结果按气泡时长显示后回落 idle。
+  3. 任务气泡首批接入真实任务：Codex 宠物目录批量导入（scanCodexPetsDir 增加可选 onProgress 回调）与自动更新下载进度（updater 增加可选 onDownloadProgress 回调，仅打包版真实触发）；`getConfig` 为 T-57/T-61 文档契约的补实现。
+  4. 执行：两卡并行 worktree（codex/m5x-animpack、codex/m5x-taskbubble），优先子代理派发；消息投递连续两次未收到任务正文则总工直接实施；验收后串行合并 main，check/smoke 全绿，更新 PLAN/STATUS 与最新版，最后人工目检。
+- 后果：用户可立即体验动画宠物并观察长任务进度；皮肤导入/更新下载等长任务不再只显示“工作中”；后续新任务源（导出、TTS、外部工具）可复用同一任务 API。
