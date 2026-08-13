@@ -232,7 +232,22 @@
     "empty": "暂无可用皮肤。",
     "unavailable": "皮肤功能暂不可用（petAPI.skin 未提供）。",
     "noPreview": "无预览图",
-    "animated": "动画"
+    "animated": "动画",
+    "scanCodexPets": "扫描 Codex 宠物目录",
+    "scanCodexPetsDialogTitle": "选择 Codex 宠物目录（含 pet.json + spritesheet.webp）",
+    "scanCodexPetsSuccess": "已从 Codex 宠物目录导入 {imported} 个宠物包",
+    "scanCodexPetsFailed": "导入失败 {failed} 个",
+    "scanCodexPetsNone": "所选目录未找到 Codex 宠物包（pet.json + spritesheet.webp）",
+    "scanCodexPetsError": "扫描 Codex 宠物目录失败：{error}",
+    "previewRows": "{name} 的 9 行状态预览",
+    "previewRowIdle": "状态行 {row}/{rows}：待机",
+    "previewRowHappy": "状态行 {row}/{rows}：开心",
+    "previewRowExcited": "状态行 {row}/{rows}：兴奋",
+    "previewRowFailed": "状态行 {row}/{rows}：失败",
+    "previewRowWaiting": "状态行 {row}/{rows}：等待输入",
+    "previewRowWorking": "状态行 {row}/{rows}：运行中",
+    "previewRowReady": "状态行 {row}/{rows}：待审阅",
+    "previewRowUnknown": "状态行 {row}/{rows}"
   },
   "data": {
     "exportTitle": "导出对话",

@@ -19,6 +19,7 @@
  */
 
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const zlib = require('zlib');
 
@@ -566,6 +567,20 @@ function toDataUrl(filePath) {
   return `data:${mime};base64,${data.toString('base64')}`;
 }
 
+/** T-59：Codex 宠物目录默认位置（env CODEX_HOME 优先，否则 HOME/.codex） */
+function defaultCodexPetsDir() {
+  const codexHome =
+    typeof process.env.CODEX_HOME === 'string' && process.env.CODEX_HOME.trim()
+      ? process.env.CODEX_HOME.trim()
+      : '';
+  const home =
+    typeof process.env.HOME === 'string' && process.env.HOME.trim()
+      ? process.env.HOME.trim()
+      : os.homedir();
+  const base = codexHome || path.join(home, '.codex');
+  return path.join(base, 'pets');
+}
+
 /**
  * 创建皮肤存储：
  * - baseDir：用户数据目录下的 skins/（导入包持久化位置）
@@ -841,12 +856,91 @@ function createSkinStore(options = {}) {
     return { id };
   }
 
+  /**
+   * T-59：扫描 Codex 宠物目录并批量导入。
+   * - 目录自身是宠物包（含 pet.json）时直接导入；否则递归扫描子目录；
+   * - 跳过 node_modules/.git/隐藏目录与符号链接，不进入已识别宠物包内部；
+   * - 逐包复用 importPack 校验，单个包失败不中断；
+   * - 返回 { imported: [皮肤条目], failed: [{name, error}] }。
+   */
+  function scanCodexPetsDir(sourceDir) {
+    if (typeof sourceDir !== 'string' || !sourceDir.trim()) {
+      throw new SkinError('未提供 Codex 宠物目录路径');
+    }
+    const resolved = path.resolve(sourceDir.trim());
+    if (!fs.existsSync(resolved)) {
+      throw new SkinError(`Codex 宠物目录不存在: ${resolved}`);
+    }
+    if (!fs.statSync(resolved).isDirectory()) {
+      throw new SkinError('Codex 宠物目录路径不是文件夹');
+    }
+    const imported = [];
+    const failed = [];
+    const visited = new Set();
+
+    function walk(dir) {
+      let real;
+      try {
+        real = fs.realpathSync(dir);
+      } catch (_error) {
+        failed.push({
+          name: path.basename(dir),
+          error: `无法解析目录路径: ${dir}`
+        });
+        return;
+      }
+      if (visited.has(real)) {
+        return;
+      }
+      visited.add(real);
+
+      if (fs.existsSync(path.join(dir, PET_MANIFEST_NAME))) {
+        const name = path.basename(dir);
+        try {
+          imported.push(importPack(dir));
+        } catch (error) {
+          failed.push({
+            name,
+            error: error && error.message ? error.message : String(error)
+          });
+        }
+        // 已按宠物包处理，不再深入其内部目录
+        return;
+      }
+
+      let entries;
+      try {
+        entries = fs.readdirSync(dir, { withFileTypes: true });
+      } catch (error) {
+        failed.push({
+          name: path.basename(dir),
+          error: `读取目录失败: ${error && error.message ? error.message : error}`
+        });
+        return;
+      }
+      for (const entry of entries) {
+        if (entry.isSymbolicLink() || !entry.isDirectory()) {
+          continue;
+        }
+        const name = entry.name;
+        if (name === 'node_modules' || name === '.git' || name.startsWith('.')) {
+          continue;
+        }
+        walk(path.join(dir, name));
+      }
+    }
+
+    walk(resolved);
+    return { imported, failed };
+  }
+
   return {
     list,
     find,
     importPack,
     exportPack,
     remove,
+    scanCodexPetsDir,
     isBuiltin,
     baseDir,
     defaultsDir
@@ -866,5 +960,6 @@ module.exports = {
   MANIFEST_NAME,
   PET_MANIFEST_NAME,
   parseWebpSize,
+  defaultCodexPetsDir,
   ALLOWED_EXTENSIONS
 };
