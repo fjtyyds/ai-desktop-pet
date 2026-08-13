@@ -6,7 +6,7 @@
 - 最近完成：T-63 任务级进度气泡验收合并（a7b31d8，main check/smoke 全绿）；T-62 动画宠物包验收合并（0e9f5bd）
 - 下一步：用户 `npm run dev` 目检（pixel-pet 动画观感 + 任务气泡体验）→ sync-latest 同步最新版 → push 授权后推送
 - 阻塞：无（商店/签名资金冻结仍按 ADR-041 处理）
-- 最新版：`E:\codex\AI桌宠最新版`（scripts/sync-latest.ps1 自动同步，当前 0.1.0 @ 5da29f6；M5.2 完成后更新）
+- 最新版：`E:\codex\AI桌宠最新版`（scripts/sync-latest.ps1 自动同步，当前 0.1.0 @ f029dbb，ADR-042/043）
 - 交接提示：新会话先读 `AGENTS.md` → `PLAN.md` → `docs/STATUS.md` → `docs/reports/2026-08-10-工作对接方案.md` → 自己的任务卡（docs/tasks/T-xx.md）
 
 ## M1 集成完成记录（2026-08-09）
