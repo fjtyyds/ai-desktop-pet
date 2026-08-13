@@ -428,6 +428,116 @@ app.whenReady().then(() => {
         fail(`气泡时长未夹取到 3~20: ${JSON.stringify(t61State)}`);
       }
       console.log('[smoke] T-61 浮窗设置读写/清洗端到端通过');
+      // T-59：Codex pets 目录扫描导入 + 失败分组 + 9 行状态预览端到端
+      const codexPetsTmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-pet-smoke-pets-'));
+      try {
+        function makeSmokePetPack(dir, id, name) {
+          fs.mkdirSync(dir, { recursive: true });
+          fs.writeFileSync(
+            path.join(dir, 'pet.json'),
+            JSON.stringify({
+              id,
+              displayName: name,
+              description: 'smoke',
+              spritesheetPath: 'spritesheet.webp'
+            }),
+            'utf8'
+          );
+          const webp = Buffer.alloc(30);
+          webp.write('RIFF', 0, 'ascii');
+          webp.writeUInt32LE(22, 4);
+          webp.write('WEBP', 8, 'ascii');
+          webp.write('VP8X', 12, 'ascii');
+          webp.writeUInt32LE(10, 16);
+          webp.writeUIntLE(1535, 24, 3);
+          webp.writeUIntLE(1871, 27, 3);
+          fs.writeFileSync(path.join(dir, 'spritesheet.webp'), webp);
+        }
+        const petsRoot = path.join(codexPetsTmp, 'pets');
+        makeSmokePetPack(path.join(petsRoot, 'alpha'), 'alpha-pet', 'Alpha');
+        makeSmokePetPack(path.join(petsRoot, 'node_modules', 'evil'), 'evil-node', 'Evil');
+        const broken = path.join(petsRoot, 'broken');
+        fs.mkdirSync(broken, { recursive: true });
+        fs.writeFileSync(
+          path.join(broken, 'pet.json'),
+          JSON.stringify({
+            id: 'broken-pet',
+            displayName: 'Broken',
+            description: '',
+            spritesheetPath: 'missing.webp'
+          }),
+          'utf8'
+        );
+        const t59State = await win.webContents.executeJavaScript(`(async () => {
+          const api = window.petAPI.skin;
+          const result = await api.importCodexPets({ path: ${JSON.stringify(petsRoot)} });
+          const page = document.getElementById('skin-page');
+          const oldHidden = page.hidden;
+          page.hidden = false;
+          await window.ChatUI.refreshSkins();
+          const cards = Array.from(document.querySelectorAll('.skin-card'));
+          const alphaCard = cards.find((card) => card.dataset.id === 'alpha-pet');
+          const previewRows = alphaCard
+            ? alphaCard.querySelectorAll('.skin-preview-atlas-row').length
+            : 0;
+          const previewRowOk = Boolean(
+            alphaCard && alphaCard.querySelector('.skin-preview-atlas-rows')
+          );
+          const panel = document.getElementById('skin-codex-result');
+          window.ChatUI.renderSkinCodexResult(result);
+          const panelText = panel ? panel.textContent : '';
+          const groupedFailures = panel
+            ? panel.querySelectorAll('.skin-codex-failures li').length
+            : 0;
+          const grouped = window.ChatUI.groupSkinImportFailures(result.failed);
+          page.hidden = oldHidden;
+          return {
+            ok: Boolean(result && result.ok),
+            imported: Array.isArray(result.imported) ? result.imported.map((s) => s.id) : [],
+            failed: Array.isArray(result.failed) ? result.failed.map((f) => f.name) : [],
+            failedError:
+              result && result.failed && result.failed[0] ? result.failed[0].error : '',
+            buttonExists: Boolean(document.getElementById('skin-codex-import-btn')),
+            previewRowOk,
+            previewRows,
+            panelText,
+            groupedFailures,
+            groupedCount: grouped.length
+          };
+        })()`);
+        if (!t59State.ok) {
+          fail('skin:import-codepets 未返回 ok');
+        }
+        if (
+          !t59State.imported.includes('alpha-pet') ||
+          t59State.imported.includes('evil-node')
+        ) {
+          fail(`扫描导入结果异常: ${JSON.stringify(t59State.imported)}`);
+        }
+        if (
+          t59State.failed.length !== 1 ||
+          t59State.failed[0] !== 'broken' ||
+          !t59State.failedError.includes('spritesheet')
+        ) {
+          fail(`扫描失败分组异常: ${JSON.stringify(t59State.failed)}`);
+        }
+        if (!t59State.buttonExists) {
+          fail('皮肤页缺少“扫描 Codex 宠物目录”按钮');
+        }
+        if (!t59State.previewRowOk || t59State.previewRows !== 9) {
+          fail(`图集 9 行预览异常: ${JSON.stringify(t59State)}`);
+        }
+        if (
+          t59State.groupedFailures < 1 ||
+          !t59State.panelText.includes('broken') ||
+          t59State.groupedCount < 1
+        ) {
+          fail(`错误分组渲染异常: ${JSON.stringify(t59State)}`);
+        }
+        console.log('[smoke] T-59 目录扫描导入/失败分组/9 行预览端到端通过');
+      } finally {
+        fs.rmSync(codexPetsTmp, { recursive: true, force: true });
+      }
       overlayWin.destroy();
       app.quit();
     } catch (error) {

@@ -29,6 +29,7 @@ const CHANNELS = {
   telemetryFlush: 'telemetry:flush', // T-42：匿名遥测批量补发（测试用）
   skinList: 'skin:list', // T-43：皮肤列表
   skinImport: 'skin:import', // T-43：导入皮肤包
+  skinImportCodexPets: 'skin:import-codepets', // T-59：扫描 Codex 宠物目录批量导入
   skinExport: 'skin:export', // T-43：导出皮肤包
   skinApply: 'skin:apply', // T-43：应用皮肤
   skinRemove: 'skin:remove', // T-43：卸载皮肤
@@ -125,6 +126,8 @@ contextBridge.exposeInMainWorld('petAPI', {
   skin: {
     list: () => ipcRenderer.invoke(CHANNELS.skinList), // T-43
     import: (payload) => ipcRenderer.invoke(CHANNELS.skinImport, payload), // T-43
+    importCodexPets: (payload) =>
+      ipcRenderer.invoke(CHANNELS.skinImportCodexPets, payload), // T-59
     export: (payload) => ipcRenderer.invoke(CHANNELS.skinExport, payload), // T-43
     apply: (payload) => ipcRenderer.invoke(CHANNELS.skinApply, payload), // T-43
     remove: (payload) => ipcRenderer.invoke(CHANNELS.skinRemove, payload) // T-43

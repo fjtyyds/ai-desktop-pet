@@ -3802,6 +3802,7 @@ pass('T-48 设置页三段式布局、既有元素 id 与双语文案断言通�
   }
   pass('T-56 浮窗交互增强静态断言通过');
 
+
   // T-60：系统与性能（多显示器/事件推送/隐藏暂停，ADR-045）
   if (
     !petOverlaySource.includes('pet:status-updated') ||
@@ -3884,6 +3885,190 @@ pass('T-48 设置页三段式布局、既有元素 id 与双语文案断言通�
     }
   }
   pass('T-61 设置与引导静态断言通过');
+
+
+
+  // T-59：皮肤体验（Codex pets 目录扫描导入 + 9 行状态预览 + 错误可读化）
+  if (
+    !ipcSource.includes("skinImportCodexPets: 'skin:import-codepets'") ||
+    !preloadSource.includes("skinImportCodexPets: 'skin:import-codepets'")
+  ) {
+    fail('ipc.js/preload.js 缺少 skin:import-codepets 通道定义');
+  }
+  if (!ipcSource.includes('ipcMain.handle(CHANNELS.skinImportCodexPets')) {
+    fail('ipc.js 未注册 skinImportCodexPets 处理器');
+  }
+  if (!preloadSource.includes('importCodexPets:')) {
+    fail('preload.js 缺少 petAPI.skin.importCodexPets 暴露');
+  }
+  for (const token of [
+    'scanCodexPetsDir',
+    'defaultCodexPetsDir',
+    'CODEX_HOME',
+    'node_modules'
+  ]) {
+    if (!skinStoreSource.includes(token)) {
+      fail(`skin-store.js 缺少 T-59 目录扫描实现: ${token}`);
+    }
+  }
+  for (const token of [
+    'skin-codex-import-btn',
+    'handleSkinCodexImport',
+    'groupSkinImportFailures',
+    'skin-preview-atlas-rows',
+    'skin-preview-atlas-row'
+  ]) {
+    if (!rendererChatSource.includes(token)) {
+      fail(`renderer/chat.js 缺少 T-59 接线: ${token}`);
+    }
+  }
+  for (const token of ['.skin-preview-atlas-rows', '.skin-preview-atlas-row', 'pet-row-strip']) {
+    if (!rendererChatCssSource.includes(token)) {
+      fail(`renderer/chat.css 缺少 T-59 预览条样式: ${token}`);
+    }
+  }
+  const skinT59LocaleKeys = [
+    'scanCodexPets',
+    'scanCodexPetsSuccess',
+    'scanCodexPetsError',
+    'scanCodexPetsNone',
+    'previewRowIdle',
+    'previewRowWaiting',
+    'previewRowWorking',
+    'previewRowReady',
+    'previewRowFailed'
+  ];
+  for (const localeFile of ['zh-CN', 'en']) {
+    const locale = JSON.parse(
+      fs.readFileSync(
+        path.join(root, 'src', 'shared', 'locales', `${localeFile}.json`),
+        'utf8'
+      )
+    );
+    for (const key of skinT59LocaleKeys) {
+      if (
+        !locale.skin ||
+        typeof locale.skin[key] !== 'string' ||
+        !locale.skin[key].trim()
+      ) {
+        fail(`${localeFile}.json 缺少 skin.${key} 文案`);
+      }
+    }
+  }
+  pass('T-59 皮肤体验静态断言通过（通道/扫描/预览/错误分组/双语文案）');
+
+  // T-59 运行时：Codex pets 目录扫描批量导入（成功/失败分组/node_modules 跳过）
+  try {
+    const skinStoreModule = require(path.join(root, 'src', 'main', 'skin-store.js'));
+    const petsTmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-pet-scan-check-'));
+    try {
+      function makePetPack(dir, id, name) {
+        fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(
+          path.join(dir, 'pet.json'),
+          JSON.stringify({
+            id,
+            displayName: name,
+            description: 'check',
+            spritesheetPath: 'spritesheet.webp'
+          }),
+          'utf8'
+        );
+        const webp = Buffer.alloc(30);
+        webp.write('RIFF', 0, 'ascii');
+        webp.writeUInt32LE(22, 4);
+        webp.write('WEBP', 8, 'ascii');
+        webp.write('VP8X', 12, 'ascii');
+        webp.writeUInt32LE(10, 16);
+        webp.writeUIntLE(1535, 24, 3);
+        webp.writeUIntLE(1871, 27, 3);
+        fs.writeFileSync(path.join(dir, 'spritesheet.webp'), webp);
+      }
+      const petsRoot = path.join(petsTmp, 'pets');
+      makePetPack(path.join(petsRoot, 'alpha'), 'alpha-pet', 'Alpha');
+      makePetPack(path.join(petsRoot, 'beta'), 'beta-pet', 'Beta');
+      makePetPack(path.join(petsRoot, 'node_modules', 'evil'), 'evil-node', 'Evil');
+      makePetPack(path.join(petsRoot, '.hidden', 'ghost'), 'ghost-pet', 'Ghost');
+      const broken = path.join(petsRoot, 'broken');
+      fs.mkdirSync(broken, { recursive: true });
+      fs.writeFileSync(
+        path.join(broken, 'pet.json'),
+        JSON.stringify({
+          id: 'broken-pet',
+          displayName: 'Broken',
+          description: '',
+          spritesheetPath: 'missing.webp'
+        }),
+        'utf8'
+      );
+      const scanStore = skinStoreModule.createSkinStore({
+        baseDir: path.join(petsTmp, 'skins'),
+        defaultsDir: path.join(petsTmp, 'defaults')
+      });
+      const scan = scanStore.scanCodexPetsDir(petsRoot);
+      const importedIds = scan.imported.map((item) => item.id);
+      if (
+        importedIds.length !== 2 ||
+        !importedIds.includes('alpha-pet') ||
+        !importedIds.includes('beta-pet')
+      ) {
+        fail(`扫描导入结果异常: ${JSON.stringify(importedIds)}`);
+      }
+      if (importedIds.includes('evil-node') || importedIds.includes('ghost-pet')) {
+        fail('扫描不应导入 node_modules/隐藏目录中的宠物包');
+      }
+      if (
+        scan.failed.length !== 1 ||
+        scan.failed[0].name !== 'broken' ||
+        !String(scan.failed[0].error).includes('spritesheet')
+      ) {
+        fail(`逐包失败分组异常: ${JSON.stringify(scan.failed)}`);
+      }
+      const savedCodexHome = process.env.CODEX_HOME;
+      const savedHome = process.env.HOME;
+      try {
+        process.env.CODEX_HOME = path.join(petsTmp, 'codex-home');
+        process.env.HOME = path.join(petsTmp, 'home');
+        const defDir = skinStoreModule.defaultCodexPetsDir();
+        if (defDir !== path.join(petsTmp, 'codex-home', 'pets')) {
+          fail(`defaultCodexPetsDir 未优先 CODEX_HOME: ${defDir}`);
+        }
+        delete process.env.CODEX_HOME;
+        if (
+          skinStoreModule.defaultCodexPetsDir() !==
+          path.join(petsTmp, 'home', '.codex', 'pets')
+        ) {
+          fail('defaultCodexPetsDir 未回退 HOME/.codex/pets');
+        }
+      } finally {
+        if (savedCodexHome === undefined) {
+          delete process.env.CODEX_HOME;
+        } else {
+          process.env.CODEX_HOME = savedCodexHome;
+        }
+        if (savedHome === undefined) {
+          delete process.env.HOME;
+        } else {
+          process.env.HOME = savedHome;
+        }
+      }
+      let missingRejected = false;
+      try {
+        scanStore.scanCodexPetsDir(path.join(petsTmp, 'no-such-dir'));
+      } catch (_error) {
+        missingRejected = true;
+      }
+      if (!missingRejected) {
+        fail('扫描不存在的目录未被拒绝');
+      }
+      pass('T-59 Codex 宠物目录扫描批量导入运行时通过（含失败分组/跳过 node_modules）');
+    } finally {
+      fs.rmSync(petsTmp, { recursive: true, force: true });
+    }
+  } catch (error) {
+    fail(`T-59 目录扫描运行时检查异常: ${error && error.message ? error.message : error}`);
+  }
+
 
   console.log('[check] 全部通过');
 })();

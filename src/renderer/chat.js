@@ -396,6 +396,7 @@
     initTts(); // T-23：语音输出能力探测（异步加载系统语音列表）
     // 先加载两份语言包，确保任何文案渲染不会回退到键名
     await window.PetLocales.ready;
+    ensureSkinCodexControls(); // T-59：皮肤页“扫描 Codex 宠物目录”入口（index.html 只读，动态注入）
     await restoreSettings();
     void refreshLicense(); // T-40：加载许可证状态并渲染账户/订阅区块
     ensureWindowFeatureControls(); // T-19: 注入窗口行为开关与提示
@@ -446,6 +447,8 @@
       skinList: document.getElementById('skin-list'),
       skinImportBtn: document.getElementById('skin-import-btn'),
       skinStatus: document.getElementById('skin-status'),
+      skinCodexImportBtn: null, // T-59：动态注入
+      skinCodexResult: null, // T-59：扫描结果分组面板
       memoryStatus: document.getElementById('memory-status'),
       memoryEmpty: document.getElementById('memory-empty'),
       memoryList: document.getElementById('memory-list'),
@@ -2596,6 +2599,41 @@
     elements.settingsBack.focus();
   }
 
+  /** T-59：动态注入 Codex 宠物目录扫描按钮与结果面板（index.html 只读，不改静态页） */
+  function ensureSkinCodexControls() {
+    if (!elements.skinPage || !elements.skinImportBtn) {
+      return;
+    }
+    if (!elements.skinCodexImportBtn) {
+      const btn = document.createElement('button');
+      btn.id = 'skin-codex-import-btn';
+      btn.type = 'button';
+      btn.className = 'secondary-btn skin-action-btn';
+      btn.addEventListener('click', () => void handleSkinCodexImport());
+      elements.skinImportBtn.insertAdjacentElement('afterend', btn);
+      elements.skinCodexImportBtn = btn;
+    }
+    if (!elements.skinCodexResult) {
+      const panel = document.createElement('p');
+      panel.id = 'skin-codex-result';
+      panel.className = 'settings-status';
+      panel.setAttribute('role', 'status');
+      panel.hidden = true;
+      elements.skinStatus.insertAdjacentElement('afterend', panel);
+      elements.skinCodexResult = panel;
+    }
+    updateSkinCodexButtonLabel();
+  }
+
+  /** T-59：语言切换时刷新扫描按钮文案 */
+  function updateSkinCodexButtonLabel() {
+    if (!elements.skinCodexImportBtn) {
+      return;
+    }
+    const t = window.PetLocales.createTranslator(currentLocale);
+    elements.skinCodexImportBtn.textContent = t('skin.scanCodexPets');
+  }
+
   /* T-55：宠物浮窗 API（Codex Pets 式） */
 
   function hasPetOverlayApi() {
@@ -2783,6 +2821,19 @@
     }
   }
 
+  /** T-59：图集 9 行预览的文案键（Codex pet.json 8 列×9 行约定） */
+  const SKIN_ATLAS_ROW_LABELS = [
+    'previewRowIdle',
+    'previewRowUnknown',
+    'previewRowUnknown',
+    'previewRowHappy',
+    'previewRowExcited',
+    'previewRowFailed',
+    'previewRowWaiting',
+    'previewRowWorking',
+    'previewRowReady'
+  ];
+
   function renderSkinList() {
     const t = window.PetLocales.createTranslator(currentLocale);
     elements.skinList.textContent = '';
@@ -2806,12 +2857,32 @@
       const preview = document.createElement('div');
       preview.className = 'skin-preview';
       if (skin.atlas && skin.spritesheetDataUrl) {
-        // T-55：Codex 宠物包（动画图集）在列表中直接预览首行动画
-        const animated = document.createElement('div');
-        animated.className = 'skin-preview-atlas';
-        animated.style.backgroundImage = `url("${skin.spritesheetDataUrl}")`;
-        animated.style.backgroundSize = `${skin.atlas.cols * 100}% ${skin.atlas.rows * 100}%`;
-        preview.appendChild(animated);
+        // T-59：图集皮肤展示 9 行状态预览条（每行一帧动画循环）
+        const rowsBox = document.createElement('div');
+        rowsBox.className = 'skin-preview-atlas-rows';
+        rowsBox.setAttribute('role', 'img');
+        rowsBox.setAttribute(
+          'aria-label',
+          t('skin.previewRows', { name: skin.name || skin.id })
+        );
+        rowsBox.style.gridTemplateRows = `repeat(${skin.atlas.rows}, 1fr)`;
+        for (let row = 0; row < skin.atlas.rows; row += 1) {
+          const cell = document.createElement('div');
+          cell.className = 'skin-preview-atlas-row';
+          cell.style.backgroundImage = `url("${skin.spritesheetDataUrl}")`;
+          cell.style.backgroundSize = `${skin.atlas.cols * 100}% ${skin.atlas.rows * 100}%`;
+          cell.style.backgroundPosition = `0% ${
+            (row * 100) / (skin.atlas.rows - 1)
+          }%`;
+          const labelKey =
+            SKIN_ATLAS_ROW_LABELS[row] || 'previewRowUnknown';
+          cell.title = t(`skin.${labelKey}`, {
+            row: row + 1,
+            rows: skin.atlas.rows
+          });
+          rowsBox.appendChild(cell);
+        }
+        preview.appendChild(rowsBox);
       } else if (skin.previewDataUrl) {
         const img = document.createElement('img');
         img.src = skin.previewDataUrl;
@@ -2873,6 +2944,110 @@
       info.append(nameRow, meta, actions);
       card.append(preview, info);
       elements.skinList.appendChild(card);
+    }
+  }
+
+  /** T-59：按错误文案分组导入失败项（可读化，同一原因合并展示） */
+  function groupSkinImportFailures(failed) {
+    const groups = new Map();
+    for (const item of Array.isArray(failed) ? failed : []) {
+      const error =
+        item && typeof item.error === 'string' && item.error.trim()
+          ? item.error
+          : 'unknown';
+      const name = item && typeof item.name === 'string' && item.name
+        ? item.name
+        : '?';
+      if (!groups.has(error)) {
+        groups.set(error, []);
+      }
+      groups.get(error).push(name);
+    }
+    return [...groups.entries()]
+      .map(([error, names]) => ({ error, names }))
+      .sort((a, b) => b.names.length - a.names.length);
+  }
+
+  /** T-59：渲染扫描导入结果（成功数 + 失败原因分组） */
+  function renderSkinCodexResult(result) {
+    const t = window.PetLocales.createTranslator(currentLocale);
+    const panel = elements.skinCodexResult;
+    if (!panel) {
+      return;
+    }
+    const imported = Array.isArray(result.imported) ? result.imported.length : 0;
+    const failed = Array.isArray(result.failed) ? result.failed : [];
+    if (imported === 0 && failed.length === 0) {
+      showSkinStatus(t('skin.scanCodexPetsNone'), 'ok');
+      return;
+    }
+    const parts = [];
+    if (imported > 0) {
+      parts.push(t('skin.scanCodexPetsSuccess', { imported }));
+    }
+    if (failed.length > 0) {
+      parts.push(t('skin.scanCodexPetsFailed', { failed: failed.length }));
+    }
+    const groups = groupSkinImportFailures(failed);
+    panel.textContent = '';
+    panel.dataset.type = failed.length > 0 ? 'error' : 'ok';
+    panel.hidden = false;
+    const summary = document.createElement('span');
+    summary.className = 'skin-codex-summary';
+    summary.textContent = parts.join('；');
+    panel.appendChild(summary);
+    if (groups.length > 0) {
+      const list = document.createElement('ul');
+      list.className = 'skin-codex-failures';
+      for (const group of groups) {
+        const item = document.createElement('li');
+        const names =
+          group.names.length > 3
+            ? `${group.names.slice(0, 3).join('、')}…`
+            : group.names.join('、');
+        item.textContent = `${group.error}（${names}）`;
+        list.appendChild(item);
+      }
+      panel.appendChild(list);
+    }
+  }
+
+  /** T-59：扫描 Codex 宠物目录（缺省目录或用户自选目录）批量导入 */
+  async function handleSkinCodexImport() {
+    const t = window.PetLocales.createTranslator(currentLocale);
+    const api =
+      window.petAPI &&
+      window.petAPI.skin &&
+      typeof window.petAPI.skin.importCodexPets === 'function'
+        ? window.petAPI.skin
+        : null;
+    if (!api) {
+      showSkinStatus(t('skin.unavailable'), 'error');
+      return;
+    }
+    elements.skinCodexImportBtn.disabled = true;
+    try {
+      const result = await api.importCodexPets({});
+      if (result && result.ok) {
+        renderSkinCodexResult(result);
+        await refreshSkins();
+      } else if (result && result.error === 'cancelled') {
+        showSkinStatus(t('skin.importCancelled'), 'ok');
+      } else {
+        showSkinStatus(
+          t('skin.scanCodexPetsError', {
+            error: result && result.error ? result.error : 'unknown'
+          }),
+          'error'
+        );
+      }
+    } catch (error) {
+      showSkinStatus(
+        t('skin.scanCodexPetsError', { error: formatErrorMessage(error) }),
+        'error'
+      );
+    } finally {
+      elements.skinCodexImportBtn.disabled = false;
     }
   }
 
@@ -3110,6 +3285,7 @@
     applyOnboardingText(); // T-20：引导与人格模板静态文案（内联双语）
     applyWeatherText(); // T-22：语言切换后重绘天气动态文案
     applyWeatherCollapsed(); // T-24：语言切换后刷新折叠按钮文案
+    updateSkinCodexButtonLabel(); // T-59：语言切换后刷新扫描按钮文案
   }
 
   /** 将设置应用到表单与标题（缺失字段回退默认值） */
@@ -4549,6 +4725,8 @@
     refreshSkins, // T-43：皮肤列表刷新（测试/手动入口）
     getSkinItems: () => skinItems, // T-43
     applySkin, // T-43
+    groupSkinImportFailures, // T-59：导入失败分组（测试/手动入口）
+    renderSkinCodexResult, // T-59：扫描结果渲染（测试/手动入口）
     sanitizeShareText, // T-45：脱敏（测试/手动入口）
     generateShareCard, // T-45：生成对话卡片 PNG
     saveShareCard, // T-45：保存卡片

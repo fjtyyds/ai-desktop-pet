@@ -239,7 +239,22 @@
     "empty": "No skins available.",
     "unavailable": "Skin feature is unavailable (petAPI.skin missing).",
     "noPreview": "No preview",
-    "animated": "Animated"
+    "animated": "Animated",
+    "scanCodexPets": "Scan Codex pets folder",
+    "scanCodexPetsDialogTitle": "Choose a Codex pets folder (pet.json + spritesheet.webp)",
+    "scanCodexPetsSuccess": "Imported {imported} pet packs from the Codex pets folder",
+    "scanCodexPetsFailed": "{failed} pack(s) failed to import",
+    "scanCodexPetsNone": "No Codex pet packs (pet.json + spritesheet.webp) found in the selected folder",
+    "scanCodexPetsError": "Failed to scan Codex pets folder: {error}",
+    "previewRows": "9-row state preview for {name}",
+    "previewRowIdle": "State row {row}/{rows}: idle",
+    "previewRowHappy": "State row {row}/{rows}: happy",
+    "previewRowExcited": "State row {row}/{rows}: excited",
+    "previewRowFailed": "State row {row}/{rows}: failed",
+    "previewRowWaiting": "State row {row}/{rows}: waiting",
+    "previewRowWorking": "State row {row}/{rows}: running",
+    "previewRowReady": "State row {row}/{rows}: review",
+    "previewRowUnknown": "State row {row}/{rows}"
   },
   "data": {
     "exportTitle": "Export chat",

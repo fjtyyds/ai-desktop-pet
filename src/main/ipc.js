@@ -62,6 +62,7 @@ const CHANNELS = {
   telemetryFlush: 'telemetry:flush', // T-42：测试/网络恢复用批量补发
   skinList: 'skin:list', // T-43：皮肤列表（含预览/角色资源 data URL）
   skinImport: 'skin:import', // T-43：导入皮肤包（zip 或目录）
+  skinImportCodexPets: 'skin:import-codepets', // T-59：扫描 Codex 宠物目录批量导入
   skinExport: 'skin:export', // T-43：导出皮肤包为 zip
   skinApply: 'skin:apply', // T-43：应用皮肤（写入 settings.skinId）
   skinRemove: 'skin:remove', // T-43：卸载导入的皮肤包
@@ -837,6 +838,45 @@ async function handleSkinImport(event, payload) {
   }
 }
 
+/**
+ * skin:import-codepets（T-59）：扫描 Codex 宠物目录批量导入。
+ * 缺省优先使用 ~/.codex/pets（env CODEX_HOME 或 HOME/.codex）；目录不存在时
+ * 弹出目录选择框供用户自选。
+ */
+async function handleSkinImportCodexPets(event, payload) {
+  try {
+    const store = getSkinStore();
+    let sourcePath =
+      payload && typeof payload.path === 'string' ? payload.path.trim() : '';
+    if (!sourcePath) {
+      const defaultDir = skinStore.defaultCodexPetsDir();
+      if (fs.existsSync(defaultDir)) {
+        sourcePath = defaultDir;
+      } else {
+        const t = getTranslator();
+        const win = BrowserWindow.fromWebContents(event.sender);
+        const options = {
+          title: t('skin.scanCodexPetsDialogTitle'),
+          defaultPath: defaultDir,
+          properties: ['openDirectory']
+        };
+        const result =
+          win && !win.isDestroyed()
+            ? await dialog.showOpenDialog(win, options)
+            : await dialog.showOpenDialog(options);
+        if (result.canceled || !result.filePaths || result.filePaths.length === 0) {
+          return { ok: false, error: 'cancelled' };
+        }
+        sourcePath = result.filePaths[0];
+      }
+    }
+    const result = store.scanCodexPetsDir(sourcePath);
+    return { ok: true, ...result };
+  } catch (error) {
+    return skinErrorResult(error);
+  }
+}
+
 /** skin:export：传入 targetPath 直接导出；缺省弹出保存框 */
 async function handleSkinExport(event, payload) {
   try {
@@ -939,6 +979,7 @@ function registerIpcHandlers() {
   ipcMain.handle(CHANNELS.telemetryFlush, handleTelemetryFlush);
   ipcMain.handle(CHANNELS.skinList, handleSkinList);
   ipcMain.handle(CHANNELS.skinImport, handleSkinImport);
+  ipcMain.handle(CHANNELS.skinImportCodexPets, handleSkinImportCodexPets);
   ipcMain.handle(CHANNELS.skinExport, handleSkinExport);
   ipcMain.handle(CHANNELS.skinApply, handleSkinApply);
   ipcMain.handle(CHANNELS.skinRemove, handleSkinRemove);
