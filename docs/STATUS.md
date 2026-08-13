@@ -380,3 +380,10 @@
 - 验证：main `npm run check` 全绿（T-56~T-61 断言）；`npm run smoke` 全绿（各卡端到端）。
 - 说明：子代理派发存在消息投递异常（t56/t57/t60/t61 未收到任务正文，t59 正常完成），未收到的卡由总工直接实施；已写入分配手册与交接文件。未 push（远程操作待用户授权）。
 - 待办：用户 `npm run dev` 目检浮窗新交互；sync-latest 同步最新版。
+
+## T-56 追加修复 + Computer Use 实测记录（2026-08-13）
+
+- Computer Use 实测（@oai/sky + 项目 cua 封装）：`/pet` 唤起浮窗 ✓、浮窗可访问性树 ✓、✕ 按钮收起 ✓、Esc 收起 ✓、双击宠物隐藏/唤回主窗口 ✓（修复后）。
+- 发现并修复真实 bug：浮窗宠物区域原用 `-webkit-app-region: drag`，Chromium 吞掉点击/双击，导致 T-56“双击唤起主窗口”失效（实测 tuck ✕ 可点、双击无效）。修复为手动指针拖拽（pet:move-window IPC + moveBy），移除拖拽区，9bd451d 已合并 main；check/smoke 全绿（新增防回归断言：浮窗不得再使用拖拽区）。
+- 待人工目检：右键菜单原生弹窗（computer use 无法枚举原生菜单/驱动键盘）；设置页控件与皮肤扫描的 UI 观感（smoke 已覆盖 DOM 级）。
+- 说明：computer use 直连 sky 存在“同进程多窗口缓存互相覆盖”问题，后续测试优先用项目 cua 封装（cua.ps1）并以精确窗口标题（^AI 桌宠$）定位。
