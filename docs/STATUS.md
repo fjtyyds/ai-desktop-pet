@@ -372,3 +372,11 @@
 - 预冻结（总工先改）：store.js 新增 petOverlayBubbleSeconds（默认 6，3~20）/petOverlayBubbleEnabled（默认 true）/petOverlayReminders（默认 true）/petOverlayBounds.displayId；contracts.js 补 petAPI.petOverlay.showMain/pushBubble/getConfig 契约说明。
 - 任务：T-56 交互增强、T-57 状态机与气泡队列、T-58 情绪与动画联动（批次 1）；T-59 皮肤体验、T-60 系统与性能、T-61 设置与引导（批次 2）。
 - 待办：批次 1 派活 → 验收合并 → 批次 2 → 全部完成后目检 + sync-latest。
+
+## T-56~T-61 合并记录（2026-08-13，M5.1 完成）
+
+- T-58 eea3c71、T-57 d3a0dca、T-56 17a82c1（批次 1）fast-forward 合并；T-60 76e7c27、T-61 ee95481（批次 2）fast-forward 合并；T-59 efc7173 以 8c5df99 合并（check/smoke 冲突块经总工机械合并解决，两侧断言均保留）。
+- 主进程/渲染层：浮窗新增 showMain/toggleMain、右键菜单、Esc 收起、贴边吸附、多显示器位置记忆、状态事件推送（5s 心跳兜底）、隐藏暂停动画；状态机扩展 speaking/attention + 气泡队列（≤3 条，3~20s 可配）；情绪驱动 waving/jumping/waiting 动画行；Codex pets 目录扫描批量导入 + 9 行预览 + 错误分组；设置页气泡开关/时长/提醒透出 + 首次开启引导气泡。
+- 验证：main `npm run check` 全绿（T-56~T-61 断言）；`npm run smoke` 全绿（各卡端到端）。
+- 说明：子代理派发存在消息投递异常（t56/t57/t60/t61 未收到任务正文，t59 正常完成），未收到的卡由总工直接实施；已写入分配手册与交接文件。未 push（远程操作待用户授权）。
+- 待办：用户 `npm run dev` 目检浮窗新交互；sync-latest 同步最新版。
