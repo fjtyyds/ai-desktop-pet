@@ -99,6 +99,17 @@ const DEFAULT_MODEL = 'deepseek-v4-flash';
  * - getSkin() -> Promise<{ ok, skin }>（含 spritesheetDataUrl/atlas 的皮肤条目）
  * - tuckAway() -> Promise<{ ok, enabled }>（收起草宠）
  * - refreshSkin() / onSkinUpdated(cb)（皮肤变更刷新）
+ * - showMain() -> Promise<void>（T-56，ADR-045：唤起主聊天窗口）
+ * - pushBubble({ state, text? }) -> Promise<PetOverlayStatus>（T-57：状态/气泡队列上报）
+ * - getConfig() -> Promise<{ bubbleEnabled, bubbleSeconds, reminders }>（T-57/T-61）
+ */
+
+/**
+ * T-55/ADR-045：宠物浮窗设置字段（store.js 白名单，worker 只读）：
+ * - petOverlayBubbleSeconds：气泡显示时长（秒），默认 6，允许 3~20；
+ * - petOverlayBubbleEnabled：气泡显示开关，默认 true；
+ * - petOverlayReminders：提醒（空闲互动/喝水等）透出到浮窗，默认 true；
+ * - petOverlayBounds.displayId：可选显示器标识（整数），用于多显示器位置记忆。
  */
 
 /** 短期记忆窗口大小（M2 默认最近 20 条消息） */

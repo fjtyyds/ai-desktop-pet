@@ -192,6 +192,29 @@
 
 - [x] T-55 宠物浮窗实现、自检与合并（cb92ec0 已合并 main，2026-08-13）
 
+**M5.1：宠物浮窗优化——方案已定，待派发（2026-08-13）**
+
+目标：把浮窗从“能显示”做到“好用”：交互增强、状态机与气泡队列、情绪动画、皮肤体验、系统性能、设置引导（ADR-045）。
+
+任务卡：
+
+- `docs/tasks/T-56.md` — 浮窗交互增强（codex/m5x-interact）
+- `docs/tasks/T-57.md` — 状态机与气泡队列（codex/m5x-status）
+- `docs/tasks/T-58.md` — 情绪与动画联动（codex/m5x-mood）
+- `docs/tasks/T-59.md` — 皮肤体验（codex/m5x-skin）
+- `docs/tasks/T-60.md` — 系统与性能（codex/m5x-perf）
+- `docs/tasks/T-61.md` — 设置与引导（codex/m5x-settings）
+
+验收标准：
+
+1. 每批次合并后 main `npm run check`、`npm run smoke` 通过。
+2. 交互/状态/情绪/皮肤/性能/设置六项全部落地并有自动化断言。
+3. 全部完成后 `npm run dev` 人工目检 + sync-latest 同步最新版。
+
+任务清单：
+
+- [ ] T-56~T-61（批次 1：T-56/T-57/T-58；批次 2：T-59/T-60/T-61）
+
 ## Progress
 
 - 2026-08-13：T-55 宠物浮窗（Codex Pets 式）实现完成：独立悬浮宠物 + 状态气泡 + Codex 宠物包导入（ADR-044）；check/smoke 全绿（含 WebP 解析、宠物包导入/拒绝、浮窗端到端断言），离屏像素验证通过；待合并 main 后目检与同步最新版。

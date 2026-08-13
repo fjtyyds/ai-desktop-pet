@@ -35,6 +35,10 @@ const TTS_VOICE_PACK_ID_MAX_LENGTH = 40;
 /** 皮肤 id 清洗上限（T-43）：≤ 64 字符，默认 default（内置经典皮肤） */
 const SKIN_ID_MAX_LENGTH = 64;
 const DEFAULT_SKIN_ID = 'default';
+/** T-55/ADR-045：宠物浮窗气泡时长（秒）与提醒透出开关 */
+const PET_OVERLAY_BUBBLE_SECONDS_MIN = 3;
+const PET_OVERLAY_BUBBLE_SECONDS_MAX = 20;
+const DEFAULT_PET_OVERLAY_BUBBLE_SECONDS = 6;
 
 /** 天气城市名清洗上限（T-22） */
 const WEATHER_CITY_MAX_LENGTH = 64;
@@ -100,6 +104,9 @@ const DEFAULT_SETTINGS = {
   skinId: DEFAULT_SKIN_ID, // T-43：当前启用皮肤 id（≤64；default=内置经典皮肤）
   petOverlayEnabled: false, // T-55：宠物浮窗（Codex Pets 式独立悬浮宠物）开关，默认关闭
   petOverlayBounds: null, // T-55：宠物浮窗位置 { x, y }；null 表示未保存
+  petOverlayBubbleSeconds: DEFAULT_PET_OVERLAY_BUBBLE_SECONDS, // ADR-045：气泡显示时长（秒）
+  petOverlayBubbleEnabled: true, // ADR-045：气泡显示开关
+  petOverlayReminders: true, // ADR-045：提醒（空闲互动/喝水等）透出到浮窗气泡
   persona: { ...DEFAULT_PERSONA }
 };
 
@@ -194,7 +201,16 @@ function sanitizeWindowBounds(value, current) {
   if (!Number.isFinite(x) || !Number.isFinite(y)) {
     return current;
   }
-  return { x: Math.round(x), y: Math.round(y) };
+  // ADR-045：可选 displayId（显示器标识），非法值忽略
+  const displayId =
+    Number.isInteger(value.displayId) && value.displayId >= 0
+      ? value.displayId
+      : undefined;
+  const bounds = { x: Math.round(x), y: Math.round(y) };
+  if (displayId !== undefined) {
+    bounds.displayId = displayId;
+  }
+  return bounds;
 }
 
 /** 清洗天气城市名（T-22）：非字符串丢弃；去空白、压缩连续空格、截断到 64 字 */
@@ -454,6 +470,20 @@ function createStore(baseDir) {
       merged.petOverlayBounds,
       DEFAULT_SETTINGS.petOverlayBounds
     );
+    merged.petOverlayBubbleSeconds = sanitizeInteger(
+      merged.petOverlayBubbleSeconds,
+      DEFAULT_SETTINGS.petOverlayBubbleSeconds,
+      PET_OVERLAY_BUBBLE_SECONDS_MIN,
+      PET_OVERLAY_BUBBLE_SECONDS_MAX
+    );
+    merged.petOverlayBubbleEnabled = sanitizeBoolean(
+      merged.petOverlayBubbleEnabled,
+      DEFAULT_SETTINGS.petOverlayBubbleEnabled
+    );
+    merged.petOverlayReminders = sanitizeBoolean(
+      merged.petOverlayReminders,
+      DEFAULT_SETTINGS.petOverlayReminders
+    );
     return merged;
   }
 
@@ -485,7 +515,10 @@ function createStore(baseDir) {
       'waterReminder',
       'todos',
       'petOverlayEnabled',
-      'petOverlayBounds'
+      'petOverlayBounds',
+      'petOverlayBubbleSeconds',
+      'petOverlayBubbleEnabled',
+      'petOverlayReminders'
     ];
     const next = { ...current };
     for (const key of allowed) {
@@ -658,6 +691,29 @@ function createStore(baseDir) {
           );
           continue;
         }
+        if (key === 'petOverlayBubbleSeconds') {
+          next.petOverlayBubbleSeconds = sanitizeInteger(
+            patch.petOverlayBubbleSeconds,
+            current.petOverlayBubbleSeconds,
+            PET_OVERLAY_BUBBLE_SECONDS_MIN,
+            PET_OVERLAY_BUBBLE_SECONDS_MAX
+          );
+          continue;
+        }
+        if (key === 'petOverlayBubbleEnabled') {
+          next.petOverlayBubbleEnabled = sanitizeBoolean(
+            patch.petOverlayBubbleEnabled,
+            current.petOverlayBubbleEnabled
+          );
+          continue;
+        }
+        if (key === 'petOverlayReminders') {
+          next.petOverlayReminders = sanitizeBoolean(
+            patch.petOverlayReminders,
+            current.petOverlayReminders
+          );
+          continue;
+        }
         next[key] = typeof patch[key] === 'string' ? patch[key].trim() : String(patch[key]);
       }
     }
@@ -693,6 +749,9 @@ module.exports = {
   WATER_INTERVAL_MIN_MIN,
   WATER_INTERVAL_MIN_MAX,
   DEFAULT_WATER_INTERVAL_MINUTES,
+  PET_OVERLAY_BUBBLE_SECONDS_MIN,
+  PET_OVERLAY_BUBBLE_SECONDS_MAX,
+  DEFAULT_PET_OVERLAY_BUBBLE_SECONDS,
   TODOS_MAX_LENGTH,
   TODO_ID_MAX_LENGTH,
   TODO_TEXT_MAX_LENGTH

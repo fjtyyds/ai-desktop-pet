@@ -1,6 +1,8 @@
 node_modules/
 dist/
 多线程开发/
+多agent工具对接/
+outputs/
 .orchestrator-logs/
 # ADR-028：scripts/orchestrator/ 决定不入库，保留本地实验产物，git 状态不再显示
 scripts/orchestrator/

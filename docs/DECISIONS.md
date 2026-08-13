@@ -395,3 +395,15 @@
   5. 安全边界沿用 T-43：包内仅允许 .png/.json/.webp、≤10MB、≤50 条目、拒绝路径跳转/加密 zip/符号链接，不执行包内任何代码。
   6. IPC/preload 新增 `petAPI.petOverlay.{getStatus,setStatus,getSkin,toggle,setEnabled,tuckAway,refreshSkin,onSkinUpdated}`；契约写入 contracts.js；check/smoke 增加静态与运行时断言（含 WebP 尺寸解析、宠物包导入与非法图集拒绝）。
 - 后果：用户可像 Codex 一样让宠物独立悬浮桌面并看到工作状态；未来可在浮窗上扩展点击唤起主窗口、任务气泡等；皮肤包格式兼容 Codex 生态（可直接导入 hatch-pet 等产出的宠物包）。
+
+## ADR-045：宠物浮窗优化方案与设置预冻结（2026-08-13，T-56~T-61）
+
+- 状态：Accepted（方案已定，分批实施）
+- 背景：用户确认 T-55 只是起点，要求先拟定针对宠物浮窗的优化方案，再自动化完善（总工派活闭环）。
+- 决策：
+  1. 优化拆 6 张卡、2 个并行批次：T-56 交互增强、T-57 状态机与气泡队列、T-58 情绪与动画联动（批次 1）；T-59 皮肤体验、T-60 系统与性能、T-61 设置与引导（批次 2）。
+  2. 设置预冻结（协调者先行改 store.js，worker 只读）：`petOverlayBubbleSeconds`（默认 6，允许 3~20）、`petOverlayBubbleEnabled`（默认 true）、`petOverlayReminders`（默认 true）、`petOverlayBounds.displayId`（可选整数，校验显示器存在）。
+  3. 契约扩展由各卡提出、总工在对应卡派活前冻结到 contracts.js/docs/API.md；worker 不得自行改契约。
+  4. 执行流程：建卡 → 派活（子代理并行）→ 等待回报 → 总工验收（check/smoke/diff 边界）→ 串行合并 main → 更新 PLAN/STATUS → 全部完成后 sync-latest + 人工目检。
+  5. 交接纪律：上下文阈值下按 docs/reports/2026-08-11-总工交接提示词模板.md 交接；当前上下文上限已调高至 500k，本轮不强制交接，但每轮写 outputs/ 交接文件。
+- 后果：浮窗从“能显示”走向“好用”；设置白名单在批次开始时即为最终形态，避免 worker 反复改 store.js；共享文件冲突由总工在合并阶段解决。

@@ -364,3 +364,11 @@
 - 验证：npm run check 全绿；npm run smoke 全绿（浮窗状态/皮肤/气泡端到端）；离屏像素验证浮窗气泡与角色区域实际渲染。
 - 合并与复验：cb92ec0 fast-forward 合并入 main；main `npm run check`、`npm run smoke` 复跑全绿。
 - 待办：人工 `npm run dev` 目检浮窗观感；按 ADR-042 同步最新版（如需）。
+
+## T-56~T-61 建卡与方案记录（2026-08-13，ADR-045）
+
+- 用户要求：T-55 只是起点，先拟定宠物浮窗优化方案，再自动化完善（注意总工交接与任务分配；上下文上限已调高至 500k）。
+- 方案：docs/reports/2026-08-13-宠物浮窗优化方案.md + 线程分配手册（docs/reports/2026-08-13-宠物浮窗优化-线程分配手册.md）。
+- 预冻结（总工先改）：store.js 新增 petOverlayBubbleSeconds（默认 6，3~20）/petOverlayBubbleEnabled（默认 true）/petOverlayReminders（默认 true）/petOverlayBounds.displayId；contracts.js 补 petAPI.petOverlay.showMain/pushBubble/getConfig 契约说明。
+- 任务：T-56 交互增强、T-57 状态机与气泡队列、T-58 情绪与动画联动（批次 1）；T-59 皮肤体验、T-60 系统与性能、T-61 设置与引导（批次 2）。
+- 待办：批次 1 派活 → 验收合并 → 批次 2 → 全部完成后目检 + sync-latest。
