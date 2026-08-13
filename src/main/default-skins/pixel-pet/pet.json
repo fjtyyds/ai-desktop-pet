@@ -1,0 +1,7 @@
+{
+  "id": "pixel-pet",
+  "displayName": "像素小宠",
+  "description": "开箱即用的像素画动画宠物：呼吸、走路、挥手、跳跃、低落、张望、打字与欢呼共 9 行状态动画。",
+  "spritesheetPath": "spritesheet.webp",
+  "preview": "preview.webp"
+}

@@ -1190,6 +1190,32 @@ if (!builtinIds.includes('default') || builtinIds.length < 3) {
 }
 for (const id of builtinIds) {
   const dir = path.join(defaultSkinsDir, id);
+  if (fs.existsSync(path.join(dir, 'pet.json'))) {
+    // Codex 宠物包格式的内置皮肤（T-62）：pet.json + spritesheet.webp
+    for (const rel of ['pet.json', 'spritesheet.webp']) {
+      if (!fs.existsSync(path.join(dir, rel))) {
+        fail(`内置宠物包 ${id} 缺少 ${rel}`);
+      }
+    }
+    const pet = JSON.parse(
+      fs.readFileSync(path.join(dir, 'pet.json'), 'utf8')
+    );
+    if (
+      pet.id !== id ||
+      typeof pet.displayName !== 'string' ||
+      !pet.displayName.trim() ||
+      pet.spritesheetPath !== 'spritesheet.webp'
+    ) {
+      fail(`内置宠物包 ${id} pet.json 结构非法`);
+    }
+    const petDims = skinStoreModule.parseWebpSize(
+      fs.readFileSync(path.join(dir, 'spritesheet.webp'))
+    );
+    if (!petDims || petDims.width % 8 !== 0 || petDims.height % 9 !== 0) {
+      fail(`内置宠物包 ${id} spritesheet.webp 非 8×9 图集`);
+    }
+    continue;
+  }
   for (const rel of ['manifest.json', 'preview.png', 'assets/idle.png']) {
     if (!fs.existsSync(path.join(dir, rel))) {
       fail(`内置皮肤 ${id} 缺少 ${rel}`);
@@ -1208,6 +1234,102 @@ for (const id of builtinIds) {
   }
 }
 pass(`T-43 内置默认皮肤齐全（${builtinIds.join(', ')}）`);
+
+// T-62：动画宠物包——生成脚本 + 内置 pixel-pet（8 列×9 行、单元格 128px）
+const makePetPackPath = path.join(root, 'scripts', 'make-pet-pack.js');
+const makePetPackSource = fs.readFileSync(makePetPackPath, 'utf8');
+for (const token of [
+  "require('electron')",
+  'BrowserWindow',
+  'show: false',
+  "toDataURL('image/webp'",
+  'spritesheet.webp',
+  'preview.webp',
+  '1024',
+  '1152'
+]) {
+  if (!makePetPackSource.includes(token)) {
+    fail(`scripts/make-pet-pack.js 缺少生成脚本要素: ${token}`);
+  }
+}
+pass('T-62 动画宠物包生成脚本存在且要素齐全');
+
+const pixelPetDir = path.join(defaultSkinsDir, 'pixel-pet');
+for (const rel of ['pet.json', 'spritesheet.webp', 'preview.webp']) {
+  if (!fs.existsSync(path.join(pixelPetDir, rel))) {
+    fail(`pixel-pet 内置包缺少 ${rel}`);
+  }
+}
+const pixelPetManifest = JSON.parse(
+  fs.readFileSync(path.join(pixelPetDir, 'pet.json'), 'utf8')
+);
+if (
+  pixelPetManifest.id !== 'pixel-pet' ||
+  typeof pixelPetManifest.displayName !== 'string' ||
+  !pixelPetManifest.displayName.trim() ||
+  pixelPetManifest.displayName.length > 80 ||
+  typeof pixelPetManifest.description !== 'string' ||
+  pixelPetManifest.description.length > 200 ||
+  pixelPetManifest.spritesheetPath !== 'spritesheet.webp' ||
+  pixelPetManifest.preview !== 'preview.webp'
+) {
+  fail('pixel-pet pet.json 结构或字段约束非法');
+}
+const pixelSheetDims = skinStoreModule.parseWebpSize(
+  fs.readFileSync(path.join(pixelPetDir, 'spritesheet.webp'))
+);
+if (
+  !pixelSheetDims ||
+  pixelSheetDims.width !== 1024 ||
+  pixelSheetDims.height !== 1152
+) {
+  fail(
+    `pixel-pet spritesheet.webp 应为 1024×1152，实际 ${JSON.stringify(pixelSheetDims)}`
+  );
+}
+const pixelPreviewDims = skinStoreModule.parseWebpSize(
+  fs.readFileSync(path.join(pixelPetDir, 'preview.webp'))
+);
+if (
+  !pixelPreviewDims ||
+  pixelPreviewDims.width < 64 ||
+  pixelPreviewDims.height < 64
+) {
+  fail('pixel-pet preview.webp 尺寸非法');
+}
+pass('T-62 pixel-pet 内置包文件与图集尺寸合法');
+
+const t62CheckDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-pet-t62-check-'));
+try {
+  const t62Store = skinStoreModule.createSkinStore({
+    baseDir: path.join(t62CheckDir, 'skins'),
+    defaultsDir: defaultSkinsDir
+  });
+  const pixelEntry = t62Store.list().find((entry) => entry.id === 'pixel-pet');
+  if (
+    !pixelEntry ||
+    pixelEntry.builtin !== true ||
+    pixelEntry.kind !== 'atlas' ||
+    pixelEntry.atlas.cols !== 8 ||
+    pixelEntry.atlas.rows !== 9 ||
+    pixelEntry.atlas.cellWidth !== 128 ||
+    pixelEntry.atlas.cellHeight !== 128 ||
+    !pixelEntry.spritesheetDataUrl.startsWith('data:image/webp;base64,') ||
+    !pixelEntry.previewDataUrl.startsWith('data:image/webp;base64,')
+  ) {
+    fail(
+      `skin-store 解析 pixel-pet 运行时索引异常: ${JSON.stringify({
+        id: pixelEntry && pixelEntry.id,
+        builtin: pixelEntry && pixelEntry.builtin,
+        kind: pixelEntry && pixelEntry.kind,
+        atlas: pixelEntry && pixelEntry.atlas
+      })}`
+    );
+  }
+  pass('T-62 skin-store 运行时解析内置动画包通过（atlas 8×9、单元格 128px）');
+} finally {
+  fs.rmSync(t62CheckDir, { recursive: true, force: true });
+}
 
 for (const channel of [
   "skinList: 'skin:list'",
