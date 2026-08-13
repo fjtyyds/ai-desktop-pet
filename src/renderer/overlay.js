@@ -248,6 +248,15 @@
   tuckBtn.addEventListener('click', () => {
     void window.petAPI.petOverlay.tuckAway();
   });
+  // T-56：双击宠物切换主聊天窗口显示；Esc 收起浮窗
+  pet.addEventListener('dblclick', () => {
+    void window.petAPI.petOverlay.toggleMain();
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      void window.petAPI.petOverlay.tuckAway();
+    }
+  });
 
   window.petAPI.petOverlay.onSkinUpdated(() => {
     void loadSkin();

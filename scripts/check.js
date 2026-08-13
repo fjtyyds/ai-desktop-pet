@@ -3752,5 +3752,55 @@ pass('T-48 设置页三段式布局、既有元素 id 与双语文案断言通�
   }
   pass('T-57 状态机与气泡队列静态断言通过');
 
+  // T-56：浮窗交互增强（showMain/右键菜单/Esc/贴边吸附，ADR-045）
+  if (
+    !preloadSource.includes('pet:show-main') ||
+    !preloadSource.includes('pet:toggle-main')
+  ) {
+    fail('preload.js 缺少 pet:show-main / pet:toggle-main 通道');
+  }
+  if (
+    !preloadSource.includes('showMain:') ||
+    !preloadSource.includes('toggleMain:')
+  ) {
+    fail('preload.js 缺少 petAPI.petOverlay.showMain/toggleMain');
+  }
+  if (
+    !petOverlaySource.includes('showContextMenu') ||
+    !petOverlaySource.includes('OVERLAY_DOCK_MARGIN')
+  ) {
+    fail('pet-overlay.js 缺少右键菜单/贴边吸附实现');
+  }
+  if (
+    !petOverlaySource.includes('showMainWindow') ||
+    !petOverlaySource.includes('toggleMainWindow')
+  ) {
+    fail('pet-overlay.js 未注入主窗口回调');
+  }
+  if (!mainSource.includes('toggleMainWindow,')) {
+    fail('main.js 未把 toggleMainWindow 传给浮窗');
+  }
+  if (!overlayJsSource.includes("'dblclick'") || !overlayJsSource.includes('Escape')) {
+    fail('overlay.js 缺少双击唤起/Esc 收起');
+  }
+  for (const localeFile of ['zh-CN', 'en']) {
+    const locale = JSON.parse(
+      fs.readFileSync(
+        path.join(root, 'src', 'shared', 'locales', `${localeFile}.json`),
+        'utf8'
+      )
+    );
+    for (const key of ['menuShowMain', 'menuToggleBubble', 'menuTuckAway', 'menuQuit']) {
+      if (
+        !locale.overlay ||
+        typeof locale.overlay[key] !== 'string' ||
+        !locale.overlay[key].trim()
+      ) {
+        fail(`${localeFile}.json 缺少 overlay.${key} 文案`);
+      }
+    }
+  }
+  pass('T-56 浮窗交互增强静态断言通过');
+
   console.log('[check] 全部通过');
 })();

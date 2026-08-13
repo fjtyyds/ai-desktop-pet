@@ -603,7 +603,11 @@ if (SKIP_BOOTSTRAP || !app || typeof app.requestSingleInstanceLock !== 'function
     // T-55：创建宠物浮窗（独立悬浮宠物）；默认关闭，按设置决定是否显示
     petOverlayApi = createPetOverlay({
       getSettings: () => ipc.getSettings(),
-      getTray: () => trayApi
+      getTray: () => trayApi,
+      showMainWindow, // T-56：点击浮窗唤起主聊天窗口
+      toggleMainWindow, // T-56：双击浮窗切换主窗口显示
+      quitApp, // T-56：浮窗右键菜单退出应用
+      getTranslator: getMainTranslator // T-56：右键菜单双语文案
     });
     try {
       const settings = ipc.getSettings();

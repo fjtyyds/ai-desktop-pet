@@ -324,6 +324,20 @@ app.whenReady().then(() => {
         fail('petOverlayBubbleEnabled=false 时气泡未隐藏');
       }
       console.log('[smoke] T-57 状态机/气泡队列端到端通过');
+      // T-56：showMain/toggleMain 通道端到端
+      const t56State = await overlayWin.webContents.executeJavaScript(`(async () => {
+        const api = window.petAPI.petOverlay;
+        const show = await api.showMain();
+        const toggle = await api.toggleMain();
+        return {
+          showOk: Boolean(show && show.ok),
+          toggleOk: Boolean(toggle && toggle.ok)
+        };
+      })()`);
+      if (!t56State.showOk || !t56State.toggleOk) {
+        fail(`T-56 showMain/toggleMain 通道异常: ${JSON.stringify(t56State)}`);
+      }
+      console.log('[smoke] T-56 浮窗交互通道端到端通过');
       overlayWin.destroy();
       app.quit();
     } catch (error) {

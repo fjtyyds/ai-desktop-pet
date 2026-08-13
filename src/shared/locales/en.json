@@ -27,6 +27,10 @@
     "statusWaiting": "Waiting for you…",
     "statusSpeaking": "Speaking…",
     "statusAttention": "Come chat with me",
+    "menuShowMain": "Show main window",
+    "menuToggleBubble": "Toggle bubbles",
+    "menuTuckAway": "Tuck away pet",
+    "menuQuit": "Quit app",
     "moodExcited": "Feeling great today!"
   },
   "idle": {

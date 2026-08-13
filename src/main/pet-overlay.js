@@ -22,7 +22,7 @@
  */
 
 const path = require('path');
-const { BrowserWindow, ipcMain, screen } = require('electron');
+const { BrowserWindow, Menu, ipcMain, screen } = require('electron');
 const { createSecureSettings } = require('./secure-settings');
 const { createDefaultStore, resolveBaseDir } = require('../storage');
 const skinStore = require('./skin-store');
@@ -36,6 +36,8 @@ const PET_CHANNELS = {
   toggleOverlay: 'pet:toggle-overlay',
   setEnabled: 'pet:set-enabled',
   tuckAway: 'pet:tuck-away',
+  showMain: 'pet:show-main',
+  toggleMain: 'pet:toggle-main',
   refreshSkin: 'pet:refresh-skin',
   skinUpdated: 'pet:skin-updated'
 };
@@ -55,15 +57,29 @@ const MAX_BUBBLE_QUEUE = 3;
 const BUBBLE_SECONDS_FALLBACK = 6;
 const BUBBLE_SECONDS_MIN = 3;
 const BUBBLE_SECONDS_MAX = 20;
+/** T-56：浮窗贴边吸附参数（浮窗内独立实现，不侵入主窗口 T-31 逻辑） */
+const OVERLAY_DOCK_MARGIN = 24;
+const OVERLAY_DOCK_DEBOUNCE_MS = 200;
 
 /**
  * 创建宠物浮窗实例。
  * @param {object} options
  * @param {() => object} options.getSettings 读取当前设置（含 petOverlayEnabled/skinId）
  * @param {() => import('./tray').TrayApi} [options.getTray] 可选：状态变化后刷新托盘菜单
+ * @param {() => void} [options.showMainWindow] 可选：唤起主聊天窗口（T-56）
+ * @param {() => void} [options.toggleMainWindow] 可选：切换主聊天窗口显示（T-56 点击宠物）
+ * @param {() => void} [options.quitApp] 可选：退出应用（T-56 右键菜单）
+ * @param {() => import('../shared/locales').Translator} [options.getTranslator] 可选：右键菜单文案
  */
 function createPetOverlay(options = {}) {
-  const { getSettings, getTray } = options;
+  const {
+    getSettings,
+    getTray,
+    showMainWindow,
+    toggleMainWindow,
+    quitApp,
+    getTranslator
+  } = options;
   let win = null;
   let queue = [{ state: 'idle', text: '', at: 0 }];
   let bubbleTimer = null;
@@ -83,11 +99,21 @@ function createPetOverlay(options = {}) {
       return;
     }
     try {
+      let displayId;
+      try {
+        displayId = screen.getDisplayMatching(bounds).id;
+      } catch (_error) {
+        displayId = undefined;
+      }
+      const next = {
+        x: Math.round(bounds.x),
+        y: Math.round(bounds.y)
+      };
+      if (Number.isInteger(displayId)) {
+        next.displayId = displayId;
+      }
       getWriter().writeSettings({
-        petOverlayBounds: {
-          x: Math.round(bounds.x),
-          y: Math.round(bounds.y)
-        }
+        petOverlayBounds: next
       });
     } catch (_error) {
       // 位置保存失败不影响浮窗
@@ -310,10 +336,98 @@ function createPetOverlay(options = {}) {
       return { ok: true, enabled: false };
     });
 
+    ipcMain.handle(PET_CHANNELS.showMain, () => {
+      showMainWindow?.();
+      return { ok: true };
+    });
+
+    ipcMain.handle(PET_CHANNELS.toggleMain, () => {
+      toggleMainWindow?.();
+      return { ok: true };
+    });
+
     ipcMain.handle(PET_CHANNELS.refreshSkin, () => {
       invalidateSkin();
       return { ok: true };
     });
+  }
+
+  /** T-56：右键菜单（显示主窗口/收起宠物/切换气泡/退出应用） */
+  function showContextMenu() {
+    let t = null;
+    try {
+      t = getTranslator?.() || null;
+    } catch (_error) {
+      t = null;
+    }
+    const label = (key) => (t ? t(key) : key);
+    const menu = Menu.buildFromTemplate([
+      {
+        label: label('overlay.menuShowMain'),
+        click: () => showMainWindow?.()
+      },
+      {
+        label: label('overlay.menuToggleBubble'),
+        click: () => {
+          try {
+            const settings = getSettings();
+            const enabled = settings
+              ? settings.petOverlayBubbleEnabled !== false
+              : true;
+            getWriter().writeSettings({ petOverlayBubbleEnabled: !enabled });
+          } catch (_error) {
+            // 持久化失败不影响菜单关闭
+          }
+        }
+      },
+      {
+        label: label('overlay.menuTuckAway'),
+        click: () => {
+          try {
+            getWriter().writeSettings({ petOverlayEnabled: false });
+          } catch (_error) {
+            // 持久化失败仍隐藏
+          }
+          hide();
+          getTray?.()?.refreshMenu?.();
+        }
+      },
+      { type: 'separator' },
+      {
+        label: label('overlay.menuQuit'),
+        click: () => quitApp?.()
+      }
+    ]);
+    menu.popup({ window: win || undefined });
+  }
+
+  /** T-56：拖动结束后若靠近屏幕边缘（≤24px）则贴边对齐 */
+  function alignToEdge(window) {
+    if (!window || window.isDestroyed()) {
+      return;
+    }
+    const bounds = window.getBounds();
+    const area = screen.getDisplayMatching(bounds).workArea;
+    const left = Math.abs(bounds.x - area.x);
+    const right = Math.abs(bounds.x + bounds.width - (area.x + area.width));
+    const top = Math.abs(bounds.y - area.y);
+    const bottom = Math.abs(bounds.y + bounds.height - (area.y + area.height));
+    const min = Math.min(left, right, top, bottom);
+    if (min > OVERLAY_DOCK_MARGIN) {
+      return;
+    }
+    const next = { ...bounds };
+    if (min === left) {
+      next.x = area.x;
+    } else if (min === right) {
+      next.x = area.x + area.width - bounds.width;
+    } else if (min === top) {
+      next.y = area.y;
+    } else {
+      next.y = area.y + area.height - bounds.height;
+    }
+    window.setBounds(next);
+    persistBounds(next);
   }
 
   function createWindow() {
@@ -341,12 +455,23 @@ function createPetOverlay(options = {}) {
       }
     });
     win.loadFile(path.join(__dirname, '..', 'renderer', 'overlay.html'));
+    let dockTimer = null;
     win.on('move', () => {
       if (win && !win.isDestroyed()) {
         persistBounds(win.getBounds());
       }
+      clearTimeout(dockTimer);
+      dockTimer = setTimeout(() => {
+        if (win && !win.isDestroyed()) {
+          alignToEdge(win);
+        }
+      }, OVERLAY_DOCK_DEBOUNCE_MS);
+    });
+    win.webContents.on('context-menu', () => {
+      showContextMenu();
     });
     win.on('closed', () => {
+      clearTimeout(dockTimer);
       win = null;
       skinCache = null;
     });

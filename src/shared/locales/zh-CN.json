@@ -27,6 +27,10 @@
     "statusWaiting": "等你输入…",
     "statusSpeaking": "正在说话…",
     "statusAttention": "快来陪我聊聊",
+    "menuShowMain": "显示主窗口",
+    "menuToggleBubble": "切换气泡显示",
+    "menuTuckAway": "收起宠物",
+    "menuQuit": "退出应用",
     "moodExcited": "今天心情超好！"
   },
   "idle": {
