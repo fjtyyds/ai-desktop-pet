@@ -40,7 +40,14 @@
     "taskImportFailed": "Pet pack import failed",
     "taskUpdating": "Downloading update…",
     "taskUpdateReady": "Update downloaded — restart to install",
-    "taskUpdateFailed": "Update download failed"
+    "taskUpdateFailed": "Update download failed",
+    "taskExporting": "Exporting chat…",
+    "taskExportGenerating": "Generating export…",
+    "taskExportWriting": "Writing file…",
+    "taskExportDone": "Exported {count} message(s)",
+    "taskTtsSpeaking": "Synthesizing speech…",
+    "taskTtsSegment": "Speech segment {i}/{total}",
+    "taskTtsDone": "Speech ready"
   },
   "idle": {
     "phrases": [

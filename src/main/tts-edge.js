@@ -3,6 +3,8 @@
 /**
  * T-34（ADR-029）：Edge 在线神经语音最小客户端。
  * T-36：输出格式改为 audio-24khz-96kbitrate-mono-mp3（96kbps，改善压缩感）。
+ * T-64（ADR-048）：synthesize 增加可选 options.onSegment({ index, total })，
+ * 每段合成前回调（index 从 1 起）；缓存命中路径回调一次 { index: 1, total: 1 }。
  * 仅依赖 package.json 已显式声明的 ws；协议参照 rany2/edge-tts（MIT）。
  * 不引入第三方 TTS 依赖；合成失败返回 { ok:false, error }，由渲染层回退 speechSynthesis。
  */
@@ -260,7 +262,9 @@ function cacheSet(key, value) {
 
 /**
  * 合成接口：返回 TtsSpeakResult（契约冻结，ADR-029）。
- * @param {{text: string, voice?: string, rate?: string, pitch?: string}} options
+ * @param {{text: string, voice?: string, rate?: string, pitch?: string, onSegment?: Function}} options
+ * onSegment 可选：每段合成前回调 { index, total }（index 从 1 起）；
+ * 缓存命中时回调一次 { index: 1, total: 1 }；缺省行为完全不变（T-64）。
  */
 async function synthesize(options) {
   const text = options && typeof options.text === 'string' ? options.text : '';
@@ -279,9 +283,14 @@ async function synthesize(options) {
     options && typeof options.pitch === 'string' && options.pitch.trim()
       ? options.pitch.trim()
       : DEFAULT_PITCH;
+  const onSegment =
+    options && typeof options.onSegment === 'function' ? options.onSegment : null;
   const key = `${voice}\u0000${rate}\u0000${pitch}\u0000${text}`;
   const cached = cacheGet(key);
   if (cached) {
+    if (onSegment) {
+      onSegment({ index: 1, total: 1 });
+    }
     return {
       ok: true,
       audioDataUrl: `data:audio/mpeg;base64,${cached.toString('base64')}`,
@@ -293,12 +302,15 @@ async function synthesize(options) {
   const startedAt = Date.now();
   const buffers = [];
   try {
-    for (const segment of segments) {
+    for (let index = 1; index <= segments.length; index += 1) {
       const remaining = OVERALL_TIMEOUT_MS - (Date.now() - startedAt);
       if (remaining <= 0) {
         throw new Error('TTS 合成超时');
       }
-      const buffer = await synthesizeSegment(segment, {
+      if (onSegment) {
+        onSegment({ index, total: segments.length });
+      }
+      const buffer = await synthesizeSegment(segments[index - 1], {
         voice,
         rate,
         pitch,

@@ -12,6 +12,7 @@ const { createSecureSettings } = require('./secure-settings');
 const { createTranslator } = require('../shared/locales');
 const { getWeather } = require('./weather'); // T-22：天气小部件（主进程网络请求）
 const ttsEdge = require('./tts-edge'); // T-34：Edge 在线神经语音（ADR-029）
+const { runWithTask } = require('./task-runner'); // T-64：任务级进度通用包裹器（ADR-048）
 const telemetry = require('./telemetry'); // T-42：匿名遥测（opt-in、脱敏、批量上报）
 const skinStore = require('./skin-store'); // T-43：皮肤包导入/导出/索引/卸载（ADR-032）
 const { createLicenseManager } = require('./license'); // T-40：许可证与付费墙
@@ -460,14 +461,70 @@ function buildJsonExport(messages) {
   return `${JSON.stringify(list, null, 2)}\n`;
 }
 
+/** 生成导出内容（Markdown/JSON 字符串；T-64 拆出供两阶段进度使用）。 */
+function buildExportContent(messages, format, options = {}) {
+  return format === 'json'
+    ? buildJsonExport(messages)
+    : buildMarkdownExport(messages, options);
+}
+
 /** 将导出内容写入用户选择的文件（与 history.get 内容一致）。 */
 async function writeExportFile(filePath, messages, format, options = {}) {
-  const content =
-    format === 'json'
-      ? buildJsonExport(messages)
-      : buildMarkdownExport(messages, options);
+  const content = buildExportContent(messages, format, options);
   await fs.promises.writeFile(filePath, content, 'utf8');
   return content;
+}
+
+/**
+ * T-64：对话导出任务包裹（对话框选定路径后调用；可纯 Node 测试）。
+ * runWithTask 两阶段：阶段 1 生成内容（percent≈50）、阶段 2 写入文件（percent=100）；
+ * 成功 finish 文案 overlay.taskExportDone {count}；错误由 runWithTask finish ok:false
+ * 后沿用现有 { ok:false, filePath:null, error } 返回契约。
+ */
+async function exportHistoryWithTask(options) {
+  const {
+    filePath,
+    messages,
+    format,
+    translate,
+    petName,
+    overlay,
+    t
+  } = options || {};
+  const list = Array.isArray(messages) ? messages : [];
+  try {
+    await runWithTask(
+      overlay,
+      { id: 'history-export', title: t('overlay.taskExporting'), totalStages: 2 },
+      async ({ update }) => {
+        update({
+          percent: 50,
+          stage: 1,
+          totalStages: 2,
+          message: t('overlay.taskExportGenerating')
+        });
+        const content = buildExportContent(list, format, { translate, petName });
+        update({
+          percent: 100,
+          stage: 2,
+          totalStages: 2,
+          message: t('overlay.taskExportWriting')
+        });
+        await fs.promises.writeFile(filePath, content, 'utf8');
+        return {
+          content,
+          message: t('overlay.taskExportDone', { count: list.length })
+        };
+      }
+    );
+    return { ok: true, filePath, error: null };
+  } catch (error) {
+    return {
+      ok: false,
+      filePath: null,
+      error: error && error.message ? error.message : String(error)
+    };
+  }
 }
 
 /**
@@ -642,16 +699,15 @@ async function handleHistoryExport(event, payload) {
   if (result.canceled || !result.filePath) {
     return { ok: false, filePath: null, error: 'cancelled' };
   }
-  try {
-    await writeExportFile(result.filePath, messages, format, { translate: t, petName });
-    return { ok: true, filePath: result.filePath, error: null };
-  } catch (error) {
-    return {
-      ok: false,
-      filePath: null,
-      error: error && error.message ? error.message : String(error)
-    };
-  }
+  return exportHistoryWithTask({
+    filePath: result.filePath,
+    messages,
+    format,
+    translate: t,
+    petName,
+    overlay: getPetOverlay(),
+    t
+  });
 }
 
 /** 清除数据：先弹本地化确认框，确认后按 scope 清空并返回结果。 */
@@ -789,7 +845,40 @@ async function handleTtsSpeak(_event, payload) {
     payload && typeof payload.rate === 'string' ? payload.rate : '+0%';
   const pitch =
     payload && typeof payload.pitch === 'string' ? payload.pitch : '+0Hz';
-  return ttsEdge.synthesize({ text, voice, rate, pitch });
+  const t = getTranslator();
+  try {
+    const result = await runWithTask(
+      getPetOverlay(),
+      { id: 'tts-speak', title: t('overlay.taskTtsSpeaking') },
+      async ({ update }) => {
+        const synth = await ttsEdge.synthesize({
+          text,
+          voice,
+          rate,
+          pitch,
+          onSegment: ({ index, total }) => {
+            update({
+              percent: total > 0 ? Math.round((index / total) * 100) : 100,
+              stage: index,
+              totalStages: total,
+              message: t('overlay.taskTtsSegment', { i: index, total })
+            });
+          }
+        });
+        if (!synth.ok) {
+          throw new Error(synth.error || 'TTS 合成失败');
+        }
+        return { ...synth, message: t('overlay.taskTtsDone') };
+      }
+    );
+    return { ok: true, audioDataUrl: result.audioDataUrl, error: null };
+  } catch (error) {
+    return {
+      ok: false,
+      audioDataUrl: null,
+      error: error && error.message ? error.message : String(error)
+    };
+  }
 }
 
 /* ---------------- T-43：皮肤与配件（ADR-032 上线方案） ---------------- */
@@ -1077,6 +1166,7 @@ module.exports = {
   buildMarkdownExport,
   buildJsonExport,
   writeExportFile,
+  exportHistoryWithTask,
   decodeSharePng,
   sanitizeShareFileName,
   clearData

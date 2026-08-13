@@ -24,7 +24,7 @@ fs.writeFileSync(
 );
 
 // 注册 IPC 处理器（聊天/设置/历史/许可证等），供渲染层端到端断言调用
-require(path.join(__dirname, '..', 'src', 'main', 'ipc'));
+const ipcModule = require(path.join(__dirname, '..', 'src', 'main', 'ipc'));
 // T-55：注册宠物浮窗 IPC（状态/皮肤/开关）
 const { createPetOverlay } = require(path.join(__dirname, '..', 'src', 'main', 'pet-overlay'));
 
@@ -37,11 +37,13 @@ process.on('exit', () => {
 });
 
 app.whenReady().then(() => {
-  createPetOverlay({
+  const overlayApi = createPetOverlay({
     getSettings: () =>
       require(path.join(__dirname, '..', 'src', 'main', 'ipc')).getSettings(),
     getTray: () => null
   });
+  // T-64：把浮窗实例注入 ipc.js，真实主进程任务源（skin-import 等）才能推送浮窗
+  ipcModule.setPetOverlay(overlayApi);
 
   const win = new BrowserWindow({
     show: false,
@@ -655,6 +657,107 @@ app.whenReady().then(() => {
         console.log('[smoke] T-59 目录扫描导入/失败分组/9 行预览端到端通过');
       } finally {
         fs.rmSync(codexPetsTmp, { recursive: true, force: true });
+      }
+      // T-64：真实扫描导入期间 overlay 出现 skin-import 任务并在结束后清空
+      const t64PetsTmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-pet-smoke-t64-'));
+      try {
+        function makeT64PetPack(dir, id) {
+          fs.mkdirSync(dir, { recursive: true });
+          fs.writeFileSync(
+            path.join(dir, 'pet.json'),
+            JSON.stringify({
+              id,
+              displayName: `T64 ${id}`,
+              description: 'smoke-t64',
+              spritesheetPath: 'spritesheet.webp'
+            }),
+            'utf8'
+          );
+          // 4MB 有效 WebP 头 + 填充：放大同步扫描耗时，让浮窗渲染进程可并发观察到运行中任务
+          const webp = Buffer.alloc(4 * 1024 * 1024);
+          webp.write('RIFF', 0, 'ascii');
+          webp.writeUInt32LE(webp.length - 8, 4);
+          webp.write('WEBP', 8, 'ascii');
+          webp.write('VP8X', 12, 'ascii');
+          webp.writeUInt32LE(10, 16);
+          webp.writeUIntLE(1535, 24, 3);
+          webp.writeUIntLE(1871, 27, 3);
+          fs.writeFileSync(path.join(dir, 'spritesheet.webp'), webp);
+        }
+        const t64Root = path.join(t64PetsTmp, 'pets');
+        for (let i = 0; i < 10; i += 1) {
+          makeT64PetPack(path.join(t64Root, `pack-${i}`), `t64-pack-${i}`);
+        }
+        // 先启动浮窗采样器（overlay 渲染进程 10ms 轮询 getTask），再触发真实导入
+        const t64SamplerPromise = overlayWin.webContents.executeJavaScript(`(async () => {
+          window.__t64Samples = [];
+          window.__t64Stop = false;
+          const t = window.__overlayTest;
+          const deadline = Date.now() + 12000;
+          while (!window.__t64Stop && Date.now() < deadline) {
+            const task = t.getTask();
+            if (task) {
+              window.__t64Samples.push({
+                id: task.id,
+                status: task.status,
+                percent: task.percent
+              });
+            }
+            await new Promise((resolve) => setTimeout(resolve, 10));
+          }
+          return true;
+        })()`);
+        // 等待采样器进入轮询（导入扫描为同步主进程操作，提前启动才能并发观察）
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        const t64Import = await win.webContents.executeJavaScript(`(async () => {
+          const result = await window.petAPI.skin.importCodexPets({ path: ${JSON.stringify(t64Root)} });
+          return {
+            ok: Boolean(result && result.ok),
+            imported: Array.isArray(result.imported) ? result.imported.length : -1
+          };
+        })()`);
+        if (!t64Import.ok || t64Import.imported !== 10) {
+          fail(`T-64 扫描导入结果异常: ${JSON.stringify(t64Import)}`);
+        }
+        const t64Observed = await overlayWin.webContents.executeJavaScript(`(async () => {
+          window.__t64Stop = true;
+          const deadline = Date.now() + 3000;
+          let cleared = false;
+          while (Date.now() < deadline) {
+            const task = window.__overlayTest.getTask();
+            if (!task || task.status !== 'running') {
+              cleared = true;
+              break;
+            }
+            await new Promise((resolve) => setTimeout(resolve, 50));
+          }
+          return {
+            samples: window.__t64Samples || [],
+            cleared,
+            finalTask: window.__overlayTest.getTask()
+          };
+        })()`);
+        await t64SamplerPromise;
+        const sawRunning = t64Observed.samples.some(
+          (sample) => sample.id === 'skin-import' && sample.status === 'running'
+        );
+        if (!sawRunning) {
+          fail(
+            `T-64 未观察到 overlay 运行中的 skin-import 任务（采样 ${JSON.stringify(
+              t64Observed.samples.slice(0, 20)
+            )}）`
+          );
+        }
+        if (!t64Observed.cleared) {
+          fail(
+            `T-64 导入返回后 overlay 任务未清空（finalTask ${JSON.stringify(
+              t64Observed.finalTask
+            )}，采样 ${JSON.stringify(t64Observed.samples.slice(0, 20))}）`
+          );
+        }
+        console.log('[smoke] T-64 扫描导入期间 skin-import 任务出现并结束后清空通过');
+      } finally {
+        fs.rmSync(t64PetsTmp, { recursive: true, force: true });
       }
       overlayWin.destroy();
       app.quit();

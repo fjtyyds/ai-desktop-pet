@@ -40,7 +40,14 @@
     "taskImportFailed": "宠物包导入失败",
     "taskUpdating": "正在下载更新…",
     "taskUpdateReady": "更新已下载，重启应用即可安装",
-    "taskUpdateFailed": "更新下载失败"
+    "taskUpdateFailed": "更新下载失败",
+    "taskExporting": "正在导出对话…",
+    "taskExportGenerating": "正在生成导出内容…",
+    "taskExportWriting": "正在写入文件…",
+    "taskExportDone": "已导出 {count} 条消息",
+    "taskTtsSpeaking": "正在合成语音…",
+    "taskTtsSegment": "语音片段 {i}/{total}",
+    "taskTtsDone": "语音合成完成"
   },
   "idle": {
     "phrases": [

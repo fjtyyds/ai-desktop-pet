@@ -4308,5 +4308,348 @@ pass('T-48 设置页三段式布局、既有元素 id 与双语文案断言通�
   }
   pass('T-63 任务级进度气泡静态断言通过');
 
+  // T-64：任务级进度扩展（ADR-048）静态断言
+  const taskRunnerPath = path.join(root, 'src', 'main', 'task-runner.js');
+  if (!fs.existsSync(taskRunnerPath)) {
+    fail('缺少 src/main/task-runner.js（T-64 通用任务包裹器）');
+  }
+  const taskRunnerSource = fs.readFileSync(taskRunnerPath, 'utf8');
+  for (const token of ['runWithTask', 'startTask', 'updateTask', 'finishTask']) {
+    if (!taskRunnerSource.includes(token)) {
+      fail(`task-runner.js 缺少 T-64 token: ${token}`);
+    }
+  }
+  if (taskRunnerSource.includes("require('electron')")) {
+    fail('task-runner.js 不得依赖 electron（纯 Node 可测）');
+  }
+  if (
+    !ipcSource.includes("require('./task-runner')") ||
+    !ipcSource.includes('runWithTask') ||
+    !ipcSource.includes("id: 'history-export'") ||
+    !ipcSource.includes("id: 'tts-speak'")
+  ) {
+    fail('ipc.js 缺少 T-64 任务源接线（runWithTask/history-export/tts-speak）');
+  }
+  if (!ttsEdgeSource.includes('onSegment')) {
+    fail('tts-edge.js 缺少 T-64 onSegment 回调');
+  }
+  const contractsSource = fs.readFileSync(
+    path.join(root, 'src', 'shared', 'contracts.js'),
+    'utf8'
+  );
+  for (const token of ['T-64', 'runWithTask', 'history-export', 'tts-speak', 'onSegment']) {
+    if (!contractsSource.includes(token)) {
+      fail(`contracts.js 缺少 T-64 说明 token: ${token}`);
+    }
+  }
+  for (const localeFile of ['zh-CN', 'en']) {
+    const locale = JSON.parse(
+      fs.readFileSync(
+        path.join(root, 'src', 'shared', 'locales', `${localeFile}.json`),
+        'utf8'
+      )
+    );
+    for (const key of [
+      'taskExporting',
+      'taskExportGenerating',
+      'taskExportWriting',
+      'taskExportDone',
+      'taskTtsSpeaking',
+      'taskTtsSegment',
+      'taskTtsDone'
+    ]) {
+      if (
+        !locale.overlay ||
+        typeof locale.overlay[key] !== 'string' ||
+        !locale.overlay[key].trim()
+      ) {
+        fail(`${localeFile}.json 缺少 overlay.${key} 文案`);
+      }
+    }
+  }
+  pass('T-64 任务级进度扩展静态断言通过');
+
+  // T-64 运行时：runWithTask 完成/失败序列（fake overlay，纯 Node）
+  try {
+    const taskRunner = require(path.join(root, 'src', 'main', 'task-runner.js'));
+    if (typeof taskRunner.runWithTask !== 'function') {
+      fail('task-runner.js 未导出 runWithTask');
+    }
+    const calls = [];
+    const fakeOverlay = {
+      startTask: (payload) => calls.push({ type: 'start', payload }),
+      updateTask: (payload) => calls.push({ type: 'update', payload }),
+      finishTask: (payload) => calls.push({ type: 'finish', payload })
+    };
+    const result = await taskRunner.runWithTask(
+      fakeOverlay,
+      { id: 'check-task', title: '检查任务', totalStages: 3 },
+      async ({ update }) => {
+        update({ percent: 33, stage: 1, totalStages: 3, message: 'step-1' });
+        await new Promise((resolve) => setTimeout(resolve, 1));
+        update({ percent: 66, stage: 2, totalStages: 3, message: 'step-2' });
+        return { ok: true, message: '完成' };
+      }
+    );
+    if (!result || result.ok !== true || result.message !== '完成') {
+      fail(`runWithTask 成功路径返回值异常: ${JSON.stringify(result)}`);
+    }
+    if (
+      calls.length !== 4 ||
+      calls[0].type !== 'start' ||
+      calls[0].payload.id !== 'check-task' ||
+      calls[0].payload.title !== '检查任务' ||
+      calls[0].payload.totalStages !== 3 ||
+      calls[1].type !== 'update' ||
+      calls[1].payload.id !== 'check-task' ||
+      calls[1].payload.percent !== 33 ||
+      calls[1].payload.stage !== 1 ||
+      calls[2].type !== 'update' ||
+      calls[2].payload.percent !== 66 ||
+      calls[2].payload.stage !== 2 ||
+      calls[3].type !== 'finish' ||
+      calls[3].payload.ok !== true ||
+      calls[3].payload.message !== '完成'
+    ) {
+      fail(`runWithTask 成功序列异常: ${JSON.stringify(calls)}`);
+    }
+
+    const failCalls = [];
+    const failOverlay = {
+      startTask: (payload) => failCalls.push({ type: 'start', payload }),
+      updateTask: (payload) => failCalls.push({ type: 'update', payload }),
+      finishTask: (payload) => failCalls.push({ type: 'finish', payload })
+    };
+    const longError = new Error('e'.repeat(200));
+    let rethrown = null;
+    try {
+      await taskRunner.runWithTask(
+        failOverlay,
+        { id: 'fail-task', title: '失败任务' },
+        async () => {
+          throw longError;
+        }
+      );
+    } catch (error) {
+      rethrown = error;
+    }
+    if (rethrown !== longError) {
+      fail('runWithTask 失败路径未重新抛出原错误');
+    }
+    if (
+      failCalls.length !== 2 ||
+      failCalls[0].type !== 'start' ||
+      failCalls[0].payload.id !== 'fail-task' ||
+      failCalls[1].type !== 'finish' ||
+      failCalls[1].payload.ok !== false ||
+      failCalls[1].payload.message.length !== 80
+    ) {
+      fail(`runWithTask 失败序列异常: ${JSON.stringify(failCalls)}`);
+    }
+
+    const noOverlayResult = await taskRunner.runWithTask(
+      null,
+      { id: 'none-task', title: 'x' },
+      async () => 'ok'
+    );
+    if (noOverlayResult !== 'ok') {
+      fail('runWithTask 在 overlay 为空时行为异常');
+    }
+    pass('T-64 runWithTask 完成/失败/空 overlay 运行时通过');
+  } catch (error) {
+    fail(`T-64 task-runner 运行时断言异常: ${error && error.message ? error.message : error}`);
+  }
+
+  // T-64 运行时：tts-edge synthesize 的 onSegment 回调（离线 fake WebSocket 注入）
+  let ttsWsPath = null;
+  let savedWsCache = null;
+  try {
+    ttsWsPath = require.resolve('ws');
+    savedWsCache = require.cache[ttsWsPath];
+    class FakeWebSocket {
+      constructor() {
+        this.handlers = {};
+        setImmediate(() => {
+          this._emit('open');
+          const header = Buffer.from('Path:audio', 'latin1');
+          const headerBuf = Buffer.alloc(2);
+          headerBuf.writeUInt16BE(header.length, 0);
+          this._emit(
+            'message',
+            Buffer.concat([headerBuf, header, Buffer.from('MP3DATA')]),
+            true
+          );
+          this._emit('message', Buffer.from('Path:turn.end'), false);
+          this._emit('close');
+        });
+      }
+      on(event, callback) {
+        (this.handlers[event] = this.handlers[event] || []).push(callback);
+        return this;
+      }
+      _emit(event, ...args) {
+        for (const callback of this.handlers[event] || []) {
+          callback(...args);
+        }
+      }
+      send() {}
+      close() {}
+      terminate() {}
+    }
+    require.cache[ttsWsPath] = {
+      id: ttsWsPath,
+      filename: ttsWsPath,
+      loaded: true,
+      exports: FakeWebSocket
+    };
+    delete require.cache[ttsEdgePath];
+    const ttsEdgeModule = require(ttsEdgePath);
+    const singleCalls = [];
+    const single = await ttsEdgeModule.synthesize({
+      text: '离线测试语音',
+      onSegment: (segment) => singleCalls.push(segment)
+    });
+    if (!single.ok || !single.audioDataUrl) {
+      fail(`tts-edge 离线合成失败: ${JSON.stringify(single)}`);
+    }
+    if (
+      singleCalls.length !== 1 ||
+      singleCalls[0].index !== 1 ||
+      singleCalls[0].total !== 1
+    ) {
+      fail(`tts-edge 单段 onSegment 回调异常: ${JSON.stringify(singleCalls)}`);
+    }
+
+    const multiCalls = [];
+    const multi = await ttsEdgeModule.synthesize({
+      text: 'a'.repeat(5000),
+      onSegment: (segment) => multiCalls.push(segment)
+    });
+    if (!multi.ok) {
+      fail(`tts-edge 多段离线合成失败: ${JSON.stringify(multi)}`);
+    }
+    if (
+      multiCalls.length !== 2 ||
+      multiCalls[0].index !== 1 ||
+      multiCalls[0].total !== 2 ||
+      multiCalls[1].index !== 2 ||
+      multiCalls[1].total !== 2
+    ) {
+      fail(`tts-edge 多段 onSegment 回调异常: ${JSON.stringify(multiCalls)}`);
+    }
+
+    const cachedCalls = [];
+    const cached = await ttsEdgeModule.synthesize({
+      text: '离线测试语音',
+      onSegment: (segment) => cachedCalls.push(segment)
+    });
+    if (!cached.ok || !cached.audioDataUrl) {
+      fail(`tts-edge 缓存命中离线合成失败: ${JSON.stringify(cached)}`);
+    }
+    if (
+      cachedCalls.length !== 1 ||
+      cachedCalls[0].index !== 1 ||
+      cachedCalls[0].total !== 1
+    ) {
+      fail(`tts-edge 缓存命中 onSegment 回调异常: ${JSON.stringify(cachedCalls)}`);
+    }
+    pass('T-64 tts-edge onSegment 回调（单段/多段/缓存命中）离线运行时通过');
+  } catch (error) {
+    fail(`T-64 tts-edge 运行时断言异常: ${error && error.message ? error.message : error}`);
+  } finally {
+    if (ttsWsPath) {
+      if (savedWsCache) {
+        require.cache[ttsWsPath] = savedWsCache;
+      } else {
+        delete require.cache[ttsWsPath];
+      }
+    }
+    delete require.cache[ttsEdgePath];
+  }
+
+  // T-64 运行时：导出任务包裹（临时文件 + 两阶段进度 + 失败清理，纯 Node）
+  try {
+    const ipcModule = require(path.join(root, 'src', 'main', 'ipc.js'));
+    if (typeof ipcModule.exportHistoryWithTask !== 'function') {
+      fail('ipc.js 未导出 exportHistoryWithTask（T-64 可测导出包裹）');
+    }
+    const exportTmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-pet-export-check-'));
+    try {
+      const messages = [
+        { role: 'user', content: '你好', sessionId: 'default', timestamp: 1 },
+        { role: 'assistant', content: '你好呀', sessionId: 'default', timestamp: 2 }
+      ];
+      const fakeT = (key, params) => `t:${key}:${JSON.stringify(params || {})}`;
+      const calls = [];
+      const overlay = {
+        startTask: (payload) => calls.push({ type: 'start', payload }),
+        updateTask: (payload) => calls.push({ type: 'update', payload }),
+        finishTask: (payload) => calls.push({ type: 'finish', payload })
+      };
+      const filePath = path.join(exportTmp, 'chat.md');
+      const exported = await ipcModule.exportHistoryWithTask({
+        filePath,
+        messages,
+        format: 'markdown',
+        translate: fakeT,
+        petName: '测试宠',
+        overlay,
+        t: fakeT
+      });
+      if (!exported.ok || exported.filePath !== filePath || exported.error !== null) {
+        fail(`导出任务包裹成功路径异常: ${JSON.stringify(exported)}`);
+      }
+      const written = fs.readFileSync(filePath, 'utf8');
+      if (!written.includes('你好') || !written.includes('测试宠')) {
+        fail('导出文件内容不完整');
+      }
+      if (
+        calls.length !== 4 ||
+        calls[0].type !== 'start' ||
+        calls[0].payload.id !== 'history-export' ||
+        calls[0].payload.totalStages !== 2 ||
+        calls[1].type !== 'update' ||
+        calls[1].payload.percent !== 50 ||
+        calls[1].payload.stage !== 1 ||
+        calls[2].type !== 'update' ||
+        calls[2].payload.percent !== 100 ||
+        calls[2].payload.stage !== 2 ||
+        calls[3].type !== 'finish' ||
+        calls[3].payload.ok !== true ||
+        !String(calls[3].payload.message).includes('"count":2')
+      ) {
+        fail(`导出任务包裹序列异常: ${JSON.stringify(calls)}`);
+      }
+
+      const failCalls = [];
+      const failOverlay = {
+        startTask: (payload) => failCalls.push({ type: 'start', payload }),
+        updateTask: (payload) => failCalls.push({ type: 'update', payload }),
+        finishTask: (payload) => failCalls.push({ type: 'finish', payload })
+      };
+      const failed = await ipcModule.exportHistoryWithTask({
+        filePath: path.join(exportTmp, 'no-such-dir', 'x.md'),
+        messages,
+        format: 'markdown',
+        translate: fakeT,
+        petName: 'x',
+        overlay: failOverlay,
+        t: fakeT
+      });
+      if (failed.ok || failed.filePath !== null || !failed.error) {
+        fail(`导出任务包裹失败路径异常: ${JSON.stringify(failed)}`);
+      }
+      const lastFinish = failCalls[failCalls.length - 1];
+      if (!lastFinish || lastFinish.type !== 'finish' || lastFinish.payload.ok !== false) {
+        fail(`导出任务包裹失败 finish 异常: ${JSON.stringify(failCalls)}`);
+      }
+      pass('T-64 导出任务包裹（临时文件/两阶段进度/失败清理）运行时通过');
+    } finally {
+      fs.rmSync(exportTmp, { recursive: true, force: true });
+    }
+  } catch (error) {
+    fail(`T-64 导出任务包裹运行时断言异常: ${error && error.message ? error.message : error}`);
+  }
+
   console.log('[check] 全部通过');
 })();
