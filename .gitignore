@@ -8,6 +8,8 @@ outputs/
 scripts/orchestrator/
 out/
 release/
+# 仓库内临时 worktree（沙箱受限时避免越界写，使用后清理）
+.worktrees/
 *.log
 # T-11: 本地日志与崩溃转储（userData/logs、userData/crashes）
 logs/

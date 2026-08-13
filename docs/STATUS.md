@@ -2,9 +2,9 @@
 
 - 更新时间：2026-08-13
 - 当前阶段：M5.2 宠物浮窗增强——动画宠物包与任务级进度气泡（ADR-046）
-- 当前任务：T-62 动画宠物包已验收合并（0e9f5bd）；T-63 任务级进度气泡实施中（子代理 t63_taskbubble）
-- 最近完成：T-62 动画宠物包验收合并（0e9f5bd，main check/smoke 全绿）；M5.1 六卡（T-56~T-61）合并完成
-- 下一步：验收合并 T-63 → main 复跑 check/smoke → 更新 PLAN/STATUS → 用户 `npm run dev` 目检 + sync-latest 同步最新版
+- 当前任务：T-62/T-63 均已验收合并（0e9f5bd / a7b31d8）；待人工目检与 sync-latest
+- 最近完成：T-63 任务级进度气泡验收合并（a7b31d8，main check/smoke 全绿）；T-62 动画宠物包验收合并（0e9f5bd）
+- 下一步：用户 `npm run dev` 目检（pixel-pet 动画观感 + 任务气泡体验）→ sync-latest 同步最新版 → push 授权后推送
 - 阻塞：无（商店/签名资金冻结仍按 ADR-041 处理）
 - 最新版：`E:\codex\AI桌宠最新版`（scripts/sync-latest.ps1 自动同步，当前 0.1.0 @ 5da29f6；M5.2 完成后更新）
 - 交接提示：新会话先读 `AGENTS.md` → `PLAN.md` → `docs/STATUS.md` → `docs/reports/2026-08-10-工作对接方案.md` → 自己的任务卡（docs/tasks/T-xx.md）
@@ -399,3 +399,10 @@
 - 实施（子代理 t62_animpack，0e9f5bd）：`scripts/make-pet-pack.js`（Electron canvas 像素画生成器，隐藏窗口导出 1024×1152 spritesheet.webp 与 256×256 preview.webp，可复现）；内置 `pixel-pet` 包（pet.json + 图集，9 行状态与 overlay STATE_ROWS 对齐）；check.js 新增 T-62 断言。
 - 验收：diff 边界仅卡内文件；worktree `npm run check`、`npm run smoke` 全绿；main 复跑全绿；0e9f5bd fast-forward 合并。
 - 待人工目检：pixel-pet 动画观感（`npm run dev` 切换皮肤查看各状态行）。
+
+## T-63 验收合并记录（2026-08-13）
+
+- 实施（总工直接实施，a7b31d8）：`pet-overlay.js` 任务注册表（startTask/updateTask/finishTask + pet:task-* IPC + getConfig 补实现）；运行中任务气泡优先，pushBubble 排队、finishTask 后补放；字段清洗（id≤64/title≤80/percent 0~100）；`skin-store.scanCodexPetsDir` 两遍扫描 + 可选 onProgress；`ipc.js` 注入浮窗并包裹皮肤批量导入；`updater.js`/`main.js` 下载进度回调 → 浮窗任务气泡（仅打包版触发）；overlay 进度条渲染（含不确定进度与 reduceMotion）；双语文案；check/smoke 断言。
+- 验收：worktree 与 main `npm run check`、`npm run smoke` 全绿（含 T-63 端到端：start→update→finish、进度条、提醒补放、getConfig）；a7b31d8 fast-forward 合并 main。
+- 说明：子代理 t63_taskbubble 在等待中断前未留下提交，按交接纪律改总工直接实施；修复一次 catch 变量作用域回归（T-59 扫描导入）。
+- 待人工目检：任务气泡观感（皮肤页批量导入宠物包时观察进度条；更新下载仅打包版可见）。

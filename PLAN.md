@@ -239,9 +239,11 @@
 任务清单：
 
 - [x] T-62 动画宠物包（0e9f5bd，已合并 main）
-- [ ] T-63 任务级进度气泡（实施中，子代理 t63_taskbubble）
+- [x] T-63 任务级进度气泡（a7b31d8，已合并 main）
 
 ## Progress
+
+- 2026-08-13：T-63 任务级进度气泡验收合并（a7b31d8 fast-forward）：petAPI.petOverlay.startTask/updateTask/finishTask/getConfig + pet:task-* IPC；任务气泡运行中优先、提醒排队补放；皮肤批量导入与更新下载接入（onProgress/onDownloadProgress）；overlay 进度条渲染；T-63 check/smoke 断言与端到端全绿；main 复跑 check/smoke 全绿。待人工目检与 sync-latest。
 
 - 2026-08-13：T-62 动画宠物包验收合并（0e9f5bd fast-forward）：内置 pixel-pet（1024×1152 WebP 8×9 图集）+ scripts/make-pet-pack.js 可复现生成脚本；worktree 与 main `npm run check`、`npm run smoke` 全绿；T-63 任务级进度气泡由子代理 t63_taskbubble 实施中。
 
