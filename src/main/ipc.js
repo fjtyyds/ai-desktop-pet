@@ -982,6 +982,11 @@ function handleSkinApply(_event, payload) {
       return { ok: false, error: `皮肤不存在: ${id}` };
     }
     settings = getSecureSettings().writeSettings({ skinId: id });
+    // M5.2 收尾：皮肤变更后同步刷新浮窗皮肤缓存（UI 与直连 API 均生效）
+    const overlay = getPetOverlay();
+    if (overlay && typeof overlay.refresh === 'function') {
+      overlay.refresh();
+    }
     return { ok: true, settings: { ...settings }, error: null };
   } catch (error) {
     return skinErrorResult(error);
@@ -1003,6 +1008,11 @@ function handleSkinRemove(_event, payload) {
       settings = getSecureSettings().writeSettings({
         skinId: skinStore.DEFAULT_SKIN_ID
       });
+      // M5.2 收尾：移除当前皮肤回退 default 时同步刷新浮窗
+      const overlay = getPetOverlay();
+      if (overlay && typeof overlay.refresh === 'function') {
+        overlay.refresh();
+      }
     }
     return { ok: true, error: null };
   } catch (error) {

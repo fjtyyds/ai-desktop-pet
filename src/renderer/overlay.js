@@ -229,6 +229,14 @@
       currentTask && currentTask.status === 'running' ? currentTask : null;
     if (!task) {
       bubbleProgress.hidden = true;
+      // M5.2 收尾：隐藏时清空残留进度文案/宽度，避免下次任务复用旧值
+      if (bubbleProgressBar) {
+        bubbleProgressBar.style.width = '';
+      }
+      if (bubbleProgressLabel) {
+        bubbleProgressLabel.textContent = '';
+        bubbleProgressLabel.hidden = true;
+      }
       return;
     }
     bubbleProgress.hidden = false;

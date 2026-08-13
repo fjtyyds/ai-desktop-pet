@@ -482,6 +482,7 @@ app.whenReady().then(() => {
         });
         const stateAfter = await api.getStatus();
         const progressHiddenAfter = Boolean(progress && progress.hidden);
+        const progressLabelAfter = progressLabel ? progressLabel.textContent : null;
         return {
           started: Boolean(started && started.ok),
           taskInHook: Boolean(
@@ -504,6 +505,7 @@ app.whenReady().then(() => {
           stateAfter: stateAfter && stateAfter.state,
           taskAfter: stateAfter && stateAfter.task,
           progressHiddenAfter,
+          progressLabelAfter,
           bubbleTextAfter: bubble ? bubble.textContent : ''
         };
       })()`);
@@ -522,6 +524,7 @@ app.whenReady().then(() => {
         t63State.stateAfter !== 'ready' ||
         t63State.taskAfter !== null ||
         !t63State.progressHiddenAfter ||
+        t63State.progressLabelAfter !== '' ||
         t63State.bubbleTextAfter.indexOf('done-63') === -1
       ) {
         fail(`T-63 任务气泡端到端异常: ${JSON.stringify(t63State)}`);

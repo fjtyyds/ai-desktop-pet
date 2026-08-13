@@ -4244,9 +4244,11 @@ pass('T-48 设置页三段式布局、既有元素 id 与双语文案断言通�
     !overlayJsSource.includes('renderTaskProgress') ||
     !overlayJsSource.includes('applyTask') ||
     !overlayJsSource.includes('getTask') ||
-    !overlayJsSource.includes('is-indeterminate')
+    !overlayJsSource.includes('is-indeterminate') ||
+    !overlayJsSource.includes("bubbleProgressBar.style.width = ''") ||
+    !overlayJsSource.includes("bubbleProgressLabel.textContent = ''")
   ) {
-    fail('overlay.js 缺少 T-63 任务渲染接线');
+    fail('overlay.js 缺少 T-63 任务渲染接线（含结束后进度残留清理）');
   }
   if (!overlayCssSource.includes('.overlay-bubble-progress')) {
     fail('overlay.css 缺少任务进度条样式');
@@ -4257,6 +4259,9 @@ pass('T-48 设置页三段式布局、既有元素 id 与双语文案断言通�
     !ipcSource.includes("id: 'skin-import'")
   ) {
     fail('ipc.js 缺少 T-63 浮窗注入/皮肤导入任务接线');
+  }
+  if (ipcSource.split('overlay.refresh()').length - 1 < 2) {
+    fail('ipc.js 皮肤 apply/remove 后未同步刷新浮窗皮肤（overlay.refresh() 至少 2 处）');
   }
   if (
     !skinStoreSource.includes('onProgress') ||
