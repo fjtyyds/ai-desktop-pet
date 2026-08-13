@@ -242,7 +242,28 @@
 - [x] T-63 任务级进度气泡（a7b31d8，已合并 main）
 - [x] computer use 目检与收尾（pixel-pet 动画/任务气泡/批量导入/右键菜单实测通过；进度残留清理 + 皮肤同步刷新两处小修）
 
+**M5.3：任务级进度扩展——已完成（2026-08-13）**
+
+目标：把导出对话（history-export）、TTS 朗读（tts-speak）接入浮窗任务气泡，并提供外部工具统一接入规范（task-runner）（ADR-048）。
+
+任务卡：
+
+- `docs/tasks/T-64.md` — 任务级进度扩展（codex/m5x-task-sources）
+
+验收标准：
+
+1. `runWithTask` 纯 Node 包裹器：startTask → runner({update}) → finishTask(ok:true)；异常 finishTask(ok:false, message≤80) 后重抛；空 overlay 安全。
+2. `tts-edge.synthesize` 可选 `onSegment` 回调（每段合成前/缓存命中一次）。
+3. history-export / tts-speak 两任务源接入；既有 skin-import / app-update 行为不变。
+4. worktree 与 main `npm run check`、`npm run smoke` 全绿；sync-latest 同步最新版。
+
+任务清单：
+
+- [x] T-64 任务级进度扩展（ca782a8，已合并 main）
+
 ## Progress
+
+- 2026-08-13：T-64 任务级进度扩展验收合并（ca782a8 fast-forward，worker 019ffb9a 实施）：task-runner.js `runWithTask` 通用包裹器（纯 Node）+ tts-edge `onSegment` 回调 + ipc.js 接入 history-export（两阶段 50/100）与 tts-speak（分片进度）+ 双语文案 7 key + check 静态/运行时断言 + smoke 端到端（真实扫描导入期间 overlay 出现 skin-import 任务并结束后清空）；worktree 与 main check/smoke 全绿；sync-latest 已同步最新版 0.1.0 @ ca782a8；待用户确认 push 与后续方向。
 
 - 2026-08-13：ADR-047 落盘——总工交接再次把新总工建到项目外（send-prompt 漏带 --project，走“不在项目中工作”路径，误建 019ffb8b）；已固化硬规则（交接命令必带 `--project E:\codex\AI桌宠`、交接文件新增“项目根目录”、codex-context-handoff 技能 §5/§6/§7 更新、AGENTS.md/交接模板同步），项目内总工 019ffb8e 已重交上岗，019ffb8b 作废只读（停手消息两次未确认送达，用户可归档该线程）。
 

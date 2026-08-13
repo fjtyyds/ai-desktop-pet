@@ -1,12 +1,12 @@
 # 项目状态
 
 - 更新时间：2026-08-13
-- 当前阶段：M5.2 宠物浮窗增强——动画宠物包与任务级进度气泡（ADR-046）
-- 当前任务：M5.2 computer use 目检完成并收口（pixel-pet 动画/任务气泡/批量导入/右键菜单），两处收尾修复已合并、推送并同步最新版
-- 最近完成：T-62/T-63 验收合并（0e9f5bd / a7b31d8）+ computer use 目检结论与收尾修复（1206855：进度残留清理、皮肤 apply/remove 浮窗同步刷新；d237fba 文档收口）
-- 下一步：向用户汇报目检结论；后续方向（宠物包在线商店等）待用户拍板
-- 阻塞：无（商店/签名资金冻结仍按 ADR-041 处理）
-- 最新版：`E:\codex\AI桌宠最新版`（scripts/sync-latest.ps1 自动同步，当前 0.1.0 @ d237fba，ADR-042/043）
+- 当前阶段：M5.3 任务级进度扩展——导出对话 / TTS 朗读 / 外部工具任务源（ADR-048）
+- 当前任务：T-64 验收合并完成（ca782a8）并同步最新版；等待用户拍板后续方向
+- 最近完成：T-64 验收合并（ca782a8，worker 019ffb9a）：runWithTask 通用包裹器接入 history-export / tts-speak 任务气泡；双语文案 7 key；worktree 与 main check/smoke 全绿
+- 下一步：向用户汇报 T-64 结论；等待用户拍板后续方向（宠物包在线商店、任务级进度继续扩展、目检补项、GitHub Release 授权等）
+- 阻塞：无（商店/签名资金冻结仍按 ADR-041 处理；push 按 ADR-034/041 待用户确认）
+- 最新版：`E:\codex\AI桌宠最新版`（scripts/sync-latest.ps1 自动同步，当前 0.1.0 @ ca782a8，ADR-042/043）
 - 交接提示：新会话先读 `AGENTS.md` → `PLAN.md` → `docs/STATUS.md` → `docs/reports/2026-08-10-工作对接方案.md` → 自己的任务卡（docs/tasks/T-xx.md）
 
 ## ADR-047 总工交接项目外事故记录（2026-08-13）
