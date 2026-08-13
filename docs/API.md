@@ -52,6 +52,7 @@ petAPI.petOverlay.getConfig() -> Promise<{ bubbleEnabled, bubbleSeconds, reminde
 
 - 状态值：`idle / working / ready / failed / speaking / attention`（T-57 扩展）。
 - 任务约束：`id ≤64`、`title/message ≤80`、`percent 0~100`（null=不确定）、`stage/totalStages` 可选整数；任务不持久化；运行中任务气泡优先，提醒气泡排队补放；状态事件 `pet:status-updated` payload 带 `task` 字段（无任务为 null）。
+- 任务源清单（T-63/T-64）：`skin-import`（皮肤批量导入）、`app-update`（自动更新下载）、`history-export`（对话导出）、`tts-speak`（语音合成）；主进程任务源统一经 `src/main/task-runner.js` 的 `runWithTask` 包裹（开始/进度/结束/失败清理），新任务源接入规范见 `docs/tasks/T-64.md`。
 
 ### 在线神经语音约定（ADR-029，T-34 冻结）
 

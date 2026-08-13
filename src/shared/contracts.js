@@ -134,6 +134,17 @@ const DEFAULT_MODEL = 'deepseek-v4-flash';
  * 结束后补放；状态事件（pet:status-updated）payload 增加 task 字段（无任务为 null）。
  */
 
+/**
+ * T-64（ADR-048）：任务源扩展（petAPI 契约不变，仅主进程任务源接线）。
+ * - 任务源清单：skin-import（T-63 皮肤批量导入）、app-update（T-63 自动更新下载）、
+ *   history-export（对话导出）、tts-speak（TTS 语音合成）。
+ * - src/main/task-runner.js：runWithTask(overlay, { id, title, totalStages? }, runner)
+ *   通用包裹器——startTask → runner({ update }) → finishTask(ok)；异常自动 finishTask(ok:false) 后重抛；
+ *   外部工具任务源统一经它接入。
+ * - tts-edge.synthesize({ ..., onSegment? })：每段合成前回调 { index, total }（缓存命中回调一次）。
+ * 约束沿用 T-63：id ≤64、title/message ≤80、任务不持久化、运行中任务气泡优先。
+ */
+
 /** 短期记忆窗口大小（M2 默认最近 20 条消息） */
 const DEFAULT_SHORT_TERM_WINDOW = 20;
 

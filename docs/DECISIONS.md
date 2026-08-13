@@ -431,3 +431,15 @@
   3. 误建的项目外线程作废（只读，不派活、不合并、不等待其反馈）；立即用带 `--project` 的命令重交，并在交接文件头部追加“交接状态”说明两个线程的归属。
   4. `codex-context-handoff/SKILL.md` §5/§6/§7 固化上述命令与验证/补救步骤；项目 `AGENTS.md` 与总工交接提示词模板同步更新。
 - 后果：每次总工交接都保持在项目上下文内，避免项目外线程假总工、双总工与上下文丢失；技能链维护线程（非项目角色）不受影响，仍按无项目参数交接。
+
+## ADR-048：任务级进度气泡多源扩展（2026-08-13）
+
+- 状态：Accepted（用户拍板：任务级进度扩展——导出对话、TTS 朗读、外部工具接入）
+- 背景：T-63（ADR-046）已提供任务 API 并接入皮肤批量导入与自动更新下载；用户要求继续把导出对话、TTS 朗读、外部工具等新任务源接入进度气泡。
+- 决策：
+  1. `petAPI.petOverlay` 契约不变（T-63 冻结）；本轮只扩展主进程任务源与内部工具接口，不新增渲染层 API。
+  2. 新增 `src/main/task-runner.js`：`runWithTask(overlay, { id, title, totalStages? }, runner)` 通用包裹器，统一 startTask/updateTask/finishTask 与失败清理（异常自动 finishTask ok:false 后重抛）；未来外部工具一律经它接入。
+  3. 接入新任务源：`history-export`（对话导出：生成内容→写入文件两阶段）、`tts-speak`（Edge TTS 合成：按 UTF-8 分段推进百分比）。
+  4. `tts-edge.synthesize` 增加可选 `onSegment({ index, total })` 回调（每段合成前调用；缓存命中回调一次）；缺省行为完全不变。
+  5. 文案双语言；check.js 静态断言 + 运行时断言（fake overlay 完成/失败序列、临时文件导出、onSegment 回调）；smoke.js 端到端（真实扫描导入期间 overlay 出现 `skin-import` 任务并在结束后清空，验证主进程任务源→浮窗真实链路）。
+- 后果：导出与朗读过程对用户可见、可感知进度；外部工具获得标准接入范式（runWithTask）；皮肤导入/更新下载既有行为不变。
