@@ -862,8 +862,10 @@ function createSkinStore(options = {}) {
    * - 跳过 node_modules/.git/隐藏目录与符号链接，不进入已识别宠物包内部；
    * - 逐包复用 importPack 校验，单个包失败不中断；
    * - 返回 { imported: [皮肤条目], failed: [{name, error}] }。
+   * T-63：支持可选 onProgress({ index, total, name, error? }) 进度回调（按包触发，
+   * 缺省不回调，现有调用与返回值不变）。
    */
-  function scanCodexPetsDir(sourceDir) {
+  function scanCodexPetsDir(sourceDir, onProgress) {
     if (typeof sourceDir !== 'string' || !sourceDir.trim()) {
       throw new SkinError('未提供 Codex 宠物目录路径');
     }
@@ -874,8 +876,7 @@ function createSkinStore(options = {}) {
     if (!fs.statSync(resolved).isDirectory()) {
       throw new SkinError('Codex 宠物目录路径不是文件夹');
     }
-    const imported = [];
-    const failed = [];
+    const petDirs = [];
     const visited = new Set();
 
     function walk(dir) {
@@ -895,15 +896,7 @@ function createSkinStore(options = {}) {
       visited.add(real);
 
       if (fs.existsSync(path.join(dir, PET_MANIFEST_NAME))) {
-        const name = path.basename(dir);
-        try {
-          imported.push(importPack(dir));
-        } catch (error) {
-          failed.push({
-            name,
-            error: error && error.message ? error.message : String(error)
-          });
-        }
+        petDirs.push(dir);
         // 已按宠物包处理，不再深入其内部目录
         return;
       }
@@ -931,6 +924,29 @@ function createSkinStore(options = {}) {
     }
 
     walk(resolved);
+    const imported = [];
+    const failed = [];
+    petDirs.forEach((dir, index) => {
+      const name = path.basename(dir);
+      let itemError = null;
+      try {
+        imported.push(importPack(dir));
+      } catch (error) {
+        itemError = error;
+        failed.push({
+          name,
+          error: error && error.message ? error.message : String(error)
+        });
+      }
+      if (typeof onProgress === 'function') {
+        onProgress({
+          index: index + 1,
+          total: petDirs.length,
+          name,
+          error: itemError && itemError.message ? itemError.message : undefined
+        });
+      }
+    });
     return { imported, failed };
   }
 

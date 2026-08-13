@@ -42,7 +42,11 @@ const PET_CHANNELS = {
   refreshSkin: 'pet:refresh-skin',
   skinUpdated: 'pet:skin-updated',
   statusUpdated: 'pet:status-updated',
-  getOverlayState: 'pet:get-overlay-state'
+  getOverlayState: 'pet:get-overlay-state',
+  taskStart: 'pet:task-start',
+  taskUpdate: 'pet:task-update',
+  taskFinish: 'pet:task-finish',
+  getConfig: 'pet:get-config'
 };
 
 const OVERLAY_WIDTH = 240;
@@ -60,6 +64,9 @@ const MAX_BUBBLE_QUEUE = 3;
 const BUBBLE_SECONDS_FALLBACK = 6;
 const BUBBLE_SECONDS_MIN = 3;
 const BUBBLE_SECONDS_MAX = 20;
+/** T-63（ADR-046）：任务级进度气泡字段上限 */
+const TASK_ID_MAX = 64;
+const TASK_TEXT_MAX = 80;
 /** T-56：浮窗贴边吸附参数（浮窗内独立实现，不侵入主窗口 T-31 逻辑） */
 const OVERLAY_DOCK_MARGIN = 24;
 const OVERLAY_DOCK_DEBOUNCE_MS = 200;
@@ -89,6 +96,9 @@ function createPetOverlay(options = {}) {
   let settingsWriter = null;
   let skinCache = null;
   let registered = false;
+  let tasks = new Map();
+  let activeTaskId = null;
+  let pendingQueue = [];
 
   function getWriter() {
     if (!settingsWriter) {
@@ -222,10 +232,85 @@ function createPetOverlay(options = {}) {
     }
   }
 
+  function remindersEnabledFromSettings() {
+    try {
+      const settings = getSettings();
+      return settings ? settings.petOverlayReminders !== false : true;
+    } catch (_error) {
+      return true;
+    }
+  }
+
+  /** T-57/T-61 契约补实现：浮窗气泡配置 */
+  function getConfigValue() {
+    return {
+      bubbleEnabled: bubbleEnabledFromSettings(),
+      bubbleSeconds: bubbleSeconds(),
+      reminders: remindersEnabledFromSettings()
+    };
+  }
+
+  /** 清洗任务载荷（T-63）：id≤64、title/message≤80、percent 0~100 或 null、stage/totalStages 可选整数 */
+  function sanitizeTaskPayload(payload) {
+    if (!payload || typeof payload.id !== 'string') {
+      return null;
+    }
+    const id = payload.id.trim().slice(0, TASK_ID_MAX);
+    if (!id) {
+      return null;
+    }
+    const title =
+      typeof payload.title === 'string'
+        ? payload.title.trim().slice(0, TASK_TEXT_MAX)
+        : '';
+    const message =
+      typeof payload.message === 'string'
+        ? payload.message.trim().slice(0, TASK_TEXT_MAX)
+        : '';
+    let percent = null;
+    if (
+      payload.percent !== null &&
+      payload.percent !== undefined &&
+      Number.isFinite(Number(payload.percent))
+    ) {
+      percent = Math.min(100, Math.max(0, Math.round(Number(payload.percent))));
+    }
+    const stage = Number.isInteger(payload.stage) ? payload.stage : null;
+    const totalStages = Number.isInteger(payload.totalStages)
+      ? payload.totalStages
+      : null;
+    return { id, title, message, percent, stage, totalStages };
+  }
+
+  function taskToPayload(task) {
+    return {
+      id: task.id,
+      title: task.title,
+      message: task.message,
+      percent: task.percent,
+      stage: task.stage,
+      totalStages: task.totalStages,
+      status: task.status
+    };
+  }
+
+  /** 当前运行中的任务（无任务返回 null） */
+  function currentTask() {
+    if (!activeTaskId) {
+      return null;
+    }
+    const task = tasks.get(activeTaskId);
+    return task ? taskToPayload(task) : null;
+  }
+
   function currentStatus() {
     const base =
       queue.length > 0 ? { ...queue[0] } : { state: 'idle', text: '', at: 0 };
-    return { ...base, bubbleEnabled: bubbleEnabledFromSettings() };
+    return {
+      ...base,
+      bubbleEnabled: bubbleEnabledFromSettings(),
+      task: currentTask()
+    };
   }
 
   /** T-60：状态变化主动推送给浮窗（浮窗心跳降为 5s 兜底） */
@@ -297,6 +382,15 @@ function createPetOverlay(options = {}) {
           : '',
       at: Date.now()
     };
+    // T-63：任务运行中提醒排队，任务结束后补放（不打断任务气泡）
+    if (activeTaskId) {
+      pendingQueue.push(next);
+      if (pendingQueue.length > MAX_BUBBLE_QUEUE) {
+        pendingQueue.splice(0, pendingQueue.length - MAX_BUBBLE_QUEUE);
+      }
+      notifyStatus();
+      return { ...next };
+    }
     // 占位 idle（无文案）直接替换，避免队列出现“先 idle 后 attention”的跳变
     const isIdlePlaceholder =
       queue.length === 1 && queue[0].state === 'idle' && !queue[0].text;
@@ -316,6 +410,76 @@ function createPetOverlay(options = {}) {
     return { ...next };
   }
 
+  /** T-63：开始任务——任务气泡优先显示，提醒气泡排队补放 */
+  function startTask(payload) {
+    const clean = sanitizeTaskPayload(payload);
+    if (!clean) {
+      return { ok: false, task: null };
+    }
+    const task = { ...clean, status: 'running', startedAt: Date.now() };
+    tasks.set(task.id, task);
+    activeTaskId = task.id;
+    clearBubbleTimer();
+    queue = [{ state: 'working', text: task.title || '', at: Date.now() }];
+    notifyStatus();
+    return { ok: true, task: taskToPayload(task) };
+  }
+
+  /** T-63：更新任务进度（标题/阶段文案/百分比） */
+  function updateTask(payload) {
+    const clean = sanitizeTaskPayload(payload);
+    const task = clean ? tasks.get(clean.id) : null;
+    if (!clean || !task) {
+      return { ok: false, task: null };
+    }
+    if (clean.title) {
+      task.title = clean.title;
+    }
+    if (typeof payload.message === 'string') {
+      task.message = payload.message.trim().slice(0, TASK_TEXT_MAX);
+    }
+    if (clean.percent !== null) {
+      task.percent = clean.percent;
+    }
+    if (clean.stage !== null) {
+      task.stage = clean.stage;
+    }
+    if (clean.totalStages !== null) {
+      task.totalStages = clean.totalStages;
+    }
+    if (queue.length > 0 && queue[0].state === 'working') {
+      queue[0].text = task.title || task.message || '';
+    }
+    notifyStatus();
+    return { ok: true, task: taskToPayload(task) };
+  }
+
+  /** T-63：结束任务——显示 done/failed 结果，随后补放排队提醒并回落 idle */
+  function finishTask(payload) {
+    const clean = sanitizeTaskPayload(payload);
+    const task = clean ? tasks.get(clean.id) : null;
+    if (!clean || !task) {
+      return { ok: false, task: null };
+    }
+    const ok = payload ? payload.ok !== false : true;
+    const message =
+      (typeof payload.message === 'string'
+        ? payload.message.trim().slice(0, TASK_TEXT_MAX)
+        : '') || task.title;
+    tasks.delete(task.id);
+    activeTaskId = null;
+    const finalState = ok ? 'ready' : 'failed';
+    const pending = pendingQueue.splice(0, pendingQueue.length);
+    clearBubbleTimer();
+    queue = [{ state: finalState, text: message, at: Date.now() }, ...pending].slice(
+      0,
+      MAX_BUBBLE_QUEUE
+    );
+    bubbleTimer = setTimeout(advanceQueue, bubbleSeconds() * 1000);
+    notifyStatus();
+    return { ok: true, task: null };
+  }
+
   function registerIpc() {
     if (registered) {
       return;
@@ -330,6 +494,22 @@ function createPetOverlay(options = {}) {
 
     ipcMain.handle(PET_CHANNELS.pushBubble, (_event, payload) => {
       return pushStatus(payload);
+    });
+
+    ipcMain.handle(PET_CHANNELS.taskStart, (_event, payload) => {
+      return startTask(payload);
+    });
+
+    ipcMain.handle(PET_CHANNELS.taskUpdate, (_event, payload) => {
+      return updateTask(payload);
+    });
+
+    ipcMain.handle(PET_CHANNELS.taskFinish, (_event, payload) => {
+      return finishTask(payload);
+    });
+
+    ipcMain.handle(PET_CHANNELS.getConfig, () => {
+      return getConfigValue();
     });
 
     ipcMain.handle(PET_CHANNELS.getSkin, () => {
@@ -596,6 +776,9 @@ function createPetOverlay(options = {}) {
 
   function dispose() {
     clearBubbleTimer();
+    tasks.clear();
+    activeTaskId = null;
+    pendingQueue = [];
     if (win && !win.isDestroyed()) {
       win.destroy();
     }
@@ -616,6 +799,10 @@ function createPetOverlay(options = {}) {
       return replaceStatus(payload);
     },
     pushBubble: (payload) => pushStatus(payload),
+    startTask: (payload) => startTask(payload),
+    updateTask: (payload) => updateTask(payload),
+    finishTask: (payload) => finishTask(payload),
+    getConfig: () => getConfigValue(),
     getState: () => currentStatus(),
     dispose
   };

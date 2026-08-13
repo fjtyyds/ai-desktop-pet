@@ -32,7 +32,15 @@
     "menuTuckAway": "收起宠物",
     "menuQuit": "退出应用",
     "firstTimeHint": "我已出现在桌面右下角，双击我可以回到聊天窗口哦！",
-    "moodExcited": "今天心情超好！"
+    "moodExcited": "今天心情超好！",
+    "taskImporting": "正在导入宠物包…",
+    "taskImportDone": "已导入 {count} 个宠物包",
+    "taskImportPartial": "导入完成：成功 {ok} 个，失败 {fail} 个",
+    "taskImportFailedShort": "失败",
+    "taskImportFailed": "宠物包导入失败",
+    "taskUpdating": "正在下载更新…",
+    "taskUpdateReady": "更新已下载，重启应用即可安装",
+    "taskUpdateFailed": "更新下载失败"
   },
   "idle": {
     "phrases": [

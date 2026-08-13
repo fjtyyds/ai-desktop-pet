@@ -436,6 +436,113 @@ app.whenReady().then(() => {
         fail(`气泡时长未夹取到 3~20: ${JSON.stringify(t61State)}`);
       }
       console.log('[smoke] T-61 浮窗设置读写/清洗端到端通过');
+      // T-63：任务级进度气泡端到端（start→update→finish、进度条、提醒补放、getConfig）
+      await win.webContents.executeJavaScript(`(async () => {
+        await window.petAPI.settings.set({
+          petOverlayBubbleSeconds: 3,
+          petOverlayBubbleEnabled: true,
+          petOverlayReminders: true
+        });
+      })()`);
+      const t63State = await overlayWin.webContents.executeJavaScript(`(async () => {
+        const api = window.petAPI.petOverlay;
+        const bubble = document.getElementById('overlay-bubble');
+        const progress = document.getElementById('overlay-bubble-progress');
+        const progressBar = document.getElementById('overlay-bubble-progress-bar');
+        const progressLabel = document.getElementById('overlay-bubble-progress-label');
+        const t = window.__overlayTest;
+        const started = await api.startTask({
+          id: 'smoke-task',
+          title: 'task-63',
+          percent: 0,
+          stage: 1,
+          totalStages: 3
+        });
+        const taskInHook = t.getTask();
+        const bubbleVisible = Boolean(
+          bubble && !bubble.hidden && bubble.textContent.indexOf('task-63') !== -1
+        );
+        const progressVisible = Boolean(progress && !progress.hidden);
+        const parked = await api.pushBubble({ state: 'attention', text: 'parked-63' });
+        const updated = await api.updateTask({
+          id: 'smoke-task',
+          percent: 50,
+          stage: 2,
+          totalStages: 3,
+          message: 'step-2'
+        });
+        const labelAfter = progressLabel ? progressLabel.textContent : '';
+        const barWidth = progressBar ? progressBar.style.width : '';
+        const stillTask = t.getTask();
+        const cfg = await api.getConfig();
+        const finished = await api.finishTask({
+          id: 'smoke-task',
+          ok: true,
+          message: 'done-63'
+        });
+        const stateAfter = await api.getStatus();
+        const progressHiddenAfter = Boolean(progress && progress.hidden);
+        return {
+          started: Boolean(started && started.ok),
+          taskInHook: Boolean(
+            taskInHook && taskInHook.id === 'smoke-task' && taskInHook.status === 'running'
+          ),
+          bubbleVisible,
+          progressVisible,
+          parked: Boolean(parked && parked.text === 'parked-63'),
+          updated: Boolean(updated && updated.ok),
+          labelAfter,
+          barWidth,
+          stillTask: Boolean(stillTask && stillTask.percent === 50 && stillTask.stage === 2),
+          cfgOk: Boolean(
+            cfg &&
+              cfg.bubbleSeconds === 3 &&
+              cfg.bubbleEnabled === true &&
+              typeof cfg.reminders === 'boolean'
+          ),
+          finished: Boolean(finished && finished.ok && finished.task === null),
+          stateAfter: stateAfter && stateAfter.state,
+          taskAfter: stateAfter && stateAfter.task,
+          progressHiddenAfter,
+          bubbleTextAfter: bubble ? bubble.textContent : ''
+        };
+      })()`);
+      if (
+        !t63State.started ||
+        !t63State.taskInHook ||
+        !t63State.bubbleVisible ||
+        !t63State.progressVisible ||
+        !t63State.parked ||
+        !t63State.updated ||
+        t63State.labelAfter.indexOf('50%') === -1 ||
+        t63State.barWidth !== '50%' ||
+        !t63State.stillTask ||
+        !t63State.cfgOk ||
+        !t63State.finished ||
+        t63State.stateAfter !== 'ready' ||
+        t63State.taskAfter !== null ||
+        !t63State.progressHiddenAfter ||
+        t63State.bubbleTextAfter.indexOf('done-63') === -1
+      ) {
+        fail(`T-63 任务气泡端到端异常: ${JSON.stringify(t63State)}`);
+      }
+      // 任务结束后排队提醒补放（气泡时长 3s）
+      const parkedDeadline = Date.now() + 4500;
+      let parkedReplayed = false;
+      while (Date.now() < parkedDeadline) {
+        const bubbleText = await overlayWin.webContents.executeJavaScript(
+          `document.getElementById('overlay-bubble') ? document.getElementById('overlay-bubble').textContent : ''`
+        );
+        if (bubbleText.indexOf('parked-63') !== -1) {
+          parkedReplayed = true;
+          break;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      }
+      if (!parkedReplayed) {
+        fail('T-63 任务结束后提醒气泡未补放');
+      }
+      console.log('[smoke] T-63 任务级进度气泡端到端通过');
       // T-59：Codex pets 目录扫描导入 + 失败分组 + 9 行状态预览端到端
       const codexPetsTmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-pet-smoke-pets-'));
       try {

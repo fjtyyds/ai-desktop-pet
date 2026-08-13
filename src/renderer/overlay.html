@@ -25,7 +25,13 @@
         role="status"
         aria-live="polite"
         hidden
-      ></div>
+      >
+        <span id="overlay-bubble-text"></span>
+        <div id="overlay-bubble-progress" class="overlay-bubble-progress" hidden>
+          <div id="overlay-bubble-progress-bar" class="overlay-bubble-progress-bar"></div>
+          <span id="overlay-bubble-progress-label" class="overlay-bubble-progress-label"></span>
+        </div>
+      </div>
       <div id="overlay-pet" class="overlay-pet" aria-hidden="true"></div>
     </div>
     <script src="../shared/locales/index.js"></script>

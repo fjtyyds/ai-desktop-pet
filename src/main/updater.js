@@ -47,6 +47,12 @@ function describeError(value) {
  *   主进程翻译器读取器，用于双语文案。
  * @param {{ info?: Function, warn?: Function, error?: Function, debug?: Function }} [options.logger]
  *   日志接收器；缺省使用 console。由 main.js 传入 console + writeLog 双写版本。
+ * @param {(percent: number) => void} [options.onDownloadProgress]
+ *   T-63：下载进度回调（0~100 整数；默认空函数），供宠物浮窗任务气泡使用。
+ * @param {() => void} [options.onUpdateDownloaded]
+ *   T-63：下载完成回调（默认空函数）。
+ * @param {(message: string) => void} [options.onUpdateError]
+ *   T-63：更新检查/下载失败回调（默认空函数）。
  * @returns {{ checkForUpdates: Function, handleBeforeQuit: Function, dispose: Function }}
  */
 function initUpdater(options = {}) {
@@ -66,7 +72,10 @@ function initUpdater(options = {}) {
   const {
     getMainWindow = () => null,
     getTranslator = () => createTranslator('zh-CN'),
-    logger = console
+    logger = console,
+    onDownloadProgress = () => {},
+    onUpdateDownloaded = () => {},
+    onUpdateError = () => {}
   } = options;
 
   let checking = false;
@@ -156,6 +165,8 @@ function initUpdater(options = {}) {
     if (percent === null) {
       return;
     }
+    // T-63：转发给浮窗任务气泡（幂等由调用方处理）
+    onDownloadProgress(percent);
     const now = Date.now();
     if (
       percent >= lastProgressLoggedPercent + PROGRESS_LOG_STEP_PERCENT ||
@@ -170,6 +181,7 @@ function initUpdater(options = {}) {
   /** 下载完成：dialog 提示重启安装；确认后由 before-quit 执行 quitAndInstall */
   function handleUpdateDownloaded() {
     logInfo('更新下载完成，等待重启安装');
+    onUpdateDownloaded();
     return showMessageBox({
       type: 'info',
       title: t('updater.updateReadyTitle'),
@@ -193,7 +205,9 @@ function initUpdater(options = {}) {
   function handleError(error) {
     checking = false;
     manualCheck = false;
-    logError(`更新检查/下载失败：${describeError(error)}`);
+    const message = describeError(error);
+    logError(`更新检查/下载失败：${message}`);
+    onUpdateError(message);
   }
 
   /**

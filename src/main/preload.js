@@ -51,7 +51,11 @@ const CHANNELS = {
   petRefreshSkin: 'pet:refresh-skin', // T-55：皮肤变更后刷新浮窗
   petSkinUpdated: 'pet:skin-updated', // T-55：主进程推送浮窗皮肤变更
   petStatusUpdated: 'pet:status-updated', // T-60：主进程推送浮窗状态变更
-  petGetOverlayState: 'pet:get-overlay-state' // T-60：浮窗完整状态（心跳/冒烟）
+  petGetOverlayState: 'pet:get-overlay-state', // T-60：浮窗完整状态（心跳/冒烟）
+  petTaskStart: 'pet:task-start', // T-63：任务级进度气泡——开始
+  petTaskUpdate: 'pet:task-update', // T-63：任务级进度气泡——更新进度
+  petTaskFinish: 'pet:task-finish', // T-63：任务级进度气泡——结束
+  petGetConfig: 'pet:get-config' // T-63：浮窗气泡配置（T-57/T-61 契约补实现）
 };
 
 contextBridge.exposeInMainWorld('petAPI', {
@@ -176,6 +180,10 @@ contextBridge.exposeInMainWorld('petAPI', {
       };
       ipcRenderer.on(CHANNELS.petStatusUpdated, listener);
       return () => ipcRenderer.removeListener(CHANNELS.petStatusUpdated, listener);
-    }
+    },
+    startTask: (payload) => ipcRenderer.invoke(CHANNELS.petTaskStart, payload), // T-63
+    updateTask: (payload) => ipcRenderer.invoke(CHANNELS.petTaskUpdate, payload), // T-63
+    finishTask: (payload) => ipcRenderer.invoke(CHANNELS.petTaskFinish, payload), // T-63
+    getConfig: () => ipcRenderer.invoke(CHANNELS.petGetConfig) // T-63
   }
 });

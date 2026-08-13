@@ -609,6 +609,7 @@ if (SKIP_BOOTSTRAP || !app || typeof app.requestSingleInstanceLock !== 'function
       quitApp, // T-56：浮窗右键菜单退出应用
       getTranslator: getMainTranslator // T-56：右键菜单双语文案
     });
+    ipc.setPetOverlay(petOverlayApi); // T-63：任务进度气泡注入（皮肤导入等长任务用）
     try {
       const settings = ipc.getSettings();
       if (settings && settings.petOverlayEnabled === true) {
@@ -619,11 +620,45 @@ if (SKIP_BOOTSTRAP || !app || typeof app.requestSingleInstanceLock !== 'function
     }
     registerWindowIpc(); // T-19/T-25: window:toggle-dock / window:minimize
     // T-37: 仅打包版初始化自动更新（开发模式绝不检查；updater 内部还有二次守卫）
+    let updateTaskStarted = false; // T-63：更新任务气泡防重复 startTask
     if (app.isPackaged) {
       updaterApi = initUpdater({
         getMainWindow: () => mainWindow,
         getTranslator: getMainTranslator,
-        logger: createUpdaterLogger()
+        logger: createUpdaterLogger(),
+        // T-63：更新下载进度 → 浮窗任务气泡（仅打包版真实触发）
+        onDownloadProgress: (percent) => {
+          if (!petOverlayApi) {
+            return;
+          }
+          const value = Number.isFinite(percent) ? percent : 0;
+          if (!updateTaskStarted) {
+            petOverlayApi.startTask({
+              id: 'app-update',
+              title: getMainTranslator()('overlay.taskUpdating'),
+              percent: value
+            });
+            updateTaskStarted = true;
+          } else {
+            petOverlayApi.updateTask({ id: 'app-update', percent: value });
+          }
+        },
+        onUpdateDownloaded: () => {
+          updateTaskStarted = false;
+          petOverlayApi?.finishTask?.({
+            id: 'app-update',
+            ok: true,
+            message: getMainTranslator()('overlay.taskUpdateReady')
+          });
+        },
+        onUpdateError: () => {
+          updateTaskStarted = false;
+          petOverlayApi?.finishTask?.({
+            id: 'app-update',
+            ok: false,
+            message: getMainTranslator()('overlay.taskUpdateFailed')
+          });
+        }
       });
       setTimeout(() => {
         updaterApi?.checkForUpdates({ manual: false });

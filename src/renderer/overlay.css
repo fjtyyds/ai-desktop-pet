@@ -57,6 +57,47 @@ body {
   pointer-events: none;
 }
 
+/* T-63：任务级进度气泡（标题/阶段/百分比进度条，ADR-046） */
+.overlay-bubble-progress {
+  margin-top: 6px;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.18);
+  overflow: hidden;
+  position: relative;
+}
+
+.overlay-bubble-progress-bar {
+  height: 100%;
+  width: 0%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #7aa2ff, #b3f0ff);
+  transition: width 0.25s ease;
+}
+
+.overlay-bubble-progress.is-indeterminate .overlay-bubble-progress-bar {
+  width: 40%;
+  animation: pet-progress-indeterminate 1.2s ease-in-out infinite;
+}
+
+.overlay-bubble-progress-label {
+  display: block;
+  margin-top: 4px;
+  font-size: 10px;
+  line-height: 1.4;
+  opacity: 0.85;
+  text-align: center;
+}
+
+@keyframes pet-progress-indeterminate {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(260%);
+  }
+}
+
 .overlay-pet {
   position: absolute;
   left: 50%;
@@ -259,10 +300,16 @@ body {
   animation: none !important;
 }
 
+/* T-63：减弱动效时进度条不做不确定动画（仍显示确定性宽度） */
+.overlay-bubble-progress.is-indeterminate[data-reduce-motion='1'] {
+  animation: none !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .overlay-pet.is-atlas,
   .overlay-pet:not(.is-atlas),
-  .overlay-mood {
+  .overlay-mood,
+  .overlay-bubble-progress.is-indeterminate {
     animation: none !important;
   }
 }

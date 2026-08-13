@@ -32,7 +32,15 @@
     "menuTuckAway": "Tuck away pet",
     "menuQuit": "Quit app",
     "firstTimeHint": "I'm on your desktop now — double-click me to open the chat window!",
-    "moodExcited": "Feeling great today!"
+    "moodExcited": "Feeling great today!",
+    "taskImporting": "Importing pet packs…",
+    "taskImportDone": "Imported {count} pet pack(s)",
+    "taskImportPartial": "Import finished: {ok} succeeded, {fail} failed",
+    "taskImportFailedShort": "failed",
+    "taskImportFailed": "Pet pack import failed",
+    "taskUpdating": "Downloading update…",
+    "taskUpdateReady": "Update downloaded — restart to install",
+    "taskUpdateFailed": "Update download failed"
   },
   "idle": {
     "phrases": [

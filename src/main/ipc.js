@@ -90,6 +90,7 @@ let streamAbortController = null;
 let skinStoreInstance = null; // T-43：皮肤存储单例
 let licenseManager = null; // T-40：许可证单例
 let paymentManagerInstance = null; // T-41：支付沙箱/桩单例
+let petOverlayApi = null; // T-63：宠物浮窗实例注入（任务进度气泡）
 
 // T-15：交互活动订阅（主进程空闲计时据此重置）
 const activityListeners = new Set();
@@ -186,6 +187,15 @@ function getSkinStore() {
     });
   }
   return skinStoreInstance;
+}
+
+/** T-63：注入宠物浮窗实例（main.js 创建后调用） */
+function setPetOverlay(api) {
+  petOverlayApi = api;
+}
+
+function getPetOverlay() {
+  return petOverlayApi;
 }
 
 async function handleChatSend(_event, payload) {
@@ -870,9 +880,58 @@ async function handleSkinImportCodexPets(event, payload) {
         sourcePath = result.filePaths[0];
       }
     }
-    const result = store.scanCodexPetsDir(sourcePath);
+    const overlay = getPetOverlay();
+    if (overlay && typeof overlay.startTask === 'function') {
+      overlay.startTask({
+        id: 'skin-import',
+        title: getTranslator()('overlay.taskImporting')
+      });
+    }
+    const result = store.scanCodexPetsDir(sourcePath, (progress) => {
+      if (overlay && typeof overlay.updateTask === 'function') {
+        const t = getTranslator();
+        const message = progress.error
+          ? `${progress.name}：${t('overlay.taskImportFailedShort')}`
+          : progress.name;
+        overlay.updateTask({
+          id: 'skin-import',
+          percent: Math.round((progress.index / progress.total) * 100),
+          stage: progress.index,
+          totalStages: progress.total,
+          message
+        });
+      }
+    });
+    if (overlay && typeof overlay.finishTask === 'function') {
+      const t = getTranslator();
+      const ok = result.failed.length === 0;
+      overlay.finishTask({
+        id: 'skin-import',
+        ok,
+        message: ok
+          ? t('overlay.taskImportDone', { count: result.imported.length })
+          : t('overlay.taskImportPartial', {
+              ok: result.imported.length,
+              fail: result.failed.length
+            })
+      });
+    }
     return { ok: true, ...result };
   } catch (error) {
+    try {
+      const overlay = getPetOverlay();
+      if (overlay && typeof overlay.finishTask === 'function') {
+        overlay.finishTask({
+          id: 'skin-import',
+          ok: false,
+          message:
+            (error && error.message) ||
+            getTranslator()('overlay.taskImportFailed')
+        });
+      }
+    } catch (_error) {
+      // 任务清理失败不影响错误返回
+    }
     return skinErrorResult(error);
   }
 }
@@ -1001,6 +1060,8 @@ module.exports = {
   getSettings,
   getLicenseManager,
   getPaymentManager,
+  setPetOverlay,
+  getPetOverlay,
   onActivity,
   notifyActivity,
   buildMarkdownExport,

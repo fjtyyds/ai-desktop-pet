@@ -4209,6 +4209,99 @@ pass('T-48 设置页三段式布局、既有元素 id 与双语文案断言通�
     fail(`T-59 目录扫描运行时检查异常: ${error && error.message ? error.message : error}`);
   }
 
+  // T-63：任务级进度气泡（契约/主进程/渲染/接入，ADR-046）
+  if (
+    !petOverlaySource.includes('pet:task-start') ||
+    !petOverlaySource.includes('pet:task-update') ||
+    !petOverlaySource.includes('pet:task-finish') ||
+    !petOverlaySource.includes('pet:get-config') ||
+    !petOverlaySource.includes('activeTaskId') ||
+    !petOverlaySource.includes('pendingQueue') ||
+    !petOverlaySource.includes('sanitizeTaskPayload')
+  ) {
+    fail('pet-overlay.js 缺少 T-63 任务注册表/通道/清洗');
+  }
+  if (
+    !preloadSource.includes('pet:task-start') ||
+    !preloadSource.includes('pet:task-update') ||
+    !preloadSource.includes('pet:task-finish') ||
+    !preloadSource.includes('pet:get-config') ||
+    !preloadSource.includes('startTask:') ||
+    !preloadSource.includes('updateTask:') ||
+    !preloadSource.includes('finishTask:') ||
+    !preloadSource.includes('getConfig:')
+  ) {
+    fail('preload.js 缺少 T-63 任务 API 暴露');
+  }
+  if (
+    !overlayHtmlSource.includes('overlay-bubble-progress') ||
+    !overlayHtmlSource.includes('overlay-bubble-progress-bar') ||
+    !overlayHtmlSource.includes('overlay-bubble-progress-label')
+  ) {
+    fail('overlay.html 缺少任务进度条元素');
+  }
+  if (
+    !overlayJsSource.includes('renderTaskProgress') ||
+    !overlayJsSource.includes('applyTask') ||
+    !overlayJsSource.includes('getTask') ||
+    !overlayJsSource.includes('is-indeterminate')
+  ) {
+    fail('overlay.js 缺少 T-63 任务渲染接线');
+  }
+  if (!overlayCssSource.includes('.overlay-bubble-progress')) {
+    fail('overlay.css 缺少任务进度条样式');
+  }
+  if (
+    !ipcSource.includes('setPetOverlay') ||
+    !ipcSource.includes('getPetOverlay') ||
+    !ipcSource.includes("id: 'skin-import'")
+  ) {
+    fail('ipc.js 缺少 T-63 浮窗注入/皮肤导入任务接线');
+  }
+  if (
+    !skinStoreSource.includes('onProgress') ||
+    !skinStoreSource.includes('scanCodexPetsDir(sourceDir, onProgress)')
+  ) {
+    fail('skin-store.js 缺少 T-63 批量导入进度回调');
+  }
+  if (
+    !updaterSource.includes('onDownloadProgress') ||
+    !updaterSource.includes('onUpdateDownloaded') ||
+    !updaterSource.includes('onUpdateError')
+  ) {
+    fail('updater.js 缺少 T-63 更新进度回调');
+  }
+  if (
+    !mainSource.includes('ipc.setPetOverlay') ||
+    !mainSource.includes("id: 'app-update'")
+  ) {
+    fail('main.js 缺少 T-63 浮窗注入/更新任务接线');
+  }
+  for (const localeFile of ['zh-CN', 'en']) {
+    const locale = JSON.parse(
+      fs.readFileSync(
+        path.join(root, 'src', 'shared', 'locales', `${localeFile}.json`),
+        'utf8'
+      )
+    );
+    for (const key of [
+      'taskImporting',
+      'taskImportDone',
+      'taskImportPartial',
+      'taskUpdating',
+      'taskUpdateReady',
+      'taskUpdateFailed'
+    ]) {
+      if (
+        !locale.overlay ||
+        typeof locale.overlay[key] !== 'string' ||
+        !locale.overlay[key].trim()
+      ) {
+        fail(`${localeFile}.json 缺少 overlay.${key} 文案`);
+      }
+    }
+  }
+  pass('T-63 任务级进度气泡静态断言通过');
 
   console.log('[check] 全部通过');
 })();

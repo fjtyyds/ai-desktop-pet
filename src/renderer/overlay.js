@@ -19,6 +19,10 @@
   const bubble = document.getElementById('overlay-bubble');
   const pet = document.getElementById('overlay-pet');
   const tuckBtn = document.getElementById('overlay-tuck');
+  const bubbleText = document.getElementById('overlay-bubble-text');
+  const bubbleProgress = document.getElementById('overlay-bubble-progress');
+  const bubbleProgressBar = document.getElementById('overlay-bubble-progress-bar');
+  const bubbleProgressLabel = document.getElementById('overlay-bubble-progress-label');
 
   // T-58：Codex 宠物包 8 列×9 行动画行映射表
   const STATE_ROWS = {
@@ -54,6 +58,7 @@
   let bubbleEnabled = true;
   let moodPolling = false;
   let moodBubble = null;
+  let currentTask = null;
   let statusTimer = null;
   let moodTimer = null;
 
@@ -122,6 +127,9 @@
   function applyReduceMotion(reduced) {
     reduceMotion = Boolean(reduced);
     pet.dataset.reduceMotion = reduceMotion ? '1' : '0';
+    if (bubbleProgress) {
+      bubbleProgress.dataset.reduceMotion = reduceMotion ? '1' : '0';
+    }
     if (moodBubble) {
       moodBubble.dataset.reduceMotion = reduceMotion ? '1' : '0';
     }
@@ -191,14 +199,66 @@
     localText = typeof text === 'string' ? text : '';
     updateMoodVisuals();
     pet.dataset.state = nextState;
-    const message = localText || t(statusKey(nextState));
-    bubble.textContent = message;
+    let message;
+    if (currentTask && currentTask.status === 'running') {
+      message = currentTask.message || currentTask.title || '';
+    } else {
+      message = localText || t(statusKey(nextState));
+    }
+    if (bubbleText) {
+      bubbleText.textContent = message;
+    } else {
+      bubble.textContent = message;
+    }
     bubble.hidden = !message || !bubbleEnabled;
+    renderTaskProgress();
   }
 
   /** T-57：气泡显示开关实时同步（主进程 getStatus 携带） */
   function applyBubbleEnabled(enabled) {
     bubbleEnabled = Boolean(enabled);
+    applyState(currentState, localText, true);
+  }
+
+  /** T-63：任务进度条渲染（percent 未知时不确定进度；任务结束隐藏） */
+  function renderTaskProgress() {
+    if (!bubbleProgress) {
+      return;
+    }
+    const task =
+      currentTask && currentTask.status === 'running' ? currentTask : null;
+    if (!task) {
+      bubbleProgress.hidden = true;
+      return;
+    }
+    bubbleProgress.hidden = false;
+    const hasPercent = task.percent !== null && Number.isFinite(task.percent);
+    bubbleProgress.classList.toggle(
+      'is-indeterminate',
+      !hasPercent && !reduceMotion
+    );
+    if (bubbleProgressBar) {
+      bubbleProgressBar.style.width = hasPercent
+        ? `${Math.min(100, Math.max(0, task.percent))}%`
+        : '';
+    }
+    const parts = [];
+    if (Number.isInteger(task.stage) && Number.isInteger(task.totalStages)) {
+      parts.push(`${task.stage}/${task.totalStages}`);
+    }
+    if (hasPercent) {
+      parts.push(`${Math.round(task.percent)}%`);
+    }
+    if (bubbleProgressLabel) {
+      bubbleProgressLabel.textContent = parts.join(' · ');
+      bubbleProgressLabel.hidden = parts.length === 0;
+    }
+  }
+
+  /** T-63：应用主进程推送的任务状态（无任务为 null） */
+  function applyTask(task) {
+    currentTask =
+      task && typeof task === 'object' ? { ...task } : null;
     applyState(currentState, localText, true);
   }
 
@@ -220,6 +280,9 @@
   async function pollStatus() {
     try {
       const status = await window.petAPI.petOverlay.getStatus();
+      if (status && typeof status.task !== 'undefined') {
+        applyTask(status.task);
+      }
       if (status && typeof status.state === 'string') {
         applyState(status.state, status.text || '');
       }
@@ -336,6 +399,9 @@
     void loadSkin();
   });
   window.petAPI.petOverlay.onStatusUpdated((status) => {
+    if (status && typeof status.task !== 'undefined') {
+      applyTask(status.task);
+    }
     if (status && typeof status.state === 'string') {
       applyState(status.state, status.text || '');
     }
@@ -371,6 +437,7 @@
     getMoodDrive: () => pet.dataset.moodDrive,
     getMood: () => (mood ? { ...mood } : null),
     getState: () => currentState,
+    getTask: () => (currentTask ? { ...currentTask } : null),
     STATE_ROWS: { ...STATE_ROWS },
     MOOD_ROWS: { ...MOOD_ROWS }
   };
