@@ -269,6 +269,61 @@ app.whenReady().then(() => {
         fail('静态皮肤兴奋时未显示表情气泡');
       }
       console.log('[smoke] T-58 情绪/动画联动端到端通过');
+      // T-57：气泡队列/时长/开关端到端（真实 IPC）
+      const queueState = await overlayWin.webContents.executeJavaScript(`(async () => {
+        const api = window.petAPI.petOverlay;
+        const bubble = document.getElementById('overlay-bubble');
+        await window.petAPI.settings.set({
+          petOverlayBubbleSeconds: 3,
+          petOverlayBubbleEnabled: true
+        });
+        // 等待聊天测试的状态链路稳定（working→ready），避免晚到事件抢占队列
+        for (let i = 0; i < 40; i += 1) {
+          const s = await api.getStatus();
+          if (s && (s.state === 'ready' || s.state === 'failed')) {
+            break;
+          }
+          await new Promise((resolve) => setTimeout(resolve, 150));
+        }
+        // 复位聊天测试残留状态（避免 ready 抢占队列）
+        await api.setStatus({ state: 'idle' });
+        const pushed = await api.pushBubble({
+          state: 'attention',
+          text: 'bubble-57'
+        });
+        await new Promise((resolve) => setTimeout(resolve, 1200));
+        const during = await api.getStatus();
+        const visibleDuring = Boolean(
+          bubble && !bubble.hidden && bubble.textContent.indexOf('bubble-57') !== -1
+        );
+        await new Promise((resolve) => setTimeout(resolve, 3400));
+        const after = await api.getStatus();
+        await window.petAPI.settings.set({ petOverlayBubbleEnabled: false });
+        await api.pushBubble({ state: 'attention', text: 'hidden-57' });
+        await new Promise((resolve) => setTimeout(resolve, 1300));
+        const hiddenAfterDisable = Boolean(bubble && bubble.hidden);
+        await window.petAPI.settings.set({ petOverlayBubbleEnabled: true });
+        return {
+          pushedState: pushed && pushed.state,
+          duringState: during && during.state,
+          visibleDuring,
+          afterState: after && after.state,
+          hiddenAfterDisable
+        };
+      })()`);
+      if (queueState.pushedState !== 'attention' || queueState.duringState !== 'attention') {
+        fail(`pushBubble 状态异常: ${JSON.stringify(queueState)}`);
+      }
+      if (!queueState.visibleDuring) {
+        fail('气泡未显示 pushBubble 文案');
+      }
+      if (queueState.afterState !== 'idle') {
+        fail(`气泡未按 petOverlayBubbleSeconds 回落 idle: ${JSON.stringify(queueState)}`);
+      }
+      if (!queueState.hiddenAfterDisable) {
+        fail('petOverlayBubbleEnabled=false 时气泡未隐藏');
+      }
+      console.log('[smoke] T-57 状态机/气泡队列端到端通过');
       overlayWin.destroy();
       app.quit();
     } catch (error) {

@@ -649,11 +649,29 @@ if (SKIP_BOOTSTRAP || !app || typeof app.requestSingleInstanceLock !== 'function
       },
       onTrigger: () => {
         const win = mainWindow;
-        if (!win || win.isDestroyed() || !win.isVisible() || !win.webContents) {
-          return false; // 窗口隐藏/不可用时不算触发，等待下一次检查
+        const winReady = Boolean(
+          win && !win.isDestroyed() && win.isVisible() && win.webContents
+        );
+        let handled = false;
+        if (winReady) {
+          win.webContents.send(ipc.CHANNELS.idleEvent, { at: Date.now() });
+          handled = true;
         }
-        win.webContents.send(ipc.CHANNELS.idleEvent, { at: Date.now() });
-        return true;
+        // T-57：提醒透出到浮窗（主窗口隐藏也可见；受 petOverlayReminders 控制）
+        let remindersEnabled = true;
+        try {
+          const settings = ipc.getSettings();
+          remindersEnabled = settings
+            ? settings.petOverlayReminders !== false
+            : true;
+        } catch (_error) {
+          // 设置读取失败按开启处理
+        }
+        if (remindersEnabled && petOverlayApi?.isVisible?.()) {
+          petOverlayApi.pushBubble({ state: 'attention' });
+          handled = true;
+        }
+        return handled;
       }
     });
     ipc.onActivity(() => idleMonitor.markActivity());

@@ -39,6 +39,7 @@ const CHANNELS = {
   paymentMockCallback: 'payment:mock-callback', // T-41：沙箱模拟回调（仅沙箱可用）
   petGetStatus: 'pet:get-status', // T-55：宠物浮窗状态读取
   petSetStatus: 'pet:set-status', // T-55：宠物浮窗状态上报（聊天页驱动）
+  petPushBubble: 'pet:push-bubble', // T-57：提醒/互动气泡入队
   petGetSkin: 'pet:get-skin', // T-55：宠物浮窗当前皮肤
   petToggleOverlay: 'pet:toggle-overlay', // T-55：显示/隐藏宠物浮窗
   petSetEnabled: 'pet:set-enabled', // T-55：按开关持久化并同步浮窗显示
@@ -138,6 +139,7 @@ contextBridge.exposeInMainWorld('petAPI', {
   petOverlay: {
     getStatus: () => ipcRenderer.invoke(CHANNELS.petGetStatus), // T-55
     setStatus: (payload) => ipcRenderer.invoke(CHANNELS.petSetStatus, payload), // T-55
+    pushBubble: (payload) => ipcRenderer.invoke(CHANNELS.petPushBubble, payload), // T-57
     getSkin: () => ipcRenderer.invoke(CHANNELS.petGetSkin), // T-55
     toggle: () => ipcRenderer.invoke(CHANNELS.petToggleOverlay), // T-55
     setEnabled: (payload) => ipcRenderer.invoke(CHANNELS.petSetEnabled, payload), // T-55

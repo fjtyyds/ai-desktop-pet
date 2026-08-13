@@ -10,7 +10,7 @@
  * - 普通皮肤：情绪兴奋时轻微浮动 + 表情气泡（状态气泡不受影响）；
  * - 当前皮肤为 Codex 宠物包（spritesheet.webp）时按状态切换动画行；
  * - 普通皮肤显示静态角色图；
- * - ready/failed 气泡 6 秒后自动回到 idle。
+ * - T-57：气泡队列与时长由主进程推进；petOverlayBubbleEnabled=false 时隐藏气泡。
  * - 冒烟测试钩子 window.__overlayTest（注入假 mood/状态/皮肤，验证行切换）。
  */
 (async function initOverlay() {
@@ -21,10 +21,25 @@
   const tuckBtn = document.getElementById('overlay-tuck');
 
   // T-58：Codex 宠物包 8 列×9 行动画行映射表
-  const STATE_ROWS = { idle: 0, waiting: 6, working: 7, ready: 8, failed: 5 };
+  const STATE_ROWS = {
+    idle: 0,
+    speaking: 3,
+    attention: 6,
+    waiting: 6,
+    working: 7,
+    ready: 8,
+    failed: 5
+  };
   const MOOD_ROWS = { excited: 4, happy: 3, neutral: 0, sad: 5 };
   // 工作状态优先于情绪驱动动画行；其余状态（如 idle）由情绪决定
-  const STATUS_ROW_OVERRIDES = { waiting: 6, working: 7, ready: 8, failed: 5 };
+  const STATUS_ROW_OVERRIDES = {
+    speaking: 3,
+    attention: 6,
+    waiting: 6,
+    working: 7,
+    ready: 8,
+    failed: 5
+  };
   const MOOD_POLL_MS = 3000;
   const MOOD_EMOJI = { excited: '🥳' };
   const MOOD_LOCALE_KEY = { excited: 'moodExcited' };
@@ -35,7 +50,7 @@
   let localText = '';
   let mood = null;
   let reduceMotion = false;
-  let revertTimer = null;
+  let bubbleEnabled = true;
   let moodPolling = false;
   let moodBubble = null;
 
@@ -113,6 +128,7 @@
     try {
       const settings = await window.petAPI.settings.get();
       applyReduceMotion(settings && settings.reduceMotion === true);
+      bubbleEnabled = settings ? settings.petOverlayBubbleEnabled !== false : true;
       const language =
         settings && typeof settings.language === 'string'
           ? settings.language
@@ -174,13 +190,13 @@
     pet.dataset.state = nextState;
     const message = localText || t(statusKey(nextState));
     bubble.textContent = message;
-    bubble.hidden = !message;
-    clearTimeout(revertTimer);
-    if (nextState === 'ready' || nextState === 'failed') {
-      revertTimer = setTimeout(() => {
-        applyState('idle', '', true);
-      }, 6000);
-    }
+    bubble.hidden = !message || !bubbleEnabled;
+  }
+
+  /** T-57：气泡显示开关实时同步（主进程 getStatus 携带） */
+  function applyBubbleEnabled(enabled) {
+    bubbleEnabled = Boolean(enabled);
+    applyState(currentState, localText, true);
   }
 
   async function pollMood() {
@@ -203,6 +219,9 @@
       const status = await window.petAPI.petOverlay.getStatus();
       if (status && typeof status.state === 'string') {
         applyState(status.state, status.text || '');
+      }
+      if (status && typeof status.bubbleEnabled === 'boolean') {
+        applyBubbleEnabled(status.bubbleEnabled);
       }
     } catch (_error) {
       // 主进程未就绪时保持当前状态
@@ -249,6 +268,10 @@
     applyState: (state, text) => applyState(state, text, true),
     applySkin: (nextSkin) => applySkin(nextSkin),
     setReduceMotion: (reduced) => applyReduceMotion(Boolean(reduced)),
+    setBubbleEnabled: (enabled) => {
+      bubbleEnabled = Boolean(enabled);
+      applyState(currentState, localText, true);
+    },
     getRow: () => pet.dataset.row,
     getMoodDrive: () => pet.dataset.moodDrive,
     getMood: () => (mood ? { ...mood } : null),

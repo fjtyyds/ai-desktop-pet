@@ -1498,6 +1498,8 @@
       }
     }
     updateSpeakButtonState(button, false);
+    // T-57：朗读结束/失败恢复 idle
+    reportPetStatus('idle');
   }
 
   function stopSpeaking() {
@@ -1523,6 +1525,8 @@
     if (button) {
       updateSpeakButtonState(button, false);
     }
+    // T-57：停止朗读恢复 idle
+    reportPetStatus('idle');
   }
 
   /** T-34：petAPI.tts.speak 是否可用（preload 已暴露即视为可用） */
@@ -1549,6 +1553,8 @@
     if (!text) {
       return;
     }
+    // T-57：TTS 朗读中上报浮窗 speaking 状态
+    reportPetStatus('speaking');
     // T-33：专属语音包开启时按当前生效人格应用 voice/pitch/rate；关闭时回退系统默认
     const packEnabled = currentSettings.ttsVoicePackEnabled !== false;
     const pack = packEnabled ? resolveTtsVoicePack() : null;

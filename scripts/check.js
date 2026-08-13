@@ -3696,5 +3696,61 @@ pass('T-48 设置页三段式布局、既有元素 id 与双语文案断言通�
   }
   pass('T-58 情绪与动画联动静态断言通过');
 
+  // T-57：状态机与气泡队列（speaking/attention + 队列 + 提醒透出，ADR-045）
+  if (
+    !petOverlaySource.includes("'speaking'") ||
+    !petOverlaySource.includes("'attention'")
+  ) {
+    fail('pet-overlay.js 未扩展 speaking/attention 状态');
+  }
+  if (!petOverlaySource.includes('MAX_BUBBLE_QUEUE')) {
+    fail('pet-overlay.js 缺少气泡队列上限');
+  }
+  if (!petOverlaySource.includes('pet:push-bubble')) {
+    fail('pet-overlay.js 缺少 pet:push-bubble 通道');
+  }
+  if (
+    !preloadSource.includes('pet:push-bubble') ||
+    !preloadSource.includes('pushBubble')
+  ) {
+    fail('preload.js 缺少 pushBubble 暴露');
+  }
+  if (
+    !overlayJsSource.includes('speaking: 3') ||
+    !overlayJsSource.includes('attention: 6')
+  ) {
+    fail('overlay.js 缺少 speaking/attention 动画行映射');
+  }
+  if (!overlayJsSource.includes('bubbleEnabled')) {
+    fail('overlay.js 未接入气泡显示开关');
+  }
+  if (!mainSource.includes('petOverlayApi.pushBubble')) {
+    fail('main.js 未把空闲互动透出到浮窗');
+  }
+  if (
+    !rendererChatSource.includes("reportPetStatus('speaking')") ||
+    !rendererChatSource.includes("reportPetStatus('idle')")
+  ) {
+    fail('chat.js 缺少 TTS speaking/idle 状态上报');
+  }
+  for (const localeFile of ['zh-CN', 'en']) {
+    const locale = JSON.parse(
+      fs.readFileSync(
+        path.join(root, 'src', 'shared', 'locales', `${localeFile}.json`),
+        'utf8'
+      )
+    );
+    for (const key of ['statusSpeaking', 'statusAttention']) {
+      if (
+        !locale.overlay ||
+        typeof locale.overlay[key] !== 'string' ||
+        !locale.overlay[key].trim()
+      ) {
+        fail(`${localeFile}.json 缺少 overlay.${key} 文案`);
+      }
+    }
+  }
+  pass('T-57 状态机与气泡队列静态断言通过');
+
   console.log('[check] 全部通过');
 })();

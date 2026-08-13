@@ -6,11 +6,16 @@
  * 一个独立的小型透明置顶窗口，仅展示当前皮肤角色与工作状态气泡；
  * 主聊天窗口隐藏/最小化时仍可悬浮在桌面，状态由聊天渲染层上报。
  *
- * 状态契约：
- * - idle   等待聊天（默认）
- * - working LLM 回复中
- * - ready  回复完成
- * - failed 回复出错
+ * 状态契约（T-57，ADR-045）：
+ * - idle      等待聊天（默认）
+ * - working   LLM 回复中
+ * - ready     回复完成
+ * - failed    回复出错
+ * - speaking  TTS 朗读中
+ * - attention 提醒/空闲互动（可排队）
+ *
+ * 气泡队列：pushBubble 最多排队 3 条，按 petOverlayBubbleSeconds（默认 6s）
+ * 逐条轮播；setStatus 为即时状态，直接替换当前显示。
  *
  * 浮窗位置持久化到 settings.petOverlayBounds；显示开关为
  * settings.petOverlayEnabled（默认关闭，由设置页/托盘/`/pet` 命令控制）。
@@ -26,6 +31,7 @@ const skinStore = require('./skin-store');
 const PET_CHANNELS = {
   getStatus: 'pet:get-status',
   setStatus: 'pet:set-status',
+  pushBubble: 'pet:push-bubble',
   getSkin: 'pet:get-skin',
   toggleOverlay: 'pet:toggle-overlay',
   setEnabled: 'pet:set-enabled',
@@ -36,8 +42,19 @@ const PET_CHANNELS = {
 
 const OVERLAY_WIDTH = 240;
 const OVERLAY_HEIGHT = 320;
-const VALID_STATES = new Set(['idle', 'working', 'ready', 'failed']);
+const VALID_STATES = new Set([
+  'idle',
+  'working',
+  'ready',
+  'failed',
+  'speaking',
+  'attention'
+]);
 const STATUS_TEXT_MAX = 80;
+const MAX_BUBBLE_QUEUE = 3;
+const BUBBLE_SECONDS_FALLBACK = 6;
+const BUBBLE_SECONDS_MIN = 3;
+const BUBBLE_SECONDS_MAX = 20;
 
 /**
  * 创建宠物浮窗实例。
@@ -48,7 +65,8 @@ const STATUS_TEXT_MAX = 80;
 function createPetOverlay(options = {}) {
   const { getSettings, getTray } = options;
   let win = null;
-  let state = { state: 'idle', text: '', at: 0 };
+  let queue = [{ state: 'idle', text: '', at: 0 }];
+  let bubbleTimer = null;
   let settingsWriter = null;
   let skinCache = null;
   let registered = false;
@@ -129,30 +147,120 @@ function createPetOverlay(options = {}) {
     }
   }
 
+  /** 气泡时长（秒）：读设置并夹取 3~20 */
+  function bubbleSeconds() {
+    try {
+      const settings = getSettings();
+      const value = Number(
+        settings && settings.petOverlayBubbleSeconds
+          ? settings.petOverlayBubbleSeconds
+          : BUBBLE_SECONDS_FALLBACK
+      );
+      return Number.isFinite(value)
+        ? Math.min(BUBBLE_SECONDS_MAX, Math.max(BUBBLE_SECONDS_MIN, value))
+        : BUBBLE_SECONDS_FALLBACK;
+    } catch (_error) {
+      return BUBBLE_SECONDS_FALLBACK;
+    }
+  }
+
+  function bubbleEnabledFromSettings() {
+    try {
+      const settings = getSettings();
+      return settings ? settings.petOverlayBubbleEnabled !== false : true;
+    } catch (_error) {
+      return true;
+    }
+  }
+
+  function currentStatus() {
+    const base =
+      queue.length > 0 ? { ...queue[0] } : { state: 'idle', text: '', at: 0 };
+    return { ...base, bubbleEnabled: bubbleEnabledFromSettings() };
+  }
+
+  function clearBubbleTimer() {
+    if (bubbleTimer) {
+      clearTimeout(bubbleTimer);
+      bubbleTimer = null;
+    }
+  }
+
+  /** 队列前进：弹出当前条目，空则回 idle；非空继续定时 */
+  function advanceQueue() {
+    clearBubbleTimer();
+    queue.shift();
+    if (queue.length === 0) {
+      queue = [{ state: 'idle', text: '', at: Date.now() }];
+      return;
+    }
+    bubbleTimer = setTimeout(advanceQueue, bubbleSeconds() * 1000);
+  }
+
+  /** 即时状态：直接替换当前显示（聊天/TTS 驱动），并调度 ready/failed 回落 */
+  function replaceStatus(payload) {
+    const nextState =
+      payload && VALID_STATES.has(payload.state) ? payload.state : 'idle';
+    const next = {
+      state: nextState,
+      text:
+        payload && typeof payload.text === 'string'
+          ? payload.text.slice(0, STATUS_TEXT_MAX)
+          : '',
+      at: Date.now()
+    };
+    clearBubbleTimer();
+    queue = [next];
+    if (nextState === 'ready' || nextState === 'failed') {
+      bubbleTimer = setTimeout(advanceQueue, bubbleSeconds() * 1000);
+    }
+    return { ...next };
+  }
+
+  /** 提醒/互动气泡：入队（最多 3 条），逐条轮播 */
+  function pushStatus(payload) {
+    const nextState =
+      payload && VALID_STATES.has(payload.state) ? payload.state : 'attention';
+    const next = {
+      state: nextState,
+      text:
+        payload && typeof payload.text === 'string'
+          ? payload.text.slice(0, STATUS_TEXT_MAX)
+          : '',
+      at: Date.now()
+    };
+    // 占位 idle（无文案）直接替换，避免队列出现“先 idle 后 attention”的跳变
+    const isIdlePlaceholder =
+      queue.length === 1 && queue[0].state === 'idle' && !queue[0].text;
+    if (isIdlePlaceholder) {
+      queue = [next];
+      bubbleTimer = setTimeout(advanceQueue, bubbleSeconds() * 1000);
+    } else {
+      queue.push(next);
+      if (queue.length > MAX_BUBBLE_QUEUE) {
+        queue.splice(0, queue.length - MAX_BUBBLE_QUEUE);
+      }
+      if (!bubbleTimer) {
+        bubbleTimer = setTimeout(advanceQueue, bubbleSeconds() * 1000);
+      }
+    }
+    return { ...next };
+  }
+
   function registerIpc() {
     if (registered) {
       return;
     }
     registered = true;
 
-    ipcMain.handle(PET_CHANNELS.getStatus, () => ({ ...state }));
+    ipcMain.handle(PET_CHANNELS.getStatus, () => currentStatus());
 
     ipcMain.handle(PET_CHANNELS.setStatus, (_event, payload) => {
-      if (!payload || typeof payload !== 'object') {
-        return { ...state };
-      }
-      const nextState = VALID_STATES.has(payload.state)
-        ? payload.state
-        : state.state;
-      state = {
-        state: nextState,
-        text:
-          typeof payload.text === 'string'
-            ? payload.text.slice(0, STATUS_TEXT_MAX)
-            : '',
-        at: Date.now()
-      };
-      return { ...state };
+      return replaceStatus(payload);
+    });
+
+    ipcMain.handle(PET_CHANNELS.pushBubble, (_event, payload) => {
+      return pushStatus(payload);
     });
 
     ipcMain.handle(PET_CHANNELS.getSkin, () => {
@@ -292,6 +400,7 @@ function createPetOverlay(options = {}) {
   }
 
   function dispose() {
+    clearBubbleTimer();
     if (win && !win.isDestroyed()) {
       win.destroy();
     }
@@ -309,19 +418,10 @@ function createPetOverlay(options = {}) {
     refresh,
     isVisible,
     setStatus: (payload) => {
-      if (payload && VALID_STATES.has(payload.state)) {
-        state = {
-          state: payload.state,
-          text:
-            typeof payload.text === 'string'
-              ? payload.text.slice(0, STATUS_TEXT_MAX)
-              : '',
-          at: Date.now()
-        };
-      }
-      return { ...state };
+      return replaceStatus(payload);
     },
-    getState: () => ({ ...state }),
+    pushBubble: (payload) => pushStatus(payload),
+    getState: () => currentStatus(),
     dispose
   };
 }

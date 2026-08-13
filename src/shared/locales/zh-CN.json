@@ -25,6 +25,8 @@
     "statusReady": "回复完成",
     "statusFailed": "刚才出错了",
     "statusWaiting": "等你输入…",
+    "statusSpeaking": "正在说话…",
+    "statusAttention": "快来陪我聊聊",
     "moodExcited": "今天心情超好！"
   },
   "idle": {

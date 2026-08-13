@@ -25,6 +25,8 @@
     "statusReady": "Reply ready",
     "statusFailed": "Something went wrong",
     "statusWaiting": "Waiting for you…",
+    "statusSpeaking": "Speaking…",
+    "statusAttention": "Come chat with me",
     "moodExcited": "Feeling great today!"
   },
   "idle": {
