@@ -200,6 +200,75 @@ app.whenReady().then(() => {
         fail('浮窗气泡未显示工作状态文案');
       }
       console.log('[smoke] 宠物浮窗状态/皮肤/气泡端到端通过');
+      // T-58：情绪/动画行联动 + reduceMotion 同步 + 静态皮肤表情气泡端到端
+      const moodState = await overlayWin.webContents.executeJavaScript(`(async () => {
+        const t = window.__overlayTest;
+        if (!t) return { hasHook: false };
+        const pet = document.getElementById('overlay-pet');
+        t.applyState('idle', '', true);
+        // 默认皮肤可能是静态皮肤；先注入合成图集，验证情绪/状态行映射
+        t.applySkin({
+          spritesheetDataUrl: 'data:image/webp;base64,AA==',
+          atlas: { cols: 8, rows: 9 }
+        });
+        t.applyMood({ valence: 92, intensity: 0.85, label: '兴奋' });
+        const excitedRow = pet.dataset.row;
+        t.applyMood({ valence: 80, intensity: 0.4, label: '开心' });
+        const happyRow = pet.dataset.row;
+        t.applyMood({ valence: 52, intensity: 0.35, label: '平静' });
+        const neutralRow = pet.dataset.row;
+        t.applyMood({ valence: 20, intensity: 0.25, label: '低落' });
+        const sadRow = pet.dataset.row;
+        t.applyState('waiting', '', true);
+        const waitingRow = pet.dataset.row;
+        t.applyState('working', '', true);
+        const workingRow = pet.dataset.row;
+        t.applyState('ready', '', true);
+        const readyRow = pet.dataset.row;
+        t.setReduceMotion(true);
+        const reducedMotion = pet.dataset.reduceMotion === '1';
+        t.applySkin({ roleAssets: { idle: 'data:image/png;base64,AA==' } });
+        t.applyMood({ valence: 92, intensity: 0.85, label: '兴奋' });
+        const moodBubble = document.getElementById('overlay-mood');
+        const moodBubbleVisible = Boolean(
+          moodBubble && !moodBubble.hidden && moodBubble.textContent.length > 0
+        );
+        return {
+          hasHook: true,
+          excitedRow,
+          happyRow,
+          neutralRow,
+          sadRow,
+          waitingRow,
+          workingRow,
+          readyRow,
+          reducedMotion,
+          moodBubbleVisible
+        };
+      })()`);
+      if (!moodState.hasHook) {
+        fail('overlay.js 未暴露 T-58 冒烟测试钩子 window.__overlayTest');
+      }
+      if (moodState.excitedRow !== '4' || moodState.happyRow !== '3') {
+        fail(`情绪兴奋/开心行切换异常: ${JSON.stringify(moodState)}`);
+      }
+      if (moodState.neutralRow !== '0' || moodState.sadRow !== '5') {
+        fail(`情绪中性/低落行切换异常: ${JSON.stringify(moodState)}`);
+      }
+      if (
+        moodState.waitingRow !== '6' ||
+        moodState.workingRow !== '7' ||
+        moodState.readyRow !== '8'
+      ) {
+        fail(`状态行映射异常: ${JSON.stringify(moodState)}`);
+      }
+      if (!moodState.reducedMotion) {
+        fail('reduceMotion 未同步到浮窗');
+      }
+      if (!moodState.moodBubbleVisible) {
+        fail('静态皮肤兴奋时未显示表情气泡');
+      }
+      console.log('[smoke] T-58 情绪/动画联动端到端通过');
       overlayWin.destroy();
       app.quit();
     } catch (error) {

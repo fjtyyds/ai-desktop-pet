@@ -3640,5 +3640,61 @@ pass('T-48 设置页三段式布局、既有元素 id 与双语文案断言通�
     fail(`T-55 宠物包运行时检查异常: ${error && error.message ? error.message : error}`);
   }
 
+  // T-58：情绪与动画联动（mood → waving/jumping + reduceMotion 同步 + waiting 行）
+  for (const token of [
+    'MOOD_POLL_MS',
+    'mood.get',
+    '__overlayTest',
+    'reduceMotion'
+  ]) {
+    if (!overlayJsSource.includes(token)) {
+      fail(`overlay.js 缺少 T-58 接线：${token}`);
+    }
+  }
+  if (!/MOOD_POLL_MS\s*=\s*3000/.test(overlayJsSource)) {
+    fail('overlay.js 情绪轮询间隔不是 3000ms');
+  }
+  for (const [token, label] of [
+    [/waiting:\s*6/, 'waiting 行 6'],
+    [/working:\s*7/, 'working 行 7'],
+    [/ready:\s*8/, 'ready 行 8'],
+    [/excited:\s*4/, 'excited 行 4'],
+    [/happy:\s*3/, 'happy 行 3'],
+    [/sad:\s*5/, 'sad 行 5']
+  ]) {
+    if (!token.test(overlayJsSource)) {
+      fail(`overlay.js 行映射表缺少 ${label}`);
+    }
+  }
+  for (const token of [
+    'pet-row-waving',
+    'pet-row-jumping',
+    'pet-row-waiting',
+    'pet-row-sad',
+    'data-reduce-motion'
+  ]) {
+    if (!overlayCssSource.includes(token)) {
+      fail(`overlay.css 缺少 T-58 动画/规则：${token}`);
+    }
+  }
+  for (const localeFile of ['zh-CN', 'en']) {
+    const locale = JSON.parse(
+      fs.readFileSync(
+        path.join(root, 'src', 'shared', 'locales', `${localeFile}.json`),
+        'utf8'
+      )
+    );
+    for (const key of ['moodExcited', 'statusWaiting']) {
+      if (
+        !locale.overlay ||
+        typeof locale.overlay[key] !== 'string' ||
+        !locale.overlay[key].trim()
+      ) {
+        fail(`${localeFile}.json 缺少 overlay.${key} 文案`);
+      }
+    }
+  }
+  pass('T-58 情绪与动画联动静态断言通过');
+
   console.log('[check] 全部通过');
 })();

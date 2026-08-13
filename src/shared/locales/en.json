@@ -23,7 +23,9 @@
     "statusIdle": "Ready to chat",
     "statusWorking": "Thinking…",
     "statusReady": "Reply ready",
-    "statusFailed": "Something went wrong"
+    "statusFailed": "Something went wrong",
+    "statusWaiting": "Waiting for you…",
+    "moodExcited": "Feeling great today!"
   },
   "idle": {
     "phrases": [

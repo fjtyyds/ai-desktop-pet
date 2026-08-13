@@ -23,7 +23,9 @@
     "statusIdle": "等你聊天",
     "statusWorking": "正在思考…",
     "statusReady": "回复完成",
-    "statusFailed": "刚才出错了"
+    "statusFailed": "刚才出错了",
+    "statusWaiting": "等你输入…",
+    "moodExcited": "今天心情超好！"
   },
   "idle": {
     "phrases": [
