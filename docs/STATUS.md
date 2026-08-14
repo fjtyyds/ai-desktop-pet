@@ -1,12 +1,12 @@
 # 项目状态
 
-- 更新时间：2026-08-13
-- 当前阶段：M5.3 任务级进度扩展——导出对话 / TTS 朗读 / 外部工具任务源（ADR-048）
-- 当前任务：T-64 验收合并完成（ca782a8）并同步最新版；等待用户拍板后续方向
-- 最近完成：T-64 验收合并（ca782a8，worker 019ffb9a）：runWithTask 通用包裹器接入 history-export / tts-speak 任务气泡；双语文案 7 key；worktree 与 main check/smoke 全绿
-- 下一步：向用户汇报 T-64 结论；等待用户拍板后续方向（宠物包在线商店、任务级进度继续扩展、目检补项、GitHub Release 授权等）
-- 阻塞：无（商店/签名资金冻结仍按 ADR-041 处理；push 按 ADR-034/041 待用户确认）
-- 最新版：`E:\codex\AI桌宠最新版`（scripts/sync-latest.ps1 自动同步，当前 0.1.0 @ ca782a8，ADR-042/043）
+- 更新时间：2026-08-14
+- 当前阶段：M5.4 Codex 真实状态绑定——宠物浮窗显示真实 Codex 工作状态（ADR-050/051）
+- 当前任务：T-65 验收合并完成（2eabfbd）并同步最新版；main 已推送 origin
+- 最近完成：T-65 验收合并（2eabfbd，总工直接实施）：codex-status.js 纯 Node 探针（rollout 元数据→working/waiting/attention，白名单工具标签，隐私只读）+ main 接线 + waiting 状态 + codexStatusEnabled 开关 + 双语文案 + check 五场景/优先级断言 + smoke 端到端；worktree 与 main check/smoke 全绿
+- 下一步：同步最新版（sync-latest）→ 用户 dev 目检（浮窗显示 Codex 状态、设置开关）；后续方向待用户拍板（目检补项、发布授权等）
+- 阻塞：无（商店/签名资金冻结仍按 ADR-041 处理；push 已按用户“自己做就行”授权执行）
+- 最新版：`E:\codex\AI桌宠最新版`（scripts/sync-latest.ps1 自动同步，当前 0.1.0 @ ca782a8，ADR-042/043；T-65 同步进行中）
 - 交接提示：新会话先读 `AGENTS.md` → `PLAN.md` → `docs/STATUS.md` → `docs/reports/2026-08-10-工作对接方案.md` → 自己的任务卡（docs/tasks/T-xx.md）
 
 ## 项目内容目录约定记录（2026-08-14，ADR-049）
@@ -15,6 +15,17 @@
 - 处置：历史遗留的 7 个已合并 worktree（AI桌宠-m4-newuser、AI桌宠-m5x-mood/perf/settings/skin/status/tasksrc）已全部移除，分支保留；E:\codex 下仅剩项目本体与用户指定的最新版分发目录（ADR-042）。
 - 新约定：任务工作树统一建在 `E:\codex\AI桌宠\.worktrees\<任务分支>`（git worktree 实测支持嵌套；.worktrees/ 已 gitignore），验收合并后清理。
 - 例外：`E:\codex\AI桌宠最新版` 为用户指定的分发目录，不属于任务内容。
+
+## T-65 建卡与验收合并记录（2026-08-14，ADR-050/051）
+
+- 背景：用户反馈“实现和 Codex 桌面宠物相同效果”未完成；本线程上岗后用户授权“自己做就行”并新增基本原则 ADR-050（任务不得表面迎合式完成，必须批判性自检、考虑真实用户体验）。总工调研 Codex 真实信号（进程可枚举、`~/.codex/sessions/**/rollout-*.jsonl` 仅活动时写入且含 task_started/function_call/token_count 元数据）后，自主选定差距方案 A（绑定真实 Codex 工作状态）。
+- 实施（总工直接实施，分支 codex/m5x-codex-status，worktree E:\codex\AI桌宠\.worktrees\codex-m5x-codex-status）：
+  - 新增 `src/main/codex-status.js`（纯 Node，无 electron 依赖）：findRolloutFiles/readTail（≤64KB）/parseTailMeta/detectCodexStatus/createCodexStatusProbe；25s 内有写入→working+工具标签（shell_command→执行命令、apply_patch→编辑文件、检索→检索资料、其他→处理任务）；静默且回合未结束≤5 分钟→waiting；approval/review/permission→attention；无会话/超时→不驱动。
+  - `main.js` 创建并启动探针（formatText 双语文案，退出 dispose）；`pet-overlay.js` VALID_STATES 增 `waiting`（渲染层已有行6 映射）；`store.js` codexStatusEnabled（默认 true）白名单+清洗；设置页“外观”组开关；zh/en 共 10 个文案 key；check.js 静态+五场景+探针优先级断言；smoke.js 端到端（临时 CODEX_HOME 合成 rollout → 浮窗 working）。
+  - 契约冻结：bcbe551（ADR-050/051 + contracts/API/T-65 卡）；实施合并：2eabfbd（fast-forward）。
+- 验证：worktree 与 main `npm run check`、`npm run smoke` 全绿（含 T-65 断言与 T-55~T-64 全回归）；外部 CU 探针 pet-overlay.js 改动 stash 保护后原样恢复（23 行未提交改动保留）。
+- 批判性自检（ADR-050）：信号真实（rollout 元数据实测后实现）；无假进度/假状态；waiting/review 有明确边界与超时回落；聊天/任务/提醒优先不被抢占；隐私只读元数据；残余风险：旧会话静默 ≤5 分钟显示等待输入、review 为 best-effort 关键词、多会话取最新 rollout、5s 轮询粒度。
+- 后续：sync-latest 同步最新版；用户 `npm run dev` 目检（Codex 运行时浮窗气泡与动画、设置开关、聊天/任务不被抢占）。
 
 ## ADR-047 总工交接项目外事故记录（2026-08-13）
 

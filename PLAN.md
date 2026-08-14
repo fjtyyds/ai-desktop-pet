@@ -261,7 +261,28 @@
 
 - [x] T-64 任务级进度扩展（ca782a8，已合并 main）
 
+**M5.4：Codex 真实状态绑定——已完成（2026-08-14）**
+
+目标：宠物浮窗像 Codex 官方 Pets 一样实时显示 Codex 真实工作状态（运行中/等待输入/需要审阅），免切换标签页；状态来自真实 rollout 元数据，不做表面装饰或假进度（ADR-050/051）。
+
+任务卡：
+
+- `docs/tasks/T-65.md` — 宠物浮窗绑定真实 Codex 工作状态（codex/m5x-codex-status）
+
+验收标准：
+
+1. 状态信号真实：`$CODEX_HOME/sessions/**/rollout-*.jsonl` 元数据（25s 内写入→working+工具标签；静默且回合未结束≤5 分钟→waiting；approval/review/permission→attention；否则不驱动）。
+2. 隐私：只解析 type/name/status/timestamp，尾部 ≤64KB，不读取会话正文；纯 Node 无 electron 依赖。
+3. 优先级：不覆盖任务气泡与聊天 working/speaking/attention；浮窗隐藏/开关关闭不轮询。
+4. worktree 与 main `npm run check`、`npm run smoke` 全绿（含 T-65 五场景+优先级+端到端）；sync-latest 同步最新版。
+
+任务清单：
+
+- [x] T-65 宠物浮窗绑定真实 Codex 工作状态（2eabfbd，已合并 main）
+
 ## Progress
+
+- 2026-08-14：用户授权“自己做就行”并新增基本原则（ADR-050：任务不得表面迎合式完成，必须批判性自检并考虑真实用户体验）；总工自主选定差距方案 A（绑定真实 Codex 工作状态），实施 T-65（ADR-051）：新增 src/main/codex-status.js 纯 Node 探针（rollout 元数据→working/waiting/attention，白名单工具标签，只读尾部 ≤64KB）+ main.js 接线 + pet-overlay VALID_STATES 增 waiting + store codexStatusEnabled（默认 true）+ 设置页开关 + 双语文案 + check 五场景/优先级断言 + smoke 端到端；worktree 与 main check/smoke 全绿；fast-forward 合并 2eabfbd；外部 CU 探针 pet-overlay 改动 stash 保护并原样恢复；main 已推送 origin（bcbe551+2eabfbd）。
 
 - 2026-08-14：ADR-049 落盘——所有项目内容必须在 E:\codex\AI桌宠 内：任务工作树统一改为项目内 `.worktrees/<任务分支>`（git worktree 实测可嵌套，.worktrees/ 已 gitignore）；历史遗留 7 个 E:\codex\AI桌宠-m* worktree（已合并）全部移除，分支保留，E:\codex 根目录恢复只剩项目本体与用户指定的最新版分发目录。待用户确认宠物效果缺口后继续闭环。
 
@@ -415,6 +436,8 @@
 - ADR-047：总工交接必须保持项目上下文——`--project` 必填，禁止项目外总工（2026-08-13，误建线程事故复盘）。
 - ADR-048：任务级进度气泡多源扩展（2026-08-13，T-64）。
 - ADR-049：所有项目内容必须位于 E:\codex\AI桌宠 内——任务工作树统一到项目内 .worktrees/（2026-08-14）。
+- ADR-050：任务完成必须批判性自检、贴合真实用户体验（2026-08-14）。
+- ADR-051：宠物浮窗绑定真实 Codex 工作状态（2026-08-14，T-65）。
 
 详见 `docs/DECISIONS.md`。
 
