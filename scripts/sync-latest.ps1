@@ -81,5 +81,25 @@ if (Test-Path -LiteralPath $template) {
   )
 }
 
+# ADR-055: replace the desktop shortcut with the latest runnable build.
+$petName = 'AI' + [string][char]0x684C + [string][char]0x5BA0
+$shortcutName = $petName + '.lnk'
+$exeName = $petName + '.exe'
+$desktop = [Environment]::GetFolderPath('Desktop')
+$shortcutPath = Join-Path $desktop $shortcutName
+$exe = Join-Path $dist (Join-Path 'win-unpacked' $exeName)
+if ($desktop -and (Test-Path -LiteralPath $exe)) {
+  $shell = New-Object -ComObject WScript.Shell
+  $sc = $shell.CreateShortcut($shortcutPath)
+  $sc.TargetPath = $exe
+  $sc.WorkingDirectory = Split-Path -Parent $exe
+  $sc.IconLocation = "$exe,0"
+  $sc.Description = 'AI desktop pet - latest build (ADR-055)'
+  $sc.Save()
+  Write-Host "[sync] desktop shortcut -> $exe"
+} else {
+  Write-Warning "[sync] desktop shortcut NOT updated (desktop=$desktop exeExists=$(Test-Path -LiteralPath $exe))"
+}
+
 Write-Host "[sync] OK -> $target (version $version, commit $commit)"
 $files | ForEach-Object { Write-Host ('  {0}  {1:N2} MB' -f $_.name, ($_.size / 1MB)) }

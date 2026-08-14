@@ -21,6 +21,14 @@
 - 验证：合成用例 6/6 通过（当前 69k→OK、420k→NEAR、550k→CRITICAL、压缩→CRITICAL、
   无当前时累计 600k→CRITICAL、累计 300k→OK）；真实线程 CONTEXT_OK。
 
+## ADR-055 桌面快捷方式自动替换（2026-08-14）
+
+- 用户要求：每次改动后把桌面 AI桌宠 快捷方式替换为最新版本。
+- 决策：锚定 ADR-042 同步节奏——每次 main 合并验收执行 sync-latest 后，自动创建/替换
+  `%USERPROFILE%\Desktop\AI桌宠.lnk` → `E:\codex\AI桌宠\dist\win-unpacked\AI桌宠.exe`
+  （最新可运行构建，与安装包同源）；AGENTS.md 验收要求已同步。
+- 验证：`sync-latest.ps1 -SkipBuild` 执行后桌面快捷方式已生成，Target 存在。
+
 ## T-66 自动目检缺陷修复记录（2026-08-14，ADR-053）
 
 - 用户要求：把上下文检测/交接上限改为 300k（ADR-052，check-context.py 已改为 300k/240k 硬阈值，合成用例验证通过）；用 Computer Use 强化版自动化 T-65 人工目检。
