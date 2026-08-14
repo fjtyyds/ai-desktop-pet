@@ -30,7 +30,7 @@ window.petAPI = {
 }
 ```
 
-### 宠物浮窗 petOverlay（T-55~T-63，ADR-044/045/046 冻结）
+### 宠物浮窗 petOverlay（T-55~T-65，ADR-044/045/046/051 冻结）
 
 ```js
 petAPI.petOverlay.getStatus() -> Promise<PetOverlayStatus>
@@ -50,9 +50,19 @@ petAPI.petOverlay.finishTask({ id, ok, message? }) -> Promise<{ ok, task: null }
 petAPI.petOverlay.getConfig() -> Promise<{ bubbleEnabled, bubbleSeconds, reminders }>
 ```
 
-- 状态值：`idle / working / ready / failed / speaking / attention`（T-57 扩展）。
+- 状态值：`idle / working / ready / failed / speaking / attention / waiting`（waiting 自 T-65 起由 Codex 状态探针驱动，渲染层映射行6）。
 - 任务约束：`id ≤64`、`title/message ≤80`、`percent 0~100`（null=不确定）、`stage/totalStages` 可选整数；任务不持久化；运行中任务气泡优先，提醒气泡排队补放；状态事件 `pet:status-updated` payload 带 `task` 字段（无任务为 null）。
 - 任务源清单（T-63/T-64）：`skin-import`（皮肤批量导入）、`app-update`（自动更新下载）、`history-export`（对话导出）、`tts-speak`（语音合成）；主进程任务源统一经 `src/main/task-runner.js` 的 `runWithTask` 包裹（开始/进度/结束/失败清理），新任务源接入规范见 `docs/tasks/T-64.md`。
+
+### Codex 真实工作状态探针（T-65，ADR-051）
+
+- 设置字段 `settings.codexStatusEnabled`（默认 true，store.js 白名单）：开关“显示 Codex 工作状态”。
+- 主进程 `src/main/codex-status.js`（纯 Node，无 electron 依赖）轮询 `$CODEX_HOME/sessions/**/rollout-*.jsonl` 元数据（仅 type/name/status/timestamp，不读取会话正文）：
+  - 最新 rollout 25s 内有写入 → 浮窗 `working`（气泡“Codex 正在工作：<工具>”，工具标签：shell_command→执行命令、apply_patch→编辑文件、检索类→检索资料、其他→处理任务）；
+  - 有会话但静默 >25s 且最近回合未结束（≤5 分钟）→ `waiting`（等待输入，行6）；
+  - 尾部事件含 approval/review/permission 关键词 → `attention`（需要审阅）；
+  - 无 rollout / 静默超时 → 不驱动浮窗（保持应用自身状态）。
+- 生命周期与优先级：浮窗可见且开关开启时轮询（默认 5s）；隐藏/关闭时跳过；不覆盖运行中任务气泡与聊天 working/speaking/attention 状态；探针异常静默降级。
 
 ### 在线神经语音约定（ADR-029，T-34 冻结）
 

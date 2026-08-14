@@ -455,3 +455,31 @@
   4. 2026-08-14 已移除历史遗留的 7 个 E:\codex\AI桌宠-m* worktree（分支均保留在 git 中，可随时恢复）。
   5. 例外：`E:\codex\AI桌宠最新版` 为用户指定的最新版分发目录（ADR-042），不属于任务内容目录。
 - 后果：E:\codex 根目录不再出现项目任务文件夹；任务工作树在项目内可被 check/smoke/清理脚本统一管理；git status 通过 .gitignore 保持干净；后续派活提示词中工作树路径一律写 `E:\codex\AI桌宠\.worktrees\<任务分支>`。
+
+## ADR-050：任务完成必须批判性自检、贴合真实用户体验（2026-08-14）
+
+- 状态：Accepted（用户要求固化，项目铁律第 8 条）
+- 背景：用户指示“新增的任务不能只是浮于表面的迎合性质的完成，要有批判性的对自己进行自我检测，要考虑到用户真实体验场景并做出完善”。此前个别实现存在“看起来完成、实际是装饰”的风险（如伪造进度、只做 UI 不做真实信号）。
+- 决策：
+  1. 实施前：质疑需求假设——该功能是否解决用户真实场景？信号是否真实可观测？是否有误报/隐私/打扰风险？范围是否夸大？
+  2. 实施后：批判性自检——功能是真实生效还是表面迎合？会不会把猜测当事实（如假百分比、假状态）？用户实际使用时会不会被误导或打扰？性能/降级是否可接受？
+  3. 自检结论必须写入任务卡“完成记录”（做什么、为什么真实、验证了什么、残余风险），不得只写“已实现”。
+  4. 无法验证为真的能力不宣称完成：宁可明确记录边界与残余风险，不造假进度/状态/效果。
+- 后果：任务卡完成记录成为验收必读；协调者验收时核对自检结论；发现表面迎合实现一律打回。
+
+## ADR-051：宠物浮窗绑定真实 Codex 工作状态（2026-08-14，T-65）
+
+- 状态：Accepted（用户授权总工自主选择差距方案，选项 A：绑定真实 Codex 工作状态）
+- 背景：用户要求“实现和 Codex 桌面宠物相同效果”。官方 Codex Pets 行为：浮窗实时显示项目工作状态（running/waiting/review + 进度），免切换标签页。AI桌宠已有独立浮窗（240×320）与状态机（idle/working/ready/failed/speaking/attention）+ 任务气泡，但状态仅由聊天页/应用内任务驱动，未反映真实 Codex 活动。
+- 真实信号调研（本机实测）：
+  - Codex 桌面应用进程可枚举（MSIX 路径 OpenAI.Codex_*）；
+  - Codex 会话日志 `~/.codex/sessions/<yyyy>/<mm>/<dd>/rollout-*.jsonl` 仅活动时写入，事件为 JSONL 元数据（`task_started`、`user_message`、`function_call`/`custom_tool_call`（含 status）、`token_count` 等），不读取会话正文即可推断活动状态；
+  - 浮窗渲染层已支持 `waiting` 行（行6=attention/等待输入），无需新增图集行。
+- 决策：
+  1. 新增 `src/main/codex-status.js`（纯 Node，无 electron 依赖，可单测）：轮询探测（默认 5s）——根目录 `$CODEX_HOME`（默认 ~/.codex），递归找最新 `rollout-*.jsonl`；最新文件 25s 内有写入 → `working`（附工具标签：shell_command→执行命令、apply_patch→编辑文件、检索类→检索资料、其他→处理任务，永不显示 arguments/content）；有会话但静默 >25s 且最近回合未结束（task_started 后未见结束标记）且 ≤5 分钟 → `waiting`（等待输入）；尾部事件含 approval/review/permission 关键词 → `attention`（需要审阅）；无 rollout 或静默超时 → 不驱动浮窗。
+  2. 状态推送：仅活动状态通过 `overlay.setStatus({ state, text })` 驱动；idle 不推送（让应用自身状态自然显示）；不覆盖运行中任务气泡与聊天 working/speaking/attention 状态，避免抢占用户可见信息。
+  3. 设置字段 `codexStatusEnabled`（默认 true）：设置页“外观”组新增“显示 Codex 工作状态”开关；store 白名单与清洗同步。
+  4. 生命周期：浮窗可见且开关开启时轮询；隐藏/关闭时跳过（T-60 性能原则）；探针异常静默降级为不驱动，不弹错。
+  5. 隐私与诚实边界：只读取 rollout 元数据字段（type/name/status/timestamp），绝不读取/展示 content/arguments/output/message 等会话正文；不伪造百分比进度；review 仅在检测到相关事件时显示；未实现 failed 状态映射（当前 rollout 无显式失败事件），记录为残余风险。
+  6. 契约：`PetOverlayStatus.state` 增加 `waiting`（渲染层已支持行6）；`codexStatusEnabled` 加入 settings 白名单；不新增 petAPI 方法。
+- 后果：浮窗获得真实 Codex 工作状态显示，免切换标签页；无新依赖；README/API 同步；残余风险：旧会话静默 ≤5 分钟仍显示“等待输入”、review 检测为 best-effort 关键词、多会话时取最新 rollout。

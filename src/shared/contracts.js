@@ -84,8 +84,10 @@ const DEFAULT_MODEL = 'deepseek-v4-flash';
 /**
  * T-55（ADR-044）：宠物浮窗状态（Codex Pets 式独立悬浮宠物）。
  * @typedef {Object} PetOverlayStatus
- * @property {'idle'|'working'|'ready'|'failed'} state
- *   idle=等待聊天；working=LLM 回复中；ready=回复完成；failed=回复出错
+ * @property {'idle'|'working'|'ready'|'failed'|'speaking'|'attention'|'waiting'} state
+ *   idle=等待聊天；working=LLM 回复中；ready=回复完成；failed=回复出错；
+ *   speaking=TTS 朗读中（T-57）；attention=提醒/空闲互动（T-57）；
+ *   waiting=等待输入（T-65 起由 Codex 状态探针驱动，渲染层映射行6）
  * @property {string} text 气泡文案（可为空串，由浮窗本地化回退）
  * @property {number} at 状态更新时间戳
  */
@@ -110,6 +112,15 @@ const DEFAULT_MODEL = 'deepseek-v4-flash';
  * - petOverlayBubbleEnabled：气泡显示开关，默认 true；
  * - petOverlayReminders：提醒（空闲互动/喝水等）透出到浮窗，默认 true；
  * - petOverlayBounds.displayId：可选显示器标识（整数），用于多显示器位置记忆。
+ */
+
+/**
+ * T-65（ADR-051）：Codex 真实工作状态探针（纯 Node 主进程模块，无新 petAPI 方法）。
+ * - 设置字段 codexStatusEnabled：显示 Codex 工作状态开关，默认 true（store.js 白名单）。
+ * - 状态驱动：working（25s 内有写入，附工具标签）/ waiting（静默且回合未结束，≤5 分钟）/
+ *   attention（含 approval/review/permission 关键词，需要审阅）；idle 不驱动浮窗。
+ * - 隐私：只读取 rollout 元数据（type/name/status/timestamp），不读取会话正文；
+ *   不伪造进度百分比；不覆盖任务气泡与聊天 working/speaking/attention 状态。
  */
 
 /**
