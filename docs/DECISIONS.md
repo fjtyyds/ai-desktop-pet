@@ -405,7 +405,7 @@
   2. 设置预冻结（协调者先行改 store.js，worker 只读）：`petOverlayBubbleSeconds`（默认 6，允许 3~20）、`petOverlayBubbleEnabled`（默认 true）、`petOverlayReminders`（默认 true）、`petOverlayBounds.displayId`（可选整数，校验显示器存在）。
   3. 契约扩展由各卡提出、总工在对应卡派活前冻结到 contracts.js/docs/API.md；worker 不得自行改契约。
   4. 执行流程：建卡 → 派活（子代理并行）→ 等待回报 → 总工验收（check/smoke/diff 边界）→ 串行合并 main → 更新 PLAN/STATUS → 全部完成后 sync-latest + 人工目检。
-  5. 交接纪律：上下文阈值下按 docs/reports/2026-08-11-总工交接提示词模板.md 交接；当前上下文上限已调高至 500k，本轮不强制交接，但每轮写 outputs/ 交接文件。
+  5. 交接纪律：上下文阈值下按 docs/reports/2026-08-11-总工交接提示词模板.md 交接；当前上下文上限已调高至 500k，本轮不强制交接，但每轮写 outputs/ 交接文件。（2026-08-14 修订：上下文硬上限改为 300k，见 ADR-052，此句中的 500k 作废。）
 - 后果：浮窗从“能显示”走向“好用”；设置白名单在批次开始时即为最终形态，避免 worker 反复改 store.js；共享文件冲突由总工在合并阶段解决。
 
 ## ADR-046：动画宠物包与任务级进度气泡（2026-08-13，T-62/T-63）
@@ -483,3 +483,32 @@
   5. 隐私与诚实边界：只读取 rollout 元数据字段（type/name/status/timestamp），绝不读取/展示 content/arguments/output/message 等会话正文；不伪造百分比进度；review 仅在检测到相关事件时显示；未实现 failed 状态映射（当前 rollout 无显式失败事件），记录为残余风险。
   6. 契约：`PetOverlayStatus.state` 增加 `waiting`（渲染层已支持行6）；`codexStatusEnabled` 加入 settings 白名单；不新增 petAPI 方法。
 - 后果：浮窗获得真实 Codex 工作状态显示，免切换标签页；无新依赖；README/API 同步；残余风险：旧会话静默 ≤5 分钟仍显示“等待输入”、review 检测为 best-effort 关键词、多会话时取最新 rollout。
+
+## ADR-052：上下文检测与交接硬上限 300k（2026-08-14）
+
+- 状态：Accepted（用户明确要求“把上下文检测与交接中的上下文上限增加至 300k”；2026-08-13 已有同向纪律“上限 300k，每次汇报/每个主要阶段后运行”）
+- 背景：codex-context-handoff 的确定性检查脚本原按 `model_context_window` 倍率判定（NEAR ≥1.5x、CRITICAL ≥3x，本机窗口 996147 → 阈值约 1.5M/3M），与用户要求的 300k 上限不符；项目文档还残留“上限已调高至 500k”的过时表述。
+- 决策：
+  1. `check-context.py` 判定改为累计处理量硬上限：默认 300000 token（环境变量 `CODEX_CONTEXT_LIMIT` 可覆盖）；NEAR ≥80%（240k），CRITICAL ≥300k 或出现压缩/截断事件；`model_context_window` 仅附带显示比值，不再作为判定基数。
+  2. `codex-context-handoff/SKILL.md` 同步更新判定说明；`wait-feedback.py` 无需改动（只消费 CONTEXT_* 输出标签）。
+  3. 项目文档中的 500k 表述作废并标注；PLAN/STATUS 增加本轮记录。
+- 后果：总工线程在累计处理量 300k 处触发交接（本环境系统提示词每轮重发，实际约 2~3 轮即达阈值，属预期：高频交接换取上下文新鲜度）；新线程冷启动仍按交接文件执行；人工复核覆盖（context-audits.json）机制不变。
+
+## ADR-053：T-65 自动化目检缺陷修复（2026-08-14，T-66）
+
+- 状态：Accepted（Computer Use 自动化目检实测发现并修复，ADR-050 批判性自检）
+- 背景：T-65 验收后按用户要求用 Computer Use 强化版替代人工目检，实测发现两个真实 UI 缺陷：
+  ① 浮窗显示“Codex 正在工作：overlay.codexToolshell”（未翻译原始 key）——main.js formatText
+  用小写 toolKey 拼 locale key，而文案 key 为大写首字母（codexToolShell/Edit/Search/Other）；
+  ② working 由探针推入后（replaceStatus 持久化），Codex 静默转 waiting/attention 时
+  shouldTakeOver 排除 working，浮窗永久卡在“正在工作”——探针未跟踪自己推过的状态。
+- 决策：
+  1. main.js 工具标签 key 首字母大写（`codexTool${toolKey.charAt(0).toUpperCase()}${toolKey.slice(1)}`）。
+  2. codex-status.js 新增 `lastPushed`（仅 setStatus 成功时记录）；shouldTakeOver 允许探针自推状态
+     继续接管（working→waiting/attention），聊天/TTS 推的 working（文案不同）与任务气泡仍不覆盖；
+     `createCodexStatusProbe` 增加可选 `detect` 注入（默认 detectCodexStatus）便于确定性测试。
+  3. check.js 新增 T-66 静态断言（大写 key、lastPushed、detect）+ 运行时断言
+     （注入 detect：idle→working→waiting→attention 全链路；聊天 working 不被覆盖）。
+- 后果：修复经 worktree check/smoke 全绿 + 真实 UI 复核（working 翻译、working→waiting、
+  attention 从 idle 显示；主进程日志确认 waiting→attention 推送链路）；残余风险按 ADR-051 保持：
+  attention 仅 25s 内有写入时显示、review 关键词 best-effort。

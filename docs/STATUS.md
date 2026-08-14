@@ -1,13 +1,21 @@
 # 项目状态
 
 - 更新时间：2026-08-14
-- 当前阶段：M5.4 Codex 真实状态绑定——宠物浮窗显示真实 Codex 工作状态（ADR-050/051）
-- 当前任务：T-65 验收合并完成（2eabfbd）并同步最新版；main 已推送 origin
+- 当前阶段：M5.4 Codex 真实状态绑定——宠物浮窗显示真实 Codex 工作状态（ADR-050/051/053）
+- 当前任务：T-66 自动目检缺陷修复已验收合并（63e7764，本地）；上下文硬上限 300k（ADR-052）
 - 最近完成：T-65 验收合并（2eabfbd，总工直接实施）：codex-status.js 纯 Node 探针（rollout 元数据→working/waiting/attention，白名单工具标签，隐私只读）+ main 接线 + waiting 状态 + codexStatusEnabled 开关 + 双语文案 + check 五场景/优先级断言 + smoke 端到端；worktree 与 main check/smoke 全绿
 - 下一步：同步最新版（sync-latest）→ 用户 dev 目检（浮窗显示 Codex 状态、设置开关）；后续方向待用户拍板（目检补项、发布授权等）
 - 阻塞：无（商店/签名资金冻结仍按 ADR-041 处理；push 已按用户“自己做就行”授权执行）
 - 最新版：`E:\codex\AI桌宠最新版`（scripts/sync-latest.ps1 自动同步，当前 0.1.0 @ ca782a8，ADR-042/043；T-65 同步进行中）
 - 交接提示：新会话先读 `AGENTS.md` → `PLAN.md` → `docs/STATUS.md` → `docs/reports/2026-08-10-工作对接方案.md` → 自己的任务卡（docs/tasks/T-xx.md）
+
+## T-66 自动目检缺陷修复记录（2026-08-14，ADR-053）
+
+- 用户要求：把上下文检测/交接上限改为 300k（ADR-052，check-context.py 已改为 300k/240k 硬阈值，合成用例验证通过）；用 Computer Use 强化版自动化 T-65 人工目检。
+- 自动目检发现并修复两个真实缺陷（T-66，分支 codex/m5x-codex-status-fix）：① 工具标签 locale key 大小写错误（显示 overlay.codexToolshell）；② 探针 working 后无法接管 waiting/attention（浮窗卡死）。
+- 修复：main.js key 首字母大写；codex-status.js lastPushed 自推状态跟踪 + detect 注入；check.js 静态+接管链路断言。
+- 验证：worktree check/smoke 全绿（首次 smoke 失败系 dev 实例占用单实例锁，关闭后通过）；真实 UI 复核（working 翻译、working→waiting、attention 显示）截图/树证据在 outputs/cu-t65-inspection/。
+- 合并：63e7764 fast-forward（本地，未 push）；待 sync-latest 同步最新版与用户确认 push。
 
 ## 项目内容目录约定记录（2026-08-14，ADR-049）
 
@@ -391,7 +399,7 @@
 
 ## T-56~T-61 建卡与方案记录（2026-08-13，ADR-045）
 
-- 用户要求：T-55 只是起点，先拟定宠物浮窗优化方案，再自动化完善（注意总工交接与任务分配；上下文上限已调高至 500k）。
+- 用户要求：T-55 只是起点，先拟定宠物浮窗优化方案，再自动化完善（注意总工交接与任务分配；上下文上限已调高至 500k，2026-08-14 修订为硬上限 300k，见 ADR-052）。
 - 方案：docs/reports/2026-08-13-宠物浮窗优化方案.md + 线程分配手册（docs/reports/2026-08-13-宠物浮窗优化-线程分配手册.md）。
 - 预冻结（总工先改）：store.js 新增 petOverlayBubbleSeconds（默认 6，3~20）/petOverlayBubbleEnabled（默认 true）/petOverlayReminders（默认 true）/petOverlayBounds.displayId；contracts.js 补 petAPI.petOverlay.showMain/pushBubble/getConfig 契约说明。
 - 任务：T-56 交互增强、T-57 状态机与气泡队列、T-58 情绪与动画联动（批次 1）；T-59 皮肤体验、T-60 系统与性能、T-61 设置与引导（批次 2）。

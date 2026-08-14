@@ -279,8 +279,13 @@
 任务清单：
 
 - [x] T-65 宠物浮窗绑定真实 Codex 工作状态（2eabfbd，已合并 main）
+- [x] T-66 自动目检缺陷修复：工具标签翻译 key + 探针状态接管（8540f74/63e7764，已合并 main，本地）
 
 ## Progress
+
+- 2026-08-14：用户要求①上下文硬上限 300k（ADR-052，check-context.py 判定改为 300k/240k，合成用例 310k→CRITICAL/250k→NEAR/100k→OK 验证通过，SKILL.md 同步）；②用 Computer Use 强化版自动化 T-65 人工目检——实测发现两个真实缺陷并闭环 T-66（ADR-053）：工具标签 locale key 大小写（显示原始 key）+ 探针 working 后无法接管 waiting/attention；修复+断言+worktree check/smoke 全绿+真实 UI 复核；fast-forward 合并 63e7764（本地未 push）；待 sync-latest 与用户确认 push。
+
+- 2026-08-14：上下文检测与交接硬上限改为 300k（ADR-052，用户明确要求）：check-context.py 判定从“窗口倍率”改为“累计处理量 300k 硬上限”（NEAR 240k / CRITICAL 300k 或压缩事件，环境变量 CODEX_CONTEXT_LIMIT 可覆盖），SKILL.md 同步；合成用例验证 310k→CRITICAL、250k→NEAR、100k→OK 通过；同时按用户要求用 Computer Use 强化版自动化 T-65 人工目检环节（进行中）。
 
 - 2026-08-14：用户授权“自己做就行”并新增基本原则（ADR-050：任务不得表面迎合式完成，必须批判性自检并考虑真实用户体验）；总工自主选定差距方案 A（绑定真实 Codex 工作状态），实施 T-65（ADR-051）：新增 src/main/codex-status.js 纯 Node 探针（rollout 元数据→working/waiting/attention，白名单工具标签，只读尾部 ≤64KB）+ main.js 接线 + pet-overlay VALID_STATES 增 waiting + store codexStatusEnabled（默认 true）+ 设置页开关 + 双语文案 + check 五场景/优先级断言 + smoke 端到端；worktree 与 main check/smoke 全绿；fast-forward 合并 2eabfbd；外部 CU 探针 pet-overlay 改动 stash 保护并原样恢复；main 已推送 origin（bcbe551+2eabfbd）。
 
