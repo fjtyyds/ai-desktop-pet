@@ -620,8 +620,11 @@ if (SKIP_BOOTSTRAP || !app || typeof app.requestSingleInstanceLock !== 'function
         const t = getMainTranslator();
         if (state === 'working') {
           if (toolKey) {
+            // T-66：工具标签 key 首字母大写（shell→Shell→overlay.codexToolShell）
             return t('overlay.codexWorkingTool', {
-              tool: t(`overlay.codexTool${toolKey}`)
+              tool: t(
+                `overlay.codexTool${toolKey.charAt(0).toUpperCase()}${toolKey.slice(1)}`
+              )
             });
           }
           return t('overlay.codexWorking');

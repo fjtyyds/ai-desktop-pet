@@ -4862,5 +4862,65 @@ pass('T-48 设置页三段式布局、既有元素 id 与双语文案断言通�
     fail(`T-65 Codex 探针运行时断言异常: ${error && error.message ? error.message : error}`);
   }
 
+  // T-66：T-65 自动化目检实测缺陷修复（ADR-053）——工具标签翻译 key + 探针状态接管
+  if (!mainSource.includes('codexTool${toolKey.charAt(0).toUpperCase()}')) {
+    fail('main.js T-66 工具标签 locale key 应首字母大写（codexToolShell/Edit/Search/Other）');
+  }
+  if (!codexStatusSource.includes('lastPushed')) {
+    fail('codex-status.js T-66 缺少探针自推状态跟踪 lastPushed');
+  }
+  if (!codexStatusSource.includes('detect ? detect() : detectCodexStatus()')) {
+    fail('codex-status.js T-66 缺少 detect 注入选项（可测状态接管）');
+  }
+  pass('T-66 静态断言（翻译 key 大小写 + 探针状态跟踪）通过');
+
+  try {
+    const codexStatus = require(codexStatusPath);
+    const pushed = [];
+    let currentFake = { state: 'idle', text: '', task: null };
+    let detectResult = { available: true, state: 'working', toolKey: 'shell' };
+    const fakeOverlay = {
+      isVisible: () => true,
+      getState: () => currentFake,
+      setStatus: (payload) => {
+        pushed.push(payload);
+        currentFake = { state: payload.state, text: payload.text, task: null };
+      }
+    };
+    const probe = codexStatus.createCodexStatusProbe({
+      getSettings: () => ({ codexStatusEnabled: true }),
+      getOverlay: () => fakeOverlay,
+      formatText: (state, toolKey) => `codex:${state}:${toolKey || ''}`,
+      pollMs: 20,
+      detect: () => detectResult
+    });
+    probe.start();
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    if (pushed.length !== 1 || pushed[0].state !== 'working') {
+      fail(`T-66 探针初始 working 异常: ${JSON.stringify(pushed)}`);
+    }
+    detectResult = { available: true, state: 'waiting', toolKey: null };
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    if (pushed.length !== 2 || pushed[1].state !== 'waiting') {
+      fail(`T-66 working→waiting 接管异常: ${JSON.stringify(pushed)}`);
+    }
+    detectResult = { available: true, state: 'attention', toolKey: null };
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    if (pushed.length !== 3 || pushed[2].state !== 'attention') {
+      fail(`T-66 waiting→attention 接管异常: ${JSON.stringify(pushed)}`);
+    }
+    currentFake = { state: 'working', text: 'chat-thinking', task: null };
+    detectResult = { available: true, state: 'waiting', toolKey: null };
+    const before = pushed.length;
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    if (pushed.length !== before) {
+      fail('T-66 不应覆盖聊天 working 状态（文案非探针自推）');
+    }
+    probe.dispose();
+    pass('T-66 探针状态接管（working→waiting→attention、不覆盖聊天）运行时通过');
+  } catch (error) {
+    fail(`T-66 探针接管运行时断言异常: ${error && error.message ? error.message : error}`);
+  }
+
   console.log('[check] 全部通过');
 })();

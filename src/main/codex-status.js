@@ -212,8 +212,9 @@ function detectCodexStatus(options = {}) {
  *   formatText?: (state: string, toolKey: string|null) => string, pollMs?: number }} options
  */
 function createCodexStatusProbe(options = {}) {
-  const { getSettings, getOverlay, formatText, pollMs = 5000 } = options;
+  const { getSettings, getOverlay, formatText, pollMs = 5000, detect } = options;
   let timer = null;
+  let lastPushed = null; // T-66：探针自己推过的状态（用于 working→waiting/attention 继续接管）
 
   function codexEnabled() {
     try {
@@ -237,7 +238,16 @@ function createCodexStatusProbe(options = {}) {
   function shouldTakeOver(current) {
     if (!current) return true;
     if (current.task) return false;
-    return ['idle', 'ready', 'failed', 'waiting'].includes(current.state);
+    if (['idle', 'ready', 'failed', 'waiting'].includes(current.state)) {
+      return true;
+    }
+    // T-66：探针自己推过的状态允许继续接管（working→waiting/attention 切换）；
+    // 聊天/TTS 推的 working（文案与 lastPushed 不同）仍不被覆盖。
+    return Boolean(
+      lastPushed &&
+        current.state === lastPushed.state &&
+        (current.text || '') === lastPushed.text
+    );
   }
 
   function push(status) {
@@ -260,6 +270,7 @@ function createCodexStatusProbe(options = {}) {
     }
     try {
       overlay.setStatus({ state: status.state, text });
+      lastPushed = { state: status.state, text };
     } catch (_error) {
       // 推送失败静默，下一轮重试
     }
@@ -269,7 +280,7 @@ function createCodexStatusProbe(options = {}) {
     if (!codexEnabled() || !overlayVisible()) return;
     let status;
     try {
-      status = detectCodexStatus();
+      status = detect ? detect() : detectCodexStatus();
     } catch (_error) {
       status = {
         available: false,
@@ -299,7 +310,7 @@ function createCodexStatusProbe(options = {}) {
 
   function getState() {
     try {
-      return detectCodexStatus();
+      return detect ? detect() : detectCodexStatus();
     } catch (_error) {
       return {
         available: false,
