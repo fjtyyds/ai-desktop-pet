@@ -283,6 +283,12 @@
 
 ## Progress
 
+- 2026-08-14：push 已获用户确认并推送 origin（main=origin，2026-08-14）；T-65/T-66 自动目检闭环
+  （CU 强化版：执行命令/编辑文件/需要审阅/等待输入全链路截图+树证据在 outputs/cu-t66-inspection/，
+  设置开关静态+运行时证据；观察项：浮窗渲染层需激活后 UIA 文本刷新，待真实使用确认）；
+  ADR-055 桌面快捷方式随 sync-latest 自动替换最新构建（已实测 0.1.0 @ 3652a9e，快捷方式指向
+  dist\win-unpacked\AI桌宠.exe）；等待用户拍板后续方向（外观对齐/发布授权/商店资金）。
+
 - 2026-08-14：ADR-055 落盘——用户要求“每次改动后把桌面 AI桌宠 快捷方式替换成最新版本”：
   sync-latest.ps1 末尾新增桌面快捷方式步骤（创建/替换 `%USERPROFILE%\Desktop\AI桌宠.lnk`
   指向 `E:\codex\AI桌宠\dist\win-unpacked\AI桌宠.exe`，缺失时告警不中断）；

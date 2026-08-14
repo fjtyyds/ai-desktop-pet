@@ -2,11 +2,11 @@
 
 - 更新时间：2026-08-14
 - 当前阶段：M5.4 Codex 真实状态绑定——宠物浮窗显示真实 Codex 工作状态（ADR-050/051/053）
-- 当前任务：T-66 自动目检缺陷修复已验收合并（63e7764，本地）；上下文判定改为主看当前占用 500k（ADR-054，取代 ADR-052 累计 300k）
-- 最近完成：ADR-054 上下文判定优化（check-context.py 主判据 last_token_usage 当前真实占用：NEAR 400k / CRITICAL 500k 或压缩事件，累计处理量仅兜底与展示；SKILL.md 同步，合成用例 6/6 通过）；sync-latest 0.1.0 @ 5d79037（含 T-66 修复）已同步最新版；T-65 验收合并（2eabfbd，总工直接实施）：codex-status.js 纯 Node 探针（rollout 元数据→working/waiting/attention，白名单工具标签，隐私只读）+ main 接线 + waiting 状态 + codexStatusEnabled 开关 + 双语文案 + check 五场景/优先级断言 + smoke 端到端；worktree 与 main check/smoke 全绿
-- 下一步：用户确认 push main（3 commits：8540f74/63e7764/5d79037）→ 用户 dev 目检（浮窗显示 Codex 状态、设置开关）与安装版目检 → 后续方向待用户拍板（目检补项、发布授权等）
-- 阻塞：push 需用户确认（main 领先 origin 3 提交）；商店/签名资金冻结仍按 ADR-041 处理
-- 最新版：`E:\codex\AI桌宠最新版`（scripts/sync-latest.ps1 自动同步，当前 0.1.0 @ 5d79037，ADR-042/043；2026-08-14 09:21 已同步含 T-66 修复）
+- 当前任务：M5.4 收口——T-65/T-66 自动目检已完成（CU 强化版，证据 outputs/cu-t66-inspection/）；上下文判定改为主看当前占用 500k（ADR-054，取代 ADR-052 累计 300k）；桌面快捷方式随 sync-latest 自动替换（ADR-055）
+- 最近完成：push 已获用户确认并推送 origin（main=origin，2026-08-14）；ADR-054 上下文判定优化（check-context.py 主判据 last_token_usage 当前真实占用：NEAR 400k / CRITICAL 500k 或压缩事件，累计处理量仅兜底与展示；SKILL.md 同步，合成用例 6/6 通过）；T-65/T-66 自动目检闭环（执行命令/编辑文件/需要审阅/等待输入全链路证据）；ADR-055 sync-latest 新增桌面快捷方式替换（0.1.0 @ 3652a9e 实测）；T-65 验收合并（2eabfbd）：codex-status.js 纯 Node 探针 + main 接线 + waiting 状态 + codexStatusEnabled 开关 + 双语文案 + check/smoke 全绿
+- 下一步：后续方向待用户拍板（外观对齐、发布授权、商店资金）；目检观察项：浮窗渲染层需激活后 UIA 文本才刷新（主进程推送正常，待真实使用确认）
+- 阻塞：无硬阻塞；商店/签名资金冻结仍按 ADR-041 处理
+- 最新版：`E:\codex\AI桌宠最新版`（scripts/sync-latest.ps1 自动同步，当前 0.1.0 @ 3652a9e，ADR-042/043/055；2026-08-14 10:20 同步，桌面快捷方式已指向最新构建）
 - 交接提示：新会话先读 `AGENTS.md` → `PLAN.md` → `docs/STATUS.md` → `docs/reports/2026-08-10-工作对接方案.md` → 自己的任务卡（docs/tasks/T-xx.md）
 
 ## ADR-054 上下文判定优化（2026-08-14）
