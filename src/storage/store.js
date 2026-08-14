@@ -107,6 +107,7 @@ const DEFAULT_SETTINGS = {
   petOverlayBubbleSeconds: DEFAULT_PET_OVERLAY_BUBBLE_SECONDS, // ADR-045：气泡显示时长（秒）
   petOverlayBubbleEnabled: true, // ADR-045：气泡显示开关
   petOverlayReminders: true, // ADR-045：提醒（空闲互动/喝水等）透出到浮窗气泡
+  codexStatusEnabled: true, // T-65（ADR-051）：浮窗显示真实 Codex 工作状态，默认开启
   persona: { ...DEFAULT_PERSONA }
 };
 
@@ -484,6 +485,10 @@ function createStore(baseDir) {
       merged.petOverlayReminders,
       DEFAULT_SETTINGS.petOverlayReminders
     );
+    merged.codexStatusEnabled = sanitizeBoolean(
+      merged.codexStatusEnabled,
+      DEFAULT_SETTINGS.codexStatusEnabled
+    );
     return merged;
   }
 
@@ -518,7 +523,8 @@ function createStore(baseDir) {
       'petOverlayBounds',
       'petOverlayBubbleSeconds',
       'petOverlayBubbleEnabled',
-      'petOverlayReminders'
+      'petOverlayReminders',
+      'codexStatusEnabled'
     ];
     const next = { ...current };
     for (const key of allowed) {
@@ -711,6 +717,13 @@ function createStore(baseDir) {
           next.petOverlayReminders = sanitizeBoolean(
             patch.petOverlayReminders,
             current.petOverlayReminders
+          );
+          continue;
+        }
+        if (key === 'codexStatusEnabled') {
+          next.codexStatusEnabled = sanitizeBoolean(
+            patch.codexStatusEnabled,
+            current.codexStatusEnabled
           );
           continue;
         }

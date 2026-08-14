@@ -47,7 +47,15 @@
     "taskExportDone": "Exported {count} message(s)",
     "taskTtsSpeaking": "Synthesizing speech…",
     "taskTtsSegment": "Speech segment {i}/{total}",
-    "taskTtsDone": "Speech ready"
+    "taskTtsDone": "Speech ready",
+    "codexWorking": "Codex is working",
+    "codexWorkingTool": "Codex is working: {tool}",
+    "codexToolShell": "running a command",
+    "codexToolEdit": "editing files",
+    "codexToolSearch": "searching",
+    "codexToolOther": "working on a task",
+    "codexWaiting": "Codex is waiting for you",
+    "codexReview": "Codex needs review"
   },
   "idle": {
     "phrases": [
@@ -200,7 +208,9 @@
     "petOverlayBubbleSeconds": "Bubble duration (seconds)",
     "petOverlayBubbleSecondsHint": "3–20 seconds, applied after saving.",
     "petOverlayReminders": "Reminder bubbles",
-    "petOverlayRemindersHint": "Idle chat and water reminders can also appear as floating bubbles."
+    "petOverlayRemindersHint": "Idle chat and water reminders can also appear as floating bubbles.",
+    "codexStatus": "Show Codex status",
+    "codexStatusHint": "The pet shows Codex's real working state (running / waiting / needs review), reading only local status metadata."
   },
   "water": {
     "widgetAriaLabel": "Water reminder",

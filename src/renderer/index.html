@@ -462,6 +462,16 @@
                     >空闲互动、喝水提醒也会通过浮窗气泡提示。
                   </span>
                 </label>
+                <!-- T-65：显示真实 Codex 工作状态（ADR-051） -->
+                <label class="field field-switch">
+                  <span class="field-label" data-i18n="settings.codexStatus"
+                    >显示 Codex 工作状态</span
+                  >
+                  <input id="codex-status-enabled" class="field-checkbox" type="checkbox" />
+                  <span class="field-hint" data-i18n="settings.codexStatusHint"
+                    >浮窗显示 Codex 的真实工作状态（运行中/等待输入/需要审阅），仅读取本地状态元数据。
+                  </span>
+                </label>
                 <button id="skin-manage-btn" class="settings-link-row" type="button">
                   <span class="settings-row-icon" aria-hidden="true">🧩</span>
                   <span class="settings-row-label" data-i18n="skin.manage"

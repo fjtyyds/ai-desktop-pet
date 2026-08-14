@@ -4651,5 +4651,216 @@ pass('T-48 设置页三段式布局、既有元素 id 与双语文案断言通�
     fail(`T-64 导出任务包裹运行时断言异常: ${error && error.message ? error.message : error}`);
   }
 
+  // T-65：真实 Codex 工作状态探针（ADR-051）静态断言
+  const codexStatusPath = path.join(root, 'src', 'main', 'codex-status.js');
+  if (!fs.existsSync(codexStatusPath)) {
+    fail('缺少 src/main/codex-status.js（T-65 Codex 状态探针）');
+  }
+  const codexStatusSource = fs.readFileSync(codexStatusPath, 'utf8');
+  for (const token of [
+    'ACTIVE_MS',
+    'WAITING_MAX_MS',
+    'detectCodexStatus',
+    'createCodexStatusProbe',
+    'REVIEW_RE'
+  ]) {
+    if (!codexStatusSource.includes(token)) {
+      fail(`codex-status.js 缺少 T-65 token: ${token}`);
+    }
+  }
+  if (codexStatusSource.includes("require('electron')")) {
+    fail('codex-status.js 不得依赖 electron（纯 Node 可测）');
+  }
+  if (
+    !mainSource.includes("require('./codex-status')") ||
+    !mainSource.includes('codexStatusProbe.start()')
+  ) {
+    fail('main.js 缺少 T-65 Codex 探针接线');
+  }
+  if (!petOverlaySource.includes("'waiting'")) {
+    fail('pet-overlay.js 缺少 T-65 waiting 状态');
+  }
+  if (!storeSource.includes('codexStatusEnabled')) {
+    fail('store.js 缺少 T-65 codexStatusEnabled 设置字段');
+  }
+  if (!rendererIndexSource.includes('id="codex-status-enabled"')) {
+    fail('index.html 缺少 T-65 Codex 状态开关');
+  }
+  if (!rendererChatSource.includes('codexStatusEnabled')) {
+    fail('chat.js 缺少 T-65 codexStatusEnabled 接线');
+  }
+  if (
+    !contractsSource.includes('T-65') ||
+    !contractsSource.includes('codexStatusEnabled')
+  ) {
+    fail('contracts.js 缺少 T-65 契约说明');
+  }
+  const apiDocSource = fs.readFileSync(path.join(root, 'docs', 'API.md'), 'utf8');
+  for (const token of ['codexStatusEnabled', 'codex-status.js', 'waiting']) {
+    if (!apiDocSource.includes(token)) {
+      fail(`API.md 缺少 T-65 token: ${token}`);
+    }
+  }
+  for (const localeFile of ['zh-CN', 'en']) {
+    const locale = JSON.parse(
+      fs.readFileSync(
+        path.join(root, 'src', 'shared', 'locales', `${localeFile}.json`),
+        'utf8'
+      )
+    );
+    for (const key of [
+      'codexWorking',
+      'codexWorkingTool',
+      'codexToolShell',
+      'codexToolEdit',
+      'codexToolSearch',
+      'codexToolOther',
+      'codexWaiting',
+      'codexReview'
+    ]) {
+      if (
+        !locale.overlay ||
+        typeof locale.overlay[key] !== 'string' ||
+        !locale.overlay[key].trim()
+      ) {
+        fail(`${localeFile}.json 缺少 overlay.${key} 文案`);
+      }
+    }
+    for (const key of ['codexStatus', 'codexStatusHint']) {
+      if (
+        !locale.settings ||
+        typeof locale.settings[key] !== 'string' ||
+        !locale.settings[key].trim()
+      ) {
+        fail(`${localeFile}.json 缺少 settings.${key} 文案`);
+      }
+    }
+  }
+  pass('T-65 Codex 状态探针静态断言通过');
+
+  // T-65 运行时：五场景 + 探针优先级（临时 CODEX_HOME fixture，纯 Node）
+  try {
+    const codexStatus = require(codexStatusPath);
+    const osTmp = require('os').tmpdir();
+    const fixtureRoot = fs.mkdtempSync(path.join(osTmp, 'ai-pet-check-codex-'));
+    try {
+      const nowMs = Date.now();
+      const sessionDir = path.join(fixtureRoot, 'sessions', '2026', '08', '14');
+      fs.mkdirSync(sessionDir, { recursive: true });
+      const workingLines = [
+        JSON.stringify({ type: 'session_meta', payload: { session_id: 't' } }),
+        JSON.stringify({
+          type: 'event_msg',
+          payload: { type: 'task_started', turn_id: 't' }
+        }),
+        JSON.stringify({
+          type: 'response_item',
+          payload: { type: 'function_call', name: 'shell_command' }
+        }),
+        JSON.stringify({ type: 'event_msg', payload: { type: 'token_count' } })
+      ].join('\n');
+      const reviewLines = [
+        JSON.stringify({ type: 'session_meta', payload: { session_id: 'r' } }),
+        JSON.stringify({
+          type: 'event_msg',
+          payload: { type: 'approval_requested' }
+        })
+      ].join('\n');
+      function writeRollout(name, lines, ageMs) {
+        const file = path.join(sessionDir, name);
+        fs.writeFileSync(file, lines, 'utf8');
+        const when = new Date(nowMs - ageMs);
+        fs.utimesSync(file, when, when);
+        return file;
+      }
+
+      writeRollout('rollout-working.jsonl', workingLines, 1000);
+      let detected = codexStatus.detectCodexStatus({
+        rootDir: fixtureRoot,
+        nowMs
+      });
+      if (detected.state !== 'working' || detected.toolKey !== 'shell') {
+        fail(`T-65 working 场景异常: ${JSON.stringify(detected)}`);
+      }
+      fs.unlinkSync(path.join(sessionDir, 'rollout-working.jsonl'));
+
+      writeRollout('rollout-waiting.jsonl', workingLines, 60 * 1000);
+      detected = codexStatus.detectCodexStatus({ rootDir: fixtureRoot, nowMs });
+      if (detected.state !== 'waiting') {
+        fail(`T-65 waiting 场景异常: ${JSON.stringify(detected)}`);
+      }
+      fs.unlinkSync(path.join(sessionDir, 'rollout-waiting.jsonl'));
+
+      writeRollout('rollout-review.jsonl', reviewLines, 1000);
+      detected = codexStatus.detectCodexStatus({ rootDir: fixtureRoot, nowMs });
+      if (detected.state !== 'attention') {
+        fail(`T-65 attention 场景异常: ${JSON.stringify(detected)}`);
+      }
+      fs.unlinkSync(path.join(sessionDir, 'rollout-review.jsonl'));
+
+      writeRollout('rollout-timeout.jsonl', workingLines, 6 * 60 * 1000);
+      detected = codexStatus.detectCodexStatus({ rootDir: fixtureRoot, nowMs });
+      if (detected.state !== 'idle') {
+        fail(`T-65 超时回落 idle 异常: ${JSON.stringify(detected)}`);
+      }
+      fs.unlinkSync(path.join(sessionDir, 'rollout-timeout.jsonl'));
+
+      const emptyRoot = path.join(fixtureRoot, 'empty');
+      fs.mkdirSync(emptyRoot, { recursive: true });
+      detected = codexStatus.detectCodexStatus({ rootDir: emptyRoot, nowMs });
+      if (detected.available !== false || detected.state !== 'idle') {
+        fail(`T-65 无会话场景异常: ${JSON.stringify(detected)}`);
+      }
+      pass('T-65 五场景（working/waiting/attention/超时/无会话）运行时通过');
+
+      // 探针优先级：不覆盖聊天 working / 任务气泡；空闲时接管
+      const pushed = [];
+      let currentFake = { state: 'working', text: 'chat-thinking', task: null };
+      const fakeOverlay = {
+        isVisible: () => true,
+        getState: () => currentFake,
+        setStatus: (payload) => {
+          pushed.push(payload);
+          currentFake = { state: payload.state, text: payload.text, task: null };
+        }
+      };
+      const savedCodexHome = process.env.CODEX_HOME;
+      process.env.CODEX_HOME = fixtureRoot;
+      const probe = codexStatus.createCodexStatusProbe({
+        getSettings: () => ({ codexStatusEnabled: true }),
+        getOverlay: () => fakeOverlay,
+        formatText: (state, toolKey) => `codex:${state}:${toolKey || ''}`,
+        pollMs: 20
+      });
+      writeRollout('rollout-probe.jsonl', workingLines, 1000);
+      probe.start();
+      await new Promise((resolve) => setTimeout(resolve, 80));
+      if (pushed.length !== 0) {
+        fail(`T-65 探针不应覆盖聊天 working 状态: ${JSON.stringify(pushed)}`);
+      }
+      currentFake = { state: 'idle', text: '', task: null };
+      await new Promise((resolve) => setTimeout(resolve, 80));
+      if (pushed.length !== 1 || pushed[0].state !== 'working') {
+        fail(`T-65 探针未在空闲时接管 Codex working: ${JSON.stringify(pushed)}`);
+      }
+      currentFake = { state: 'working', text: '', task: { id: 't' } };
+      const before = pushed.length;
+      await new Promise((resolve) => setTimeout(resolve, 80));
+      if (pushed.length !== before) {
+        fail('T-65 探针不应覆盖运行中任务气泡');
+      }
+      probe.dispose();
+      process.env.CODEX_HOME = savedCodexHome;
+      pass('T-65 探针优先级（不覆盖聊天/任务、空闲接管）运行时通过');
+    } finally {
+      if (process.env.CODEX_HOME && process.env.CODEX_HOME.startsWith(osTmp)) {
+        process.env.CODEX_HOME = undefined;
+      }
+      fs.rmSync(fixtureRoot, { recursive: true, force: true });
+    }
+  } catch (error) {
+    fail(`T-65 Codex 探针运行时断言异常: ${error && error.message ? error.message : error}`);
+  }
+
   console.log('[check] 全部通过');
 })();

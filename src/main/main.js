@@ -21,6 +21,7 @@ const {
   DEFAULT_MIN_INTERVAL_MS
 } = require('./idle'); // T-15: 空闲主动互动计时
 const { createPetOverlay } = require('./pet-overlay'); // T-55: 宠物浮窗（Codex Pets 式）
+const { createCodexStatusProbe } = require('./codex-status'); // T-65: 真实 Codex 工作状态探针（ADR-051）
 
 let mainWindow = null;
 let trayApi = null;
@@ -30,6 +31,7 @@ let updaterApi = null; // T-37: 自动更新（仅打包版初始化）
 let telemetryApi = null; // T-42: 匿名遥测实例
 let telemetrySessionStartedAt = 0; // T-42: 会话时长统计起点
 let petOverlayApi = null; // T-55: 宠物浮窗实例
+let codexStatusProbe = null; // T-65: Codex 工作状态探针实例
 
 /** T-19：窗口体验 IPC 通道（ADR-022 冻结契约；preload.js 同名常量保持一致） */
 const WINDOW_CHANNELS = {
@@ -610,6 +612,30 @@ if (SKIP_BOOTSTRAP || !app || typeof app.requestSingleInstanceLock !== 'function
       getTranslator: getMainTranslator // T-56：右键菜单双语文案
     });
     ipc.setPetOverlay(petOverlayApi); // T-63：任务进度气泡注入（皮肤导入等长任务用）
+    // T-65：真实 Codex 工作状态探针（ADR-051）——浮窗可见且设置开启时轮询 rollout 元数据
+    codexStatusProbe = createCodexStatusProbe({
+      getSettings: () => ipc.getSettings(),
+      getOverlay: () => petOverlayApi,
+      formatText: (state, toolKey) => {
+        const t = getMainTranslator();
+        if (state === 'working') {
+          if (toolKey) {
+            return t('overlay.codexWorkingTool', {
+              tool: t(`overlay.codexTool${toolKey}`)
+            });
+          }
+          return t('overlay.codexWorking');
+        }
+        if (state === 'waiting') {
+          return t('overlay.codexWaiting');
+        }
+        if (state === 'attention') {
+          return t('overlay.codexReview');
+        }
+        return '';
+      }
+    });
+    codexStatusProbe.start();
     try {
       const settings = ipc.getSettings();
       if (settings && settings.petOverlayEnabled === true) {
@@ -727,6 +753,7 @@ if (SKIP_BOOTSTRAP || !app || typeof app.requestSingleInstanceLock !== 'function
 
   app.on('before-quit', () => {
     isQuitting = true;
+    codexStatusProbe?.dispose?.(); // T-65: 退出前停止 Codex 状态轮询
     petOverlayApi?.dispose?.(); // T-55: 退出前销毁浮窗
     updaterApi?.handleBeforeQuit(); // T-37: 用户确认后执行 quitAndInstall
     // T-42：退出前记录会话时长（留存漏斗）；补发为尽力而为，失败保留队列

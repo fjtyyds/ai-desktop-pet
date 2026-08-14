@@ -13,6 +13,7 @@
  * - failed    回复出错
  * - speaking  TTS 朗读中
  * - attention 提醒/空闲互动（可排队）
+ * - waiting   等待输入（T-65：由 Codex 状态探针驱动，渲染层映射行6）
  *
  * 气泡队列：pushBubble 最多排队 3 条，按 petOverlayBubbleSeconds（默认 6s）
  * 逐条轮播；setStatus 为即时状态，直接替换当前显示。
@@ -57,7 +58,8 @@ const VALID_STATES = new Set([
   'ready',
   'failed',
   'speaking',
-  'attention'
+  'attention',
+  'waiting'
 ]);
 const STATUS_TEXT_MAX = 80;
 const MAX_BUBBLE_QUEUE = 3;

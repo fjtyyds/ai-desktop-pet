@@ -47,7 +47,15 @@
     "taskExportDone": "已导出 {count} 条消息",
     "taskTtsSpeaking": "正在合成语音…",
     "taskTtsSegment": "语音片段 {i}/{total}",
-    "taskTtsDone": "语音合成完成"
+    "taskTtsDone": "语音合成完成",
+    "codexWorking": "Codex 正在工作",
+    "codexWorkingTool": "Codex 正在工作：{tool}",
+    "codexToolShell": "执行命令",
+    "codexToolEdit": "编辑文件",
+    "codexToolSearch": "检索资料",
+    "codexToolOther": "处理任务",
+    "codexWaiting": "Codex 等待输入",
+    "codexReview": "Codex 需要审阅"
   },
   "idle": {
     "phrases": [
@@ -200,7 +208,9 @@
     "petOverlayBubbleSeconds": "气泡时长（秒）",
     "petOverlayBubbleSecondsHint": "3~20 秒，保存后生效。",
     "petOverlayReminders": "提醒透出",
-    "petOverlayRemindersHint": "空闲互动、喝水提醒也会通过浮窗气泡提示。"
+    "petOverlayRemindersHint": "空闲互动、喝水提醒也会通过浮窗气泡提示。",
+    "codexStatus": "显示 Codex 工作状态",
+    "codexStatusHint": "浮窗显示 Codex 的真实工作状态（运行中/等待输入/需要审阅），仅读取本地状态元数据。"
   },
   "water": {
     "widgetAriaLabel": "喝水提醒",

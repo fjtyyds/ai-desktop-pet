@@ -759,6 +759,96 @@ app.whenReady().then(() => {
       } finally {
         fs.rmSync(t64PetsTmp, { recursive: true, force: true });
       }
+      // T-65：真实 Codex 工作状态端到端（ADR-051）——临时 CODEX_HOME 合成 rollout，
+      // 探针（fake visible overlay 转发到真实 overlayApi）应把浮窗驱动为 working 且文案带 codex 标记
+      const codexStatusModule = require(path.join(
+        __dirname,
+        '..',
+        'src',
+        'main',
+        'codex-status'
+      ));
+      const codexTmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-pet-codex-smoke-'));
+      try {
+        const nowMs = Date.now();
+        const sessionDir = path.join(codexTmp, 'sessions', '2026', '08', '14');
+        fs.mkdirSync(sessionDir, { recursive: true });
+        const rolloutPath = path.join(sessionDir, 'rollout-smoke.jsonl');
+        fs.writeFileSync(
+          rolloutPath,
+          [
+            JSON.stringify({
+              timestamp: new Date(nowMs - 5000).toISOString(),
+              type: 'session_meta',
+              payload: { session_id: 'smoke' }
+            }),
+            JSON.stringify({
+              timestamp: new Date(nowMs - 4000).toISOString(),
+              type: 'event_msg',
+              payload: { type: 'task_started', turn_id: 'smoke' }
+            }),
+            JSON.stringify({
+              timestamp: new Date(nowMs - 3000).toISOString(),
+              type: 'response_item',
+              payload: { type: 'function_call', name: 'shell_command' }
+            }),
+            JSON.stringify({
+              timestamp: new Date(nowMs - 2000).toISOString(),
+              type: 'event_msg',
+              payload: { type: 'token_count' }
+            })
+          ].join('\n'),
+          'utf8'
+        );
+        fs.utimesSync(rolloutPath, new Date(nowMs - 1000), new Date(nowMs - 1000));
+
+        const savedCodexHome = process.env.CODEX_HOME;
+        process.env.CODEX_HOME = codexTmp;
+        const codexProbe = codexStatusModule.createCodexStatusProbe({
+          getSettings: () => ({ codexStatusEnabled: true }),
+          getOverlay: () => ({
+            isVisible: () => true,
+            getState: () => overlayApi.getState(),
+            setStatus: (payload) => overlayApi.setStatus(payload)
+          }),
+          formatText: (state, toolKey) => `codex:${state}:${toolKey || ''}`,
+          pollMs: 100
+        });
+        codexProbe.start();
+        let t65State = null;
+        const t65Deadline = Date.now() + 5000;
+        while (Date.now() < t65Deadline) {
+          await new Promise((resolve) => setTimeout(resolve, 100));
+          t65State = await overlayWin.webContents.executeJavaScript(
+            'window.petAPI.petOverlay.getStatus()'
+          );
+          if (
+            t65State &&
+            t65State.state === 'working' &&
+            String(t65State.text || '').startsWith('codex:')
+          ) {
+            break;
+          }
+        }
+        codexProbe.dispose();
+        process.env.CODEX_HOME = savedCodexHome;
+        if (
+          !t65State ||
+          t65State.state !== 'working' ||
+          String(t65State.text || '') !== 'codex:working:shell'
+        ) {
+          fail(
+            `T-65 探针未驱动浮窗显示 Codex working（实际 ${JSON.stringify(t65State)}）`
+          );
+        }
+        console.log('[smoke] T-65 Codex 真实工作状态端到端通过');
+      } finally {
+        try {
+          fs.rmSync(codexTmp, { recursive: true, force: true });
+        } catch (_error) {
+          // 临时目录清理失败不影响退出
+        }
+      }
       overlayWin.destroy();
       app.quit();
     } catch (error) {

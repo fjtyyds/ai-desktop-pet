@@ -443,6 +443,7 @@
       petOverlayBubbleEnabled: document.getElementById('pet-overlay-bubble-enabled'),
       petOverlayBubbleSeconds: document.getElementById('pet-overlay-bubble-seconds'),
       petOverlayReminders: document.getElementById('pet-overlay-reminders'),
+      codexStatusEnabled: document.getElementById('codex-status-enabled'),
       skinBack: document.getElementById('skin-back'),
       skinList: document.getElementById('skin-list'),
       skinImportBtn: document.getElementById('skin-import-btn'),
@@ -745,6 +746,11 @@
     }
     if (elements.petOverlayReminders) {
       elements.petOverlayReminders.addEventListener('change', () => {
+        void persistPetOverlayConfig();
+      });
+    }
+    if (elements.codexStatusEnabled) {
+      elements.codexStatusEnabled.addEventListener('change', () => {
         void persistPetOverlayConfig();
       });
     }
@@ -2723,6 +2729,9 @@
       petOverlayBubbleSeconds: seconds,
       petOverlayReminders: elements.petOverlayReminders
         ? elements.petOverlayReminders.checked
+        : true,
+      codexStatusEnabled: elements.codexStatusEnabled
+        ? elements.codexStatusEnabled.checked
         : true
     };
     currentSettings = { ...currentSettings, ...patch };
@@ -3239,6 +3248,7 @@
           ? Math.min(20, Math.max(3, Math.round(Number(saved.petOverlayBubbleSeconds))))
           : 6,
         petOverlayReminders: saved.petOverlayReminders !== false,
+        codexStatusEnabled: saved.codexStatusEnabled !== false,
         theme: saved.theme === 'light' ? 'light' : 'dark',
         reduceMotion: saved.reduceMotion === true,
         waterReminder: saved.waterReminder,
@@ -3329,6 +3339,10 @@
     if (elements.petOverlayReminders) {
       elements.petOverlayReminders.checked =
         currentSettings.petOverlayReminders !== false;
+    }
+    if (elements.codexStatusEnabled) {
+      elements.codexStatusEnabled.checked =
+        currentSettings.codexStatusEnabled !== false;
     }
     if (elements.petOverlayBubbleSeconds) {
       const seconds = Number(currentSettings.petOverlayBubbleSeconds);
@@ -3429,6 +3443,9 @@
         petOverlayReminders: elements.petOverlayReminders
           ? elements.petOverlayReminders.checked
           : true,
+        codexStatusEnabled: elements.codexStatusEnabled
+          ? elements.codexStatusEnabled.checked
+          : true,
         theme,
         reduceMotion,
         waterReminder: {
@@ -3465,6 +3482,9 @@
           : 6,
         petOverlayReminders: elements.petOverlayReminders
           ? elements.petOverlayReminders.checked
+          : true,
+        codexStatusEnabled: elements.codexStatusEnabled
+          ? elements.codexStatusEnabled.checked
           : true,
         theme,
         reduceMotion,
