@@ -2,12 +2,24 @@
 
 - 更新时间：2026-08-14
 - 当前阶段：M5.4 Codex 真实状态绑定——宠物浮窗显示真实 Codex 工作状态（ADR-050/051/053）
-- 当前任务：T-66 自动目检缺陷修复已验收合并（63e7764，本地）；上下文硬上限 300k（ADR-052）
-- 最近完成：T-65 验收合并（2eabfbd，总工直接实施）：codex-status.js 纯 Node 探针（rollout 元数据→working/waiting/attention，白名单工具标签，隐私只读）+ main 接线 + waiting 状态 + codexStatusEnabled 开关 + 双语文案 + check 五场景/优先级断言 + smoke 端到端；worktree 与 main check/smoke 全绿
-- 下一步：同步最新版（sync-latest）→ 用户 dev 目检（浮窗显示 Codex 状态、设置开关）；后续方向待用户拍板（目检补项、发布授权等）
-- 阻塞：无（商店/签名资金冻结仍按 ADR-041 处理；push 已按用户“自己做就行”授权执行）
-- 最新版：`E:\codex\AI桌宠最新版`（scripts/sync-latest.ps1 自动同步，当前 0.1.0 @ ca782a8，ADR-042/043；T-65 同步进行中）
+- 当前任务：T-66 自动目检缺陷修复已验收合并（63e7764，本地）；上下文判定改为主看当前占用 500k（ADR-054，取代 ADR-052 累计 300k）
+- 最近完成：ADR-054 上下文判定优化（check-context.py 主判据 last_token_usage 当前真实占用：NEAR 400k / CRITICAL 500k 或压缩事件，累计处理量仅兜底与展示；SKILL.md 同步，合成用例 6/6 通过）；sync-latest 0.1.0 @ 5d79037（含 T-66 修复）已同步最新版；T-65 验收合并（2eabfbd，总工直接实施）：codex-status.js 纯 Node 探针（rollout 元数据→working/waiting/attention，白名单工具标签，隐私只读）+ main 接线 + waiting 状态 + codexStatusEnabled 开关 + 双语文案 + check 五场景/优先级断言 + smoke 端到端；worktree 与 main check/smoke 全绿
+- 下一步：用户确认 push main（3 commits：8540f74/63e7764/5d79037）→ 用户 dev 目检（浮窗显示 Codex 状态、设置开关）与安装版目检 → 后续方向待用户拍板（目检补项、发布授权等）
+- 阻塞：push 需用户确认（main 领先 origin 3 提交）；商店/签名资金冻结仍按 ADR-041 处理
+- 最新版：`E:\codex\AI桌宠最新版`（scripts/sync-latest.ps1 自动同步，当前 0.1.0 @ 5d79037，ADR-042/043；2026-08-14 09:21 已同步含 T-66 修复）
 - 交接提示：新会话先读 `AGENTS.md` → `PLAN.md` → `docs/STATUS.md` → `docs/reports/2026-08-10-工作对接方案.md` → 自己的任务卡（docs/tasks/T-xx.md）
+
+## ADR-054 上下文判定优化（2026-08-14）
+
+- 用户要求：把上限调至 500k 并优化交接方案，防止多长的会话历史占用。
+- 实测根因：本环境每轮重发系统提示词，累计处理量（total_token_usage）单线程首轮即 1.48M+，
+  当前真实占用（last_token_usage，等价 App“上下文用量”）仅 69k；ADR-052 的累计 300k 主判据
+  导致线程 1-2 轮即误触发交接，与真实上下文压力脱节。
+- 决策：check-context.py 主判据改为当前真实占用——NEAR ≥400k（80%×500k）、CRITICAL ≥500k
+  或压缩/截断事件；累计处理量仅作无当前数据时的兜底与展示；SKILL.md 同步；
+  09:27 交接文件作废留档，总工 019ffde0 继续担任（当前 94k/500k → CONTEXT_OK）。
+- 验证：合成用例 6/6 通过（当前 69k→OK、420k→NEAR、550k→CRITICAL、压缩→CRITICAL、
+  无当前时累计 600k→CRITICAL、累计 300k→OK）；真实线程 CONTEXT_OK。
 
 ## T-66 自动目检缺陷修复记录（2026-08-14，ADR-053）
 

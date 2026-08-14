@@ -512,3 +512,26 @@
 - 后果：修复经 worktree check/smoke 全绿 + 真实 UI 复核（working 翻译、working→waiting、
   attention 从 idle 显示；主进程日志确认 waiting→attention 推送链路）；残余风险按 ADR-051 保持：
   attention 仅 25s 内有写入时显示、review 关键词 best-effort。
+
+## ADR-054：上下文判定改为主看当前占用，上限 500k（2026-08-14）
+
+- 状态：Accepted（用户明确要求“把上限调制500k并优化交接方案，防止多长的会话历史占用”，
+  2026-08-14 09:35 实施）
+- 背景：ADR-052 以累计处理量 300k 为硬上限；实测本环境每轮重发系统提示词与会话历史，
+  last token_count 事件累计 total 在单线程首轮即达 1.48M（cached_input 1.43M），而当前真实占用
+  （last_token_usage）仅约 69k、App 界面显示 58k；累计口径导致线程 1-2 轮即误触发交接，
+  与真实上下文压力脱节，交接过于频繁（总工 019ffdda、019ffde0 均在首轮/次轮 CRITICAL）。
+- 决策：
+  1. `check-context.py` 主判据改为最后一个 token_count 的 `last_token_usage.total_tokens`
+     （当前真实占用，等价 App 界面“上下文用量”）：NEAR ≥400k（80%×500k），
+     CRITICAL ≥500k 或出现压缩/截断事件；`CODEX_CONTEXT_LIMIT` 可覆盖（默认 500000）。
+  2. 累计处理量 `total_token_usage` 降级为兜底与展示：仅当 last_token_usage 缺失时按
+     ≥500k 判定 CRITICAL；正常输出同时显示 current/cumulative 便于核对。
+  3. 交接方案优化：触发条件与“会话历史是否真正占用上下文”挂钩（长会话/压缩），
+     防止累计重发虚高造成空转交接；新线程冷启动仍只带自包含交接文件，不搬运旧历史；
+     总工每轮汇报后复检，未达阈值不提前建线程。
+  4. `codex-context-handoff/SKILL.md` 同步更新；ADR-052 中“累计处理量 300k 为主判据”
+     被本 ADR 取代，300k 表述作废。
+- 后果：本线程 019ffde0 当前占用约 69k（<400k）→ CONTEXT_OK，无需交接，继续担任总工；
+  累计 1.48M 仅展示不触发；09:27 交接文件（交接-20260814-0927.md）作废留档；
+  交接触发条件回归真实上下文压力，减少线程爆炸与空转。

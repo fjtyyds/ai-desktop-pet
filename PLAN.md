@@ -283,6 +283,8 @@
 
 ## Progress
 
+- 2026-08-14：上下文判定优化（ADR-054，用户要求“把上限调制500k并优化交接方案，防止多长的会话历史占用”）：实测根因——本环境每轮重发系统提示词，累计处理量首轮即 1.48M+，当前真实占用（last_token_usage）仅 69k，ADR-052 的累计 300k 主判据导致线程 1-2 轮即误触发交接；check-context.py 主判据改为当前真实占用（NEAR 400k / CRITICAL 500k 或压缩事件，累计仅兜底与展示），SKILL.md 同步；合成用例 6/6 通过（69k→OK、420k→NEAR、550k→CRITICAL、压缩→CRITICAL、无当前时 600k→CRITICAL/300k→OK），真实线程 CONTEXT_OK 94k/500k；09:27 交接作废，总工 019ffde0 继续；仍待用户确认 push（3 提交）与 dev 目检 T-65/T-66。
+
 - 2026-08-14：用户要求①上下文硬上限 300k（ADR-052，check-context.py 判定改为 300k/240k，合成用例 310k→CRITICAL/250k→NEAR/100k→OK 验证通过，SKILL.md 同步）；②用 Computer Use 强化版自动化 T-65 人工目检——实测发现两个真实缺陷并闭环 T-66（ADR-053）：工具标签 locale key 大小写（显示原始 key）+ 探针 working 后无法接管 waiting/attention；修复+断言+worktree check/smoke 全绿+真实 UI 复核；fast-forward 合并 63e7764（本地未 push）；待 sync-latest 与用户确认 push。
 
 - 2026-08-14：上下文检测与交接硬上限改为 300k（ADR-052，用户明确要求）：check-context.py 判定从“窗口倍率”改为“累计处理量 300k 硬上限”（NEAR 240k / CRITICAL 300k 或压缩事件，环境变量 CODEX_CONTEXT_LIMIT 可覆盖），SKILL.md 同步；合成用例验证 310k→CRITICAL、250k→NEAR、100k→OK 通过；同时按用户要求用 Computer Use 强化版自动化 T-65 人工目检环节（进行中）。
@@ -443,6 +445,9 @@
 - ADR-049：所有项目内容必须位于 E:\codex\AI桌宠 内——任务工作树统一到项目内 .worktrees/（2026-08-14）。
 - ADR-050：任务完成必须批判性自检、贴合真实用户体验（2026-08-14）。
 - ADR-051：宠物浮窗绑定真实 Codex 工作状态（2026-08-14，T-65）。
+- ADR-052：上下文检测与交接硬上限 300k 累计处理量（2026-08-14；被 ADR-054 取代）。
+- ADR-053：T-65 自动目检缺陷修复——工具标签翻译 key + 探针状态接管（2026-08-14，T-66）。
+- ADR-054：上下文判定改为主看当前占用，上限 500k；累计处理量仅兜底/展示（2026-08-14，取代 ADR-052）。
 
 详见 `docs/DECISIONS.md`。
 
