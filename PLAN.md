@@ -263,6 +263,8 @@
 
 ## Progress
 
+- 2026-08-14：ADR-049 落盘——所有项目内容必须在 E:\codex\AI桌宠 内：任务工作树统一改为项目内 `.worktrees/<任务分支>`（git worktree 实测可嵌套，.worktrees/ 已 gitignore）；历史遗留 7 个 E:\codex\AI桌宠-m* worktree（已合并）全部移除，分支保留，E:\codex 根目录恢复只剩项目本体与用户指定的最新版分发目录。待用户确认宠物效果缺口后继续闭环。
+
 - 2026-08-13：T-64 任务级进度扩展验收合并（ca782a8 fast-forward，worker 019ffb9a 实施）：task-runner.js `runWithTask` 通用包裹器（纯 Node）+ tts-edge `onSegment` 回调 + ipc.js 接入 history-export（两阶段 50/100）与 tts-speak（分片进度）+ 双语文案 7 key + check 静态/运行时断言 + smoke 端到端（真实扫描导入期间 overlay 出现 skin-import 任务并结束后清空）；worktree 与 main check/smoke 全绿；sync-latest 已同步最新版 0.1.0 @ ca782a8；待用户确认 push 与后续方向。
 
 - 2026-08-13：ADR-047 落盘——总工交接再次把新总工建到项目外（send-prompt 漏带 --project，走“不在项目中工作”路径，误建 019ffb8b）；已固化硬规则（交接命令必带 `--project E:\codex\AI桌宠`、交接文件新增“项目根目录”、codex-context-handoff 技能 §5/§6/§7 更新、AGENTS.md/交接模板同步），项目内总工 019ffb8e 已重交上岗，019ffb8b 作废只读（停手消息两次未确认送达，用户可归档该线程）。
@@ -411,6 +413,8 @@
 - ADR-046：动画宠物包与任务级进度气泡（2026-08-13，T-62/T-63）。
 - ADR-047：总工交接必须保持项目上下文——send-prompt 必带 --project（2026-08-13，项目外误建线程事故复盘）。
 - ADR-047：总工交接必须保持项目上下文——`--project` 必填，禁止项目外总工（2026-08-13，误建线程事故复盘）。
+- ADR-048：任务级进度气泡多源扩展（2026-08-13，T-64）。
+- ADR-049：所有项目内容必须位于 E:\codex\AI桌宠 内——任务工作树统一到项目内 .worktrees/（2026-08-14）。
 
 详见 `docs/DECISIONS.md`。
 

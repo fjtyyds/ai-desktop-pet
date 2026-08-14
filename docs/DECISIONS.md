@@ -443,3 +443,15 @@
   4. `tts-edge.synthesize` 增加可选 `onSegment({ index, total })` 回调（每段合成前调用；缓存命中回调一次）；缺省行为完全不变。
   5. 文案双语言；check.js 静态断言 + 运行时断言（fake overlay 完成/失败序列、临时文件导出、onSegment 回调）；smoke.js 端到端（真实扫描导入期间 overlay 出现 `skin-import` 任务并在结束后清空，验证主进程任务源→浮窗真实链路）。
 - 后果：导出与朗读过程对用户可见、可感知进度；外部工具获得标准接入范式（runWithTask）；皮肤导入/更新下载既有行为不变。
+
+## ADR-049：所有项目内容必须位于 E:\codex\AI桌宠 内（任务工作树约定）（2026-08-14）
+
+- 状态：Accepted（用户要求固化）
+- 背景：用户指出“新任务的文件夹都建在 E:\codex 中，没有遵守所有项目内容都存在 E:\codex\AI桌宠 的约定”。历史 git worktree（AI桌宠-m4-newuser、AI桌宠-m5x-mood/perf/settings/skin/status/tasksrc）均创建在 E:\codex 根目录作为项目兄弟目录，违反该约定。
+- 决策：
+  1. 所有项目内容（含任务开发工作树、临时目录）必须位于 E:\codex\AI桌宠 内；禁止在 E:\codex 根目录或项目外创建任务文件夹。
+  2. 任务工作树统一建在 `E:\codex\AI桌宠\.worktrees\<任务分支>`（git worktree 实测支持嵌套于主工作树；`.worktrees/` 已加入 .gitignore）；node_modules 用 junction 复用主工作树，避免重复安装。
+  3. 验收合并后清理 `.worktrees/<任务>`（分支保留），由协调者执行。
+  4. 2026-08-14 已移除历史遗留的 7 个 E:\codex\AI桌宠-m* worktree（分支均保留在 git 中，可随时恢复）。
+  5. 例外：`E:\codex\AI桌宠最新版` 为用户指定的最新版分发目录（ADR-042），不属于任务内容目录。
+- 后果：E:\codex 根目录不再出现项目任务文件夹；任务工作树在项目内可被 check/smoke/清理脚本统一管理；git status 通过 .gitignore 保持干净；后续派活提示词中工作树路径一律写 `E:\codex\AI桌宠\.worktrees\<任务分支>`。

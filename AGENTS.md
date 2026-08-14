@@ -28,12 +28,12 @@
 ## 并行开发模式（M1 起）
 
 - 每个任务一张任务卡，位于 `docs/tasks/`；一个线程只做一张卡。
-- 每个任务使用独立 git worktree 与分支（`codex/m1-*`），工作树目录见任务卡。
+- 每个任务使用独立 git worktree 与分支（`codex/m1-*`），工作树统一建在项目根内 `.worktrees/<任务分支>`（实测 git worktree 支持嵌套；禁止在 E:\codex 根目录或项目外创建任务文件夹，ADR-049）。
 - 只允许修改任务卡“涉及文件”列出的内容；其他文件只读。
 - 依赖（package.json）变更只允许 T-03 或协调者执行。
 - 子任务完成后，由协调者在 main 分支合并并更新 STATUS.md/PLAN.md；子线程只更新自己的任务卡。
 - 各任务必须遵守 `src/shared/contracts.js` 的接口契约；修改契约需先经协调者。
-- 新 worktree 首次使用时需运行 `npm install`（二进制下载慢时使用上面的镜像命令）。
+- 新 worktree 首次使用时需运行 `npm install`（或复用主工作树 node_modules junction；二进制下载慢时使用上面的镜像命令）。
 
 ## 目录地图
 
@@ -44,6 +44,7 @@
 - `src/storage` — 本地存储（T-03 新建）
 - `scripts` — 校验与自动化脚本
 - `docs` — 产品、决策、状态、任务卡
+- `.worktrees` — 任务临时工作树（gitignore，验收合并后清理，ADR-049）
 - `.github/workflows` — CI
 
 ## 验收要求

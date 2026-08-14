@@ -9,6 +9,13 @@
 - 最新版：`E:\codex\AI桌宠最新版`（scripts/sync-latest.ps1 自动同步，当前 0.1.0 @ ca782a8，ADR-042/043）
 - 交接提示：新会话先读 `AGENTS.md` → `PLAN.md` → `docs/STATUS.md` → `docs/reports/2026-08-10-工作对接方案.md` → 自己的任务卡（docs/tasks/T-xx.md）
 
+## 项目内容目录约定记录（2026-08-14，ADR-049）
+
+- 用户指出任务文件夹建在 E:\codex 根目录，违反“所有项目内容都在 E:\codex\AI桌宠”约定。
+- 处置：历史遗留的 7 个已合并 worktree（AI桌宠-m4-newuser、AI桌宠-m5x-mood/perf/settings/skin/status/tasksrc）已全部移除，分支保留；E:\codex 下仅剩项目本体与用户指定的最新版分发目录（ADR-042）。
+- 新约定：任务工作树统一建在 `E:\codex\AI桌宠\.worktrees\<任务分支>`（git worktree 实测支持嵌套；.worktrees/ 已 gitignore），验收合并后清理。
+- 例外：`E:\codex\AI桌宠最新版` 为用户指定的分发目录，不属于任务内容。
+
 ## ADR-047 总工交接项目外事故记录（2026-08-13）
 
 - 事故：22:34 总工交接再次把新总工创建为“不在项目中工作”的项目外线程（send-prompt 漏带 `--project`，误建 019ffb8b；其一度写入 coordinator-loop-state.json 自认总工）。
